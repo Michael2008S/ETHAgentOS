@@ -1,0 +1,12 @@
+{
+  "schedule": "*/30 * * * * *",
+  "chainName": "ethereum-testnet-sepolia",
+  "escrowAddress": "REPLACE_WITH_DEPLOYED_ESCROW_ADDRESS",
+  "taskId": "REPLACE_WITH_32_BYTE_TASK_ID",
+  "gasLimit": "500000",
+  "spec": {
+    "datasetUrl": "https://YOUR_IMMUTABLE_EVIDENCE_HOST/transfers.json",
+    "datasetHash": "REPLACE_WITH_KECCAK256_OF_EXACT_DATASET_BYTES",
+    "artifactUrl": "https://YOUR_ARTIFACT_HOST/task-result.json"
+  }
+}
