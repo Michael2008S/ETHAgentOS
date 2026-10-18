@@ -1,18 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { seed, transition, DomainError } from './engine';
 import type { Command, Workspace } from './types';
-
-export function owner(request: Request): string {
-  const user = request.headers.get('oai-authenticated-user-id');
-  if (user) return user;
-  const host = new URL(request.url).hostname;
-  if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') return 'local-demo';
-  throw new DomainError('Sign in to access your workspace.', 'UNAUTHORIZED');
-}
-export function checkOrigin(request: Request) {
-  const origin = request.headers.get('origin');
-  if (origin && origin !== new URL(request.url).origin) throw new DomainError('Cross-origin writes are not allowed.', 'FORBIDDEN');
-}
+export { owner, checkOrigin } from './auth';
 function db() { if (!env.DB) throw new Error('Database unavailable. Configure DB and apply the migration.'); return env.DB; }
 export async function read(ownerId: string): Promise<{ state: Workspace; revision: number }> {
   const database = db();

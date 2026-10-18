@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seed, transition, wallet, verifyReceipt, authorizeOperation, assertInvariants } from '../lib/agentos/engine.ts';
+import { seed, transition, wallet, verifyReceipt, authorizeOperation, assertInvariants, digest, DomainError } from '../lib/agentos/engine.ts';
 import type { Workspace, Scenario, Command } from '../lib/agentos/types.ts';
 const now = '2026-10-15T10:00:00.000Z';
-const create = (id='a', scenario: Scenario='success', budget=500): Command => ({ type:'create_task',taskId:id,requestId:id,agentId:'atlas',title:'Analyze treasury events',scenario,budget });
+const create = (id='a', scenario: Scenario='success', budget=500): Extract<Command,{type:"create_task"}> => ({ type:'create_task',taskId:id,requestId:id,agentId:'atlas',title:'Analyze treasury events',scenario,budget });
 const step = (s: Workspace, id='a') => transition(s,{type:'advance',taskId:id,expectedStep:s.tasks.find(t=>t.id===id)!.step},now);
 async function run(s: Workspace,id='a') { for(let i=0;i<8 && ['queued','running'].includes(s.tasks.find(t=>t.id===id)!.status);i++) s=await step(s,id); return s; }
 test('success conserves funds, releases surplus, and generates a verifiable receipt',async()=>{
@@ -16,6 +16,22 @@ test('request and command replay cannot pay twice',async()=>{
  let s=await transition(seed(now),create(),now); s=await transition(s,create(),now); assert.equal(s.tasks.length,1);
  s=await run(s); const prior=structuredClone(s); for(let i=0;i<10;i++) s=await transition(s,{type:'advance',taskId:'a',expectedStep:4},now);
  assert.deepEqual(s,prior); assert.equal(s.ledger.filter(l=>l.kind==='settle').length,1);
+});
+test('reusing an idempotency key with a different payload is a conflict',async()=>{
+ let s=await transition(seed(now),create(),now);
+ await assert.rejects(transition(s,{...create(),budget:600},now),error=>error instanceof DomainError && error.code==='IDEMPOTENCY_CONFLICT');
+ s=await transition(s,{type:'topup',amount:500,requestId:'same'},now);
+ await assert.rejects(transition(s,{type:'topup',amount:501,requestId:'same'},now),error=>error instanceof DomainError && error.code==='IDEMPOTENCY_CONFLICT');
+ const agent={name:'Example',description:'Service',skill:'event-analysis' as const};
+ s=await transition(s,{type:'register_agent',agent,requestId:'same'},now);
+ await assert.rejects(transition(s,{type:'register_agent',agent:{...agent,description:'Different'},requestId:'same'},now),error=>error instanceof DomainError && error.code==='IDEMPOTENCY_CONFLICT');
+});
+test('receipt verification rejects a correctly rehashed but malformed receipt schema',async()=>{
+ const s=await run(await transition(seed(now),create(),now)); const {digest:hash,...body}=s.tasks[0].receipt!;
+ for(const patch of [{currency:'ETH'},{inputHash:'not-a-hash'},{taskId:''},{settlementId:'different'},{settledAt:'never'},{extra:true}]){
+   const altered={...body,...patch};
+   assert.equal(await verifyReceipt({...altered,digest:await digest(altered)} as never),false);
+ }
 });
 test('persisted interruption resumes after settlement with one payment',async()=>{
  let s=await run(await transition(seed(now),create('a','interruption'),now)); assert.equal(s.tasks[0].status,'paused'); assert.equal(wallet(s).spent,240);

@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     if (!parsed.success) return Response.json({ error: parsed.error.issues.map(i => i.message).join('; ') }, { status: 400 });
     return Response.json(await execute(owner(request), parsed.data), { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
-    const status = e instanceof DomainError ? ({ UNAUTHORIZED: 401, FORBIDDEN: 403, NOT_FOUND: 404, CONFLICT: 409 }[e.code] ?? 400) : e instanceof SyntaxError ? 400 : 500;
+    const status = e instanceof DomainError ? ({ UNAUTHORIZED: 401, FORBIDDEN: 403, NOT_FOUND: 404, CONFLICT: 409, IDEMPOTENCY_CONFLICT: 409 }[e.code] ?? 400) : e instanceof SyntaxError ? 400 : 500;
     return Response.json({ error: e instanceof Error ? e.message : 'Operation failed.' }, { status });
   }
 }

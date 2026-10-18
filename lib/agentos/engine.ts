@@ -22,7 +22,12 @@ export async function digest(value: unknown): Promise<string> {
   return '0x' + Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))).map(v => v.toString(16).padStart(2, '0')).join('');
 }
 export async function verifyReceipt(receipt: Receipt): Promise<boolean> {
-  if (!receipt || receipt.version !== 'agentos.receipt.v1' || receipt.mode !== 'simulation' || !Number.isSafeInteger(receipt.amount) || receipt.amount <= 0) return false;
+  if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt) || receipt.version !== 'agentos.receipt.v1' || receipt.mode !== 'simulation' || receipt.currency !== 'testUSD' || !Number.isSafeInteger(receipt.amount) || receipt.amount <= 0) return false;
+  const fields = ['version', 'mode', 'taskId', 'agentId', 'amount', 'currency', 'inputHash', 'outputHash', 'policyHash', 'settledAt', 'settlementId', 'digest'];
+  if (Object.keys(receipt).length !== fields.length || fields.some(field => !Object.hasOwn(receipt, field))) return false;
+  if ([receipt.taskId, receipt.agentId].some(id => typeof id !== 'string' || id.length < 1 || id.length > 128) || receipt.settlementId !== `${receipt.taskId}:settle`) return false;
+  if ([receipt.inputHash, receipt.outputHash, receipt.policyHash, receipt.digest].some(hash => typeof hash !== 'string' || !/^0x[0-9a-f]{64}$/.test(hash))) return false;
+  if (typeof receipt.settledAt !== 'string' || !Number.isFinite(Date.parse(receipt.settledAt))) return false;
   const { digest: expected, ...body } = receipt;
   return await digest(body) === expected;
 }
@@ -100,7 +105,11 @@ export function assertInvariants(s: Workspace) {
 export async function transition(input: Workspace, command: Command, now = new Date().toISOString()): Promise<Workspace> {
   const s = structuredClone(input);
   if (command.type === 'create_task') {
-    if (s.tasks.some(t => t.requestId === command.requestId)) return s;
+    const prior = s.tasks.find(t => t.requestId === command.requestId);
+    if (prior) {
+      if (prior.id !== command.taskId || prior.agentId !== command.agentId || prior.title !== command.title.trim() || prior.budget !== command.budget || prior.scenario !== command.scenario) throw new DomainError('Request ID was already used with different task parameters.', 'IDEMPOTENCY_CONFLICT');
+      return s;
+    }
     if (s.tasks.some(t => t.id === command.taskId)) throw new DomainError('Task ID already exists.');
     if (!command.requestId || command.requestId.length > 128 || !command.taskId || command.taskId.length > 128) throw new DomainError('Invalid task identifier.');
     if (!['success', 'injection', 'interruption', 'invalid-delivery'].includes(command.scenario)) throw new DomainError('Unknown scenario.');
@@ -122,12 +131,15 @@ export async function transition(input: Workspace, command: Command, now = new D
     money(command.amount, 'Allocation', 100000);
     if (!command.requestId || command.requestId.length > 128) throw new DomainError('Invalid allocation identifier.');
     const id = 'deposit:' + command.requestId;
+    if (s.ledger.some(l => l.id === id && l.amount !== command.amount)) throw new DomainError('Request ID was already used with a different allocation.', 'IDEMPOTENCY_CONFLICT');
     if (!s.ledger.some(l => l.id === id)) s.ledger.push({ id, taskId: null, kind: 'deposit', amount: command.amount, at: now, note: 'Sandbox allocation · no real funds' });
   } else if (command.type === 'register_agent') {
     const name = command.agent.name.trim();
     if (!name || name.length > 40 || command.agent.description.length > 240 || !SKILLS.some(x => x.id === command.agent.skill)) throw new DomainError('Invalid agent profile.');
     if (!command.requestId || command.requestId.length > 128) throw new DomainError('Invalid agent identifier.');
     const id = `custom-${command.requestId}`;
+    const prior = s.agents.find(a => a.id === id);
+    if (prior && (prior.name !== name || prior.description !== command.agent.description || prior.skill !== command.agent.skill)) throw new DomainError('Request ID was already used with a different agent profile.', 'IDEMPOTENCY_CONFLICT');
     if (!s.agents.some(a => a.id === id)) s.agents.push({ id, name, description: command.agent.description, skill: command.agent.skill, role: 'Custom service', price: command.agent.skill === 'event-analysis' ? 240 : 360, color: 'orange', enabled: true, identity: 'local', createdAt: now });
   } else {
     const t = s.tasks.find(t => t.id === command.taskId);

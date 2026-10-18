@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177';
 if(!['localhost','127.0.0.1','[::1]'].includes(new URL(base).hostname))throw new Error('API test is restricted to loopback development servers.');
-const headers={'Content-Type':'application/json'};
+// The trusted local gateway still owns identity; this namespace isolates test records.
+const headers={'Content-Type':'application/json','x-agentos-sandbox':'api-'+crypto.randomUUID()};
 async function command(body){const r=await fetch(base+'/api/command',{method:'POST',headers,body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw new Error(data.error);return data.state;}
 async function read(){const r=await fetch(base+'/api/workspace',{headers});assert.equal(r.status,200);return(await r.json()).state;}
 const initial=await read(); const runId=crypto.randomUUID();
