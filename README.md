@@ -16,13 +16,14 @@
 - Solidity `AgentEscrow` 与 `AgentVault`：标准 ERC-20 托管、CRE forwarder + workflow metadata 双重限制、重复结算拒绝、超时退款、执行者限额与撤销。
 - 自定义任务输入：1–100 条转账记录、区块范围筛选、受理时固定输入与 SHA-256 哈希、按原输入校验结果。
 - 链上钱包界面：EIP-1193 浏览器钱包入口、独立本地测试钱包、链上余额、精确授权与托管、回执核验及超时退款。
+- 可选 LLM 工具规划器：真实本地 Qwen 推理，模型计划经过 capability gate，失败退款；可导出模型描述、操作、哈希与 token 用量。
 - 使用真实 `@chainlink/cre-sdk` 的工作流源码、viem ERC-8004 身份注册 calldata 适配器、TypeScript 客户端 SDK。
 
 ## 状态边界
 
-**网页是可运行的模拟环境。** Agent 使用两个确定性数据分析适配器，可分析内置或用户提交的转账记录，没有调用 LLM；余额是 testUSD 测试积分，没有真实资金；身份是本地档案。任务由服务端后台推进，关闭浏览器不影响当前执行。请求中止或服务重启后，持久检查点可通过恢复 API 或本地恢复 worker 继续。注册自定义 Agent 当前只绑定已有适配器，不会执行任意第三方代码。
+**沙盒任务与链上订单是两条独立链路。** 沙盒使用 testUSD 积分；预注资订单通过真实 EVM 托管测试代币。两个数据分析适配器可分析内置或用户提交的转账记录。预注资订单可选择真实 LLM 工具规划，服务端仍负责权限校验、确定性计算与独立复核；模型不签名、不计算最终金额。身份仍是本地档案。任务由服务端后台推进，关闭浏览器不影响当前执行。请求中止或服务重启后，持久检查点可通过恢复 API 或本地恢复 worker 继续。注册自定义 Agent 当前只绑定已有适配器，不会执行任意第三方代码。
 
-Solidity 在本地 EVM 中测试；CRE 工作流已通过 SDK 与官方 CLI 编译，并完成真实 HTTPS 读取、节点共识、报告生成和 EVM capability 的 CLI dry-run。**尚未部署 DON、验收真实浏览器钱包扩展或广播公共测试网交易。网页沙盒账本与合约没有同步适配器。** 不应将界面收据展示为链上证明或 Chainlink 签名。x402、CCIP、Data Feeds、链上 Reputation Registry 是后续扩展。
+Solidity 在本地 EVM 中测试；CRE 工作流已通过 SDK 与官方 CLI 编译，并完成真实 HTTPS 读取、节点共识、报告生成和 EVM capability 的 CLI dry-run。**尚未部署 DON、验收真实浏览器钱包扩展或广播公共测试网交易。沙盒积分账本保持独立；预注资链上订单有单独的资金凭证与 D1 对账。** 不应将界面收据展示为链上证明或 Chainlink 签名。x402、CCIP、Data Feeds、链上 Reputation Registry 是后续扩展。
 
 ## 运行
 
@@ -49,6 +50,9 @@ npm run demo:cre          # 先编译，再运行 3 场景的本地 RPC + HTTPS 
 npm run demo              # 完整闭环，独立沙盒，不需要打开浏览器
 npm run demo:deadline     # 自动超时、预留释放、已付款跨期限恢复
 npm run demo:chain        # 网页成果 → 本地校验器 → 真实本地 EVM 托管与退款
+npm run model:setup       # 官方 llama.cpp / Qwen 固定版本、SHA-256 校验，macOS arm64
+npm run model:local       # 独立终端保持运行，127.0.0.1:11435
+npm run demo:model        # 真实本地 Qwen + HTTP/D1/EVM，3 场景
 npm run test:api          # 并发、撤销、收据 API 回归
 npm run worker            # 可选：本地常驻恢复 worker
 ```
@@ -114,7 +118,7 @@ npm run demo:wallet # 独立临时链，网页 API → HTTP 钱包 → 付款/�
 
 派发任务时选择「自定义转账记录」，输入区块范围和 JSON 数组。每条记录为 `{ "block": 5, "from": "treasury.eth", "to": "builder.eth", "cents": 1200 }`；金额是非负整数分，最多 100 条且总额必须是安全整数。不会自动访问其中的地址或名称。
 
-SDK 的 `createTask` 支持 `input: { dataset: 'custom-transfers-v1', blockFrom: 0, blockTo: 100, records: [...] }`。事件分析返回总额、条数与收款方数量；资金库报告额外按收款方汇总。结果仅计算指定区块范围；输入在受理时固定，重用请求 ID 修改输入返回 409。收据的 `inputHash` 绑定整个输入，导出的上下文包含原记录。数据只由当前工作区存储与分析，不会发送给模型。
+SDK 的 `createTask` 支持 `input: { dataset: 'custom-transfers-v1', blockFrom: 0, blockTo: 100, records: [...] }`。事件分析返回总额、条数与收款方数量；资金库报告额外按收款方汇总。结果仅计算指定区块范围；输入在受理时固定，重用请求 ID 修改输入返回 409。收据的 `inputHash` 绑定整个输入，导出的上下文包含原记录。原始转账记录由当前工作区存储与分析；可选模型规划只接收任务标题、技能、区块范围和数据集标识。提供商配置和边界见 [docs/MODEL.md](docs/MODEL.md)。
 
 ## 自动执行与恢复
 

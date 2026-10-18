@@ -1,6 +1,15 @@
 # 验证记录
 
-## 2026-10-19 增量验证
+## 2026-10-19 模型规划增量验证
+
+- `npm test`：59 项全部通过；`npm run typecheck` 通过。新增协议结构/重定向拒绝/大小限制/密钥脱敏、租约过期与晚到结果丢弃测试；真实 EVM 另验证并发仅一次模型请求、越权计划和模型连接失败退款、无成果、不改变沙盒账本。
+- `npm run demo:model`：实际 llama.cpp b11669 + 官方 Qwen2.5-0.5B Q4_K_M 运行；正常、恶意标题、中断恢复 3 场景通过，每订单一个 Settled 事件，重复对账不改变原付款。证据 `outputs/model-demo-64c51257-187d-4dee-af4f-c4d48cd67b58.json`。这是本地模型与本地 EVM 的真实调用，不是云模型或 DON 执行。
+- `npm run test:api` 与既有 `npm run demo:prefund` 五场景回归通过；证据 `outputs/prefund-demo-29658f3e-6643-4274-bc2c-c46aaa06267b.json`。
+- 浏览器创建并执行模型订单 `chain-db9ecabd-61f8-4b66-a3f2-c3762c1fd7db`，先注资再模型规划、能力检查、成果生成与链上付款，检查点 6/6；141 prompt token / 10 completion token，成果 579 分、两条记录。付款交易 `0xca1910f546bfa2eae5e0c65b2125d5d472a4753bdcf7c77af53b02229b5ca3c4`。沙盒积分仍为 82.00；同时有回归脚本使用测试钱包，因此不将期间钱包总余额差归因于该订单。
+- 修复实跑发现的 Workers 参数兼容问题：`redirect: error` 不受支持，改为 `manual` 并拒绝非 2xx，保证重定向不携带提供商凭证继续请求。
+- `cre whoami` 已确认登录成功，Deploy Access 显示未启用。已有 CLI dry-run 证据仍有效，尚未进行公共网络广播。
+
+## 2026-10-19 先前增量验证
 
 发布前完整回归的 26 个端到端场景通过：
 

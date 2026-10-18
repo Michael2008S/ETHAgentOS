@@ -1,9 +1,11 @@
 import type { Workspace } from './types.ts';
-import { advanceOrder,authorizeSettlement,findOrder,finishOrder,orderEvent,pendingOrders } from './orders.ts';
+import { advanceOrder,authorizeSettlement,claimModelLease,commitModelPlan,findOrder,finishOrder,orderEvent,pendingOrders } from './orders.ts';
 import type { OrderChain } from './order-chain.ts';
 import { DomainError } from './engine.ts';
+import { canonical } from '../../cre/workflow/verify.ts';
+import type { ModelPlan,OrderPlanner } from './model.ts';
 type OrderStore={read(ownerId:string):Promise<{state:Workspace}>;updateWorkspace(ownerId:string,reduce:(state:Workspace)=>Promise<Workspace>|Workspace):Promise<{state:Workspace}>};
-export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:OrderChain,options:{delayMs?:number;now?:()=>string;maxSteps?:number}={}){
+export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:OrderChain,options:{delayMs?:number;now?:()=>string;maxSteps?:number;planner?:OrderPlanner}={}){
   let failures=0;
   for(let step=0;step<(options.maxSteps??16);step++){
     try{
@@ -19,6 +21,14 @@ export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:O
         const evidence=await chain.settlement(ready,hash);await store.updateWorkspace(ownerId,current=>finishOrder(current,id,evidence,now));continue;
       }
       if(view.timestamp>=view.intent.deadline){await store.updateWorkspace(ownerId,current=>{const next=structuredClone(current),o=findOrder(next,id);o.failure='Escrow deadline passed.';o.status='awaiting-settlement';return next;});continue;}
+      if(order.planner==='llm'&&order.step===2&&!order.modelPlan){
+        const token=crypto.randomUUID(),claimed=await store.updateWorkspace(ownerId,current=>claimModelLease(current,id,token,now)),leased=findOrder(claimed.state,id);
+        if(leased.status!=='running')continue;
+        if(leased.modelLease?.token!==token)return {orderId:id,status:'planning'};
+        let result:{plan?:ModelPlan;error?:string};
+        try{if(!options.planner||canonical(options.planner.descriptor)!==canonical(leased.model))throw new DomainError('Configured model differs from the authorized order.','MODEL_UNAVAILABLE');result={plan:await options.planner.plan(leased)};}catch(error){result={error:error instanceof DomainError?error.message:'Model inference failed. No skill operation was executed.'};}
+        await store.updateWorkspace(ownerId,current=>commitModelPlan(current,id,token,result,options.now?.()??new Date().toISOString()));continue;
+      }
       if(options.delayMs)await new Promise(resolve=>setTimeout(resolve,options.delayMs));
       await store.updateWorkspace(ownerId,current=>advanceOrder(current,id,order.step,options.now?.()??new Date().toISOString()));
     }catch(error){

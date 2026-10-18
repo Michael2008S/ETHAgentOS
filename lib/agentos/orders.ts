@@ -4,9 +4,10 @@ import type { ChainEvidence } from '../../sdk/chain.ts';
 import { canonical, type DeliverySpec } from '../../cre/workflow/verify.ts';
 import { authorizeOperation, digest, DomainError, expectedOutput, normalizeInput } from './engine.ts';
 import type { Event, Policy, Scenario, Skill, TaskInput, Workspace } from './types.ts';
+import type { ModelDescriptor,ModelPlan } from './model.ts';
 export type OrderStatus='awaiting-funding'|'queued'|'running'|'awaiting-settlement'|'paused'|'completed'|'refunded'|'cancelled';
-export type ChainOrder={id:string;requestId:string;title:string;agentId:string;skill:Skill;quote:number;budget:number;buyer:Address;deployment:WalletDeployment;spec:DeliverySpec;input:TaskInput;inputHash:string;scenario:Scenario;timeoutSeconds:number;status:OrderStatus;step:number;createdAt:string;updatedAt:string;deadlineAt?:string;chainDeadline?:string;settledAt?:string;lastError?:string;output:Record<string,unknown>|null;outputHash:string|null;failure:string|null;funding:ChainEvidence|null;settlement:ChainEvidence|null;policySnapshot:Policy|null;events:Event[];authorization?:{nonce:string;message:string;expiresAt:string;transactionHash:Hex};settlementAuthorization?:{artifactText:string;authorizedAt:string;policyHash:string}};
-export type OrderDraft={requestId:string;title:string;agentId:string;budget:number;buyer:Address;spec:DeliverySpec;input?:TaskInput;scenario:Scenario;timeoutSeconds:number};
+export type ChainOrder={id:string;requestId:string;title:string;agentId:string;skill:Skill;quote:number;budget:number;buyer:Address;deployment:WalletDeployment;spec:DeliverySpec;input:TaskInput;inputHash:string;scenario:Scenario;timeoutSeconds:number;status:OrderStatus;step:number;createdAt:string;updatedAt:string;deadlineAt?:string;chainDeadline?:string;settledAt?:string;lastError?:string;planner?:'deterministic'|'llm';model?:ModelDescriptor;modelPlan?:ModelPlan;modelLease?:{token:string;expiresAt:string};output:Record<string,unknown>|null;outputHash:string|null;failure:string|null;funding:ChainEvidence|null;settlement:ChainEvidence|null;policySnapshot:Policy|null;events:Event[];authorization?:{nonce:string;message:string;expiresAt:string;transactionHash:Hex};settlementAuthorization?:{artifactText:string;authorizedAt:string;policyHash:string}};
+export type OrderDraft={planner?:'deterministic'|'llm';model?:ModelDescriptor;requestId:string;title:string;agentId:string;budget:number;buyer:Address;spec:DeliverySpec;input?:TaskInput;scenario:Scenario;timeoutSeconds:number};
 export const pendingOrders=(state:Workspace)=>(state.chainOrders??[]).filter(o=>['queued','running','awaiting-settlement'].includes(o.status));
 export function orderEvent(o:ChainOrder,title:string,detail:string,now=new Date().toISOString(),level:Event['level']='info'){
   o.events.push({id:`${o.id}:${o.events.length}`,at:now,title,detail,level,step:o.step});o.updatedAt=now;
@@ -22,22 +23,38 @@ export function orderPolicy(state:Workspace,order:ChainOrder,now:string){
 }
 export async function createOrder(state:Workspace,draft:OrderDraft,deployment:WalletDeployment,now=new Date().toISOString()):Promise<Workspace>{
   const input=normalizeInput(draft.input),prior=state.chainOrders?.find(o=>o.requestId===draft.requestId);
-  const parameters={...draft,input};
+  const parameters={...draft,input,planner:draft.planner??'deterministic',model:draft.model??null};
   if(prior){
-    const previous={requestId:prior.requestId,title:prior.title,agentId:prior.agentId,budget:prior.budget,buyer:prior.buyer,spec:prior.spec,input:prior.input,scenario:prior.scenario,timeoutSeconds:prior.timeoutSeconds};
+    const previous={planner:prior.planner??'deterministic',model:prior.model??null,requestId:prior.requestId,title:prior.title,agentId:prior.agentId,budget:prior.budget,buyer:prior.buyer,spec:prior.spec,input:prior.input,scenario:prior.scenario,timeoutSeconds:prior.timeoutSeconds};
     if(canonical(previous)!==canonical(parameters)||canonical(prior.deployment)!==canonical(deployment))throw new DomainError('Request ID was already used with different chain order parameters.','IDEMPOTENCY_CONFLICT');return state;
   }
   if((state.chainOrders?.length??0)>=300)throw new DomainError('This prototype supports up to 300 onchain orders per workspace.');
   const agent=state.agents.find(a=>a.id===draft.agentId);
   if(!agent?.enabled)throw new DomainError('An enabled service is required.');
   if(!Number.isSafeInteger(draft.budget)||draft.budget<agent.price||draft.budget>1000000||!Number.isSafeInteger(draft.timeoutSeconds)||draft.timeoutSeconds<1||draft.timeoutSeconds>86400)throw new DomainError('Invalid onchain budget or execution window.');
-  const order:ChainOrder={...draft,id:'chain-'+draft.requestId,title:draft.title.trim(),skill:agent.skill,quote:agent.price,deployment:{...deployment},input,inputHash:await digest(input),status:'awaiting-funding',step:0,createdAt:now,updatedAt:now,output:null,outputHash:null,failure:null,funding:null,settlement:null,policySnapshot:null,events:[]};
+  if(draft.planner==='llm'&&!draft.model)throw new DomainError('A configured model is required for LLM planning.');
+  const order:ChainOrder={...draft,planner:draft.planner??'deterministic',id:'chain-'+draft.requestId,title:draft.title.trim(),skill:agent.skill,quote:agent.price,deployment:{...deployment},input,inputHash:await digest(input),status:'awaiting-funding',step:0,createdAt:now,updatedAt:now,output:null,outputHash:null,failure:null,funding:null,settlement:null,policySnapshot:null,events:[]};
   const violation=orderPolicy(state,order,now);if(violation)throw new DomainError(violation);
   orderEvent(order,'Awaiting escrow funding','Input and service quote are frozen. No adapter has executed and no sandbox funds were used.',now);
   return {...state,chainOrders:[order,...state.chainOrders??[]]};
 }
 export function findOrder(state:Workspace,id:string){const order=state.chainOrders?.find(o=>o.id===id);if(!order)throw new DomainError('Onchain order not found.','NOT_FOUND');return order;}
-export const orderCommitment=(o:ChainOrder)=>digest({id:o.id,agentId:o.agentId,skill:o.skill,quote:o.quote,budget:o.budget,buyer:o.buyer,input:o.input,spec:o.spec,deployment:o.deployment,scenario:o.scenario,timeoutSeconds:o.timeoutSeconds});
+export function claimModelLease(state:Workspace,id:string,token:string,now=new Date().toISOString()):Workspace{
+  const next=structuredClone(state),o=findOrder(next,id);
+  if(!o.funding||o.planner!=='llm'||o.modelPlan||o.step!==2||o.status!=='running'||o.modelLease&&o.modelLease.expiresAt>now)return state;
+  const violation=orderPolicy(next,o,now);if(violation||o.deadlineAt&&o.deadlineAt<=now){o.failure=violation??'Execution deadline passed.';o.status='awaiting-settlement';return next;}
+  o.modelLease={token,expiresAt:new Date(Date.parse(now)+65000).toISOString()};orderEvent(o,'Model planning started','A leased model request will select typed operations; it cannot sign transactions.',now);return next;
+}
+export function commitModelPlan(state:Workspace,id:string,token:string,result:{plan?:ModelPlan;error?:string},now=new Date().toISOString()):Workspace{
+  const next=structuredClone(state),o=findOrder(next,id);
+  if(o.status!=='running'||o.step!==2||o.modelPlan||o.modelLease?.token!==token||o.modelLease.expiresAt<=now)return state;
+  delete o.modelLease;
+  const violation=orderPolicy(next,o,now)??(o.deadlineAt&&o.deadlineAt<=now?'Execution deadline passed.':null);
+  if(violation||result.error){o.failure=violation??result.error!;o.status='awaiting-settlement';orderEvent(o,'Model execution rejected',o.failure,now,'error');return next;}
+  if(!result.plan||canonical(result.plan.descriptor)!==canonical(o.model))throw new DomainError('Model identity differs from the authorized order.','CONFLICT');
+  o.modelPlan=result.plan;orderEvent(o,'Model plan received','Model output remains untrusted until every requested operation passes the capability gate.',now,'success');return next;
+}
+export const orderCommitment=(o:ChainOrder)=>digest({id:o.id,agentId:o.agentId,skill:o.skill,quote:o.quote,budget:o.budget,buyer:o.buyer,input:o.input,spec:o.spec,deployment:o.deployment,scenario:o.scenario,timeoutSeconds:o.timeoutSeconds,planner:o.planner??'deterministic',model:o.model??null});
 export async function authorizeOrder(state:Workspace,id:string,ownerId:string,transactionHash:Hex,nonce:string,now=new Date().toISOString()){
   const next=structuredClone(state),o=findOrder(next,id);
   if(o.status!=='awaiting-funding')throw new DomainError('This order has already been activated or cancelled.');
@@ -66,7 +83,7 @@ export async function advanceOrder(state:Workspace,id:string,expectedStep:number
   if(o.step===0){o.policySnapshot=structuredClone(next.policy);o.step=1;orderEvent(o,'Permissions granted','Current capability, budget and onchain daily allowance checks passed.',now,'success');}
   else if(o.step===1){o.step=2;orderEvent(o,'Escrow secured','The existing funded escrow covers the frozen service quote. Sandbox credits are unchanged.',now,'success');}
   else if(o.step===2){
-    try{authorizeOperation(o.skill,'dataset.read');if(o.scenario==='injection')authorizeOperation(o.skill,'wallet.transfer');authorizeOperation(o.skill,'artifact.write');o.output=expectedOutput(o);if(o.scenario==='invalid-delivery')o.output.totalCents=Number(o.output.totalCents)+1;o.outputHash=await digest(o.output);o.step=3;orderEvent(o,'Artifact generated','Server adapter ran after funding confirmation. It has no signing key.',now,'success');}
+    try{if(o.planner==='llm'){if(!o.modelPlan)return state;for(const operation of o.modelPlan.operations)authorizeOperation(o.skill,operation);if(canonical(o.modelPlan.operations)!==canonical(['dataset.read','artifact.write']))throw new DomainError('Model plan must read the dataset before writing one artifact.','MODEL_REJECTED');}authorizeOperation(o.skill,'dataset.read');if(o.scenario==='injection')authorizeOperation(o.skill,'wallet.transfer');authorizeOperation(o.skill,'artifact.write');o.output=expectedOutput(o);if(o.scenario==='invalid-delivery')o.output.totalCents=Number(o.output.totalCents)+1;o.outputHash=await digest(o.output);o.step=3;orderEvent(o,'Artifact generated','Server adapter ran after funding confirmation. It has no signing key.',now,'success');}
     catch(error){if(!(error instanceof DomainError))throw error;o.failure=error.message;o.status='awaiting-settlement';orderEvent(o,'Execution blocked',o.failure,now,'error');}
   }else if(o.step===3){if(canonical(o.output)!==canonical(expectedOutput(o)))o.failure='Delivery differs from independent recomputation.';o.step=4;o.status='awaiting-settlement';orderEvent(o,o.failure?'Delivery rejected':'Delivery verified locally','Waiting for an actual onchain payment or refund receipt.',now,o.failure?'error':'success');}
   return next;

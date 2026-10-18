@@ -29,7 +29,10 @@
     "demo:wallet": "node scripts/demo-wallet.mjs",
     "demo:cre": "node scripts/cre-cli.mjs build && node scripts/demo-cre.mjs",
     "demo:reconcile": "node scripts/demo-reconciliation.mjs",
-    "demo:prefund": "node scripts/demo-prefund.mjs"
+    "demo:prefund": "node scripts/demo-prefund.mjs",
+    "model:setup": "node scripts/model-setup.mjs",
+    "model:local": "node scripts/model-local.mjs",
+    "demo:model": "node scripts/demo-model.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

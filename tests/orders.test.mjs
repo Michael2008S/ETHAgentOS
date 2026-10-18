@@ -10,6 +10,7 @@ import { seed } from '../lib/agentos/engine.ts';
 import { activateOrder,authorizeOrder,createOrder,findOrder } from '../lib/agentos/orders.ts';
 import { orderChain } from '../lib/agentos/order-chain.ts';
 import { runOrder } from '../lib/agentos/order-runner.ts';
+import { createModelPlanner,parseModelConfiguration } from '../lib/agentos/model.ts';
 
 test('pre-funded runtime executes only after escrow, pays once, refunds rejection/revocation/expiry and resumes paid checkpoints',async()=>{
  const provider=ganache.provider({logging:{quiet:true},chain:{hardfork:'shanghai',chainId:31337}}),client=createPublicClient({transport:custom(provider),cacheTime:0}),signer=createWalletClient({transport:custom(provider),chain:null});
@@ -31,9 +32,9 @@ test('pre-funded runtime executes only after escrow, pays once, refunds rejectio
    })());return transactions.get(body.id);
   });
   function specHashValue(id){return keccak256(stringToHex(data.get(id)));}
-  async function draft(scenario='success'){
+  async function draft(scenario='success',model){
    const requestId=crypto.randomUUID(),input={dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:[{block:0,from:'x',to:'ignored',cents:999},{block:1,from:'x',to:'a',cents:123},{block:2,from:'x',to:'b',cents:456}]},bytes=inputEvidence({id:'chain-'+requestId,input},buyer),spec={datasetUrl:'https://data.example/'+bytes.id,artifactUrl:'https://artifact.example/'+bytes.id,datasetHash:bytes.datasetHash};
-   data.set(bytes.id,bytes.datasetText);state=await createOrder(state,{requestId,title:'Pre-funded '+scenario,agentId:'atlas',budget:1000,buyer,input,spec,scenario,timeoutSeconds:300},deployment);return state.chainOrders[0];
+   data.set(bytes.id,bytes.datasetText);state=await createOrder(state,{requestId,title:'Pre-funded '+scenario,agentId:'atlas',budget:1000,buyer,input,spec,scenario,timeoutSeconds:300,...(model?{planner:'llm',model}:{} )},deployment);return state.chainOrders[0];
   }
   async function fund(order){const evidence=await wallet.fundOrder(order,120);state=(await authorizeOrder(state,order.id,'owner',evidence.transactionHash,crypto.randomUUID())).state;const current=await access.funding(findOrder(state,order.id),evidence.transactionHash);state=activateOrder(state,order.id,findOrder(state,order.id).authorization.nonce,current);return evidence;}
   const first=await draft();await runOrder(store,'owner',first.id,access);assert.equal(findOrder(state,first.id).output,null);assert.equal(artifacts.size,0);assert.equal(findOrder(state,first.id).status,'awaiting-funding');
@@ -49,5 +50,16 @@ test('pre-funded runtime executes only after escrow, pays once, refunds rejectio
   const expired=await draft();await fund(expired);await provider.request({method:'evm_increaseTime',params:[121]});await provider.request({method:'evm_mine',params:[]});await runOrder(store,'owner',expired.id,access);done=findOrder(state,expired.id);assert.equal(done.output,null);assert.equal(done.settlement.status,'refunded');assert.deepEqual(state.ledger,ledger);
   const recovery=await draft();await fund(recovery);const unavailable={...access,inspect:async()=>{throw new Error('private RPC credential must not leak');}};const failed=await runOrder(store,'owner',recovery.id,unavailable);assert.equal(failed.status,'retryable');assert.equal(findOrder(state,recovery.id).output,null);assert.equal(findOrder(state,recovery.id).lastError.includes('credential'),false);await runOrder(store,'owner',recovery.id,access);assert.equal(findOrder(state,recovery.id).status,'completed');assert.equal(findOrder(state,recovery.id).lastError,undefined);
   assert.equal((await wallet.balances()).token,'92800000');
+  // Controlled model responses exercise the actual EVM refund and concurrency paths.
+  const modelConfig=parseModelConfiguration({url:'https://model.example/v1/chat/completions',model:'controlled-test',revision:'1'});let calls=0;
+  const planner=await createModelPlanner(modelConfig,undefined,async()=>{calls++;await new Promise(resolve=>setTimeout(resolve,20));return new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:'{"operations":["dataset.read","artifact.write"]}'}}]}));});
+  const planned=await draft('success',planner.descriptor);await fund(planned);await Promise.all(Array.from({length:3},()=>runOrder(store,'owner',planned.id,access,{planner})));await runOrder(store,'owner',planned.id,access,{planner});
+  assert.equal(calls,1);assert.equal(findOrder(state,planned.id).settlement.status,'paid');assert.equal(findOrder(state,planned.id).output.totalCents,579);
+  for(const kind of ['forbidden','unavailable']){
+   const badPlanner=await createModelPlanner(modelConfig,undefined,async()=>{if(kind==='unavailable')throw new Error('provider-secret');return new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:'{"operations":["wallet.transfer"]}'}}]}));});
+   const badOrder=await draft('success',badPlanner.descriptor);await fund(badOrder);await runOrder(store,'owner',badOrder.id,access,{planner:badPlanner});const rejected=findOrder(state,badOrder.id);
+   assert.equal(rejected.settlement.status,'refunded');assert.equal(rejected.output,null);assert.equal(rejected.failure.includes('provider-secret'),false);assert.deepEqual(state.ledger,ledger);
+  }
+  assert.equal((await wallet.balances()).token,'90400000');
  }finally{await provider.disconnect();}
 });

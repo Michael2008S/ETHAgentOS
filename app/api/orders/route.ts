@@ -11,7 +11,7 @@ const id=z.string().min(1).max(128),hash=z.string().regex(/^0x[0-9a-fA-F]{64}$/)
 const input=z.object({dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe(),records:z.array(z.object({block:z.number().int().nonnegative().safe(),from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:z.number().int().nonnegative().safe()}).strict()).min(1).max(100).optional()}).strict();
 const https=z.string().url().max(4096).refine(s=>{const u=new URL(s);return u.protocol==='https:'&&!u.username&&!u.password&&!u.hash;});
 const schema=z.discriminatedUnion('action',[
-  z.object({action:z.literal('create'),requestId:z.string().uuid(),title:z.string().trim().min(1).max(160),agentId:id,budget:z.number().int().positive().max(1000000),buyer:address,input:input.optional(),scenario:z.enum(['success','injection','interruption','invalid-delivery']).default('success'),timeoutSeconds:z.number().int().min(1).max(86400).default(300),spec:z.object({datasetUrl:https,artifactUrl:https,datasetHash:hash}).strict().optional()}).strict(),
+  z.object({action:z.literal('create'),planner:z.enum(['deterministic','llm']).default('deterministic'),requestId:z.string().uuid(),title:z.string().trim().min(1).max(160),agentId:id,budget:z.number().int().positive().max(1000000),buyer:address,input:input.optional(),scenario:z.enum(['success','injection','interruption','invalid-delivery']).default('success'),timeoutSeconds:z.number().int().min(1).max(86400).default(300),spec:z.object({datasetUrl:https,artifactUrl:https,datasetHash:hash}).strict().optional()}).strict(),
   z.object({action:z.literal('challenge'),orderId:id,transactionHash:hash}).strict(),
   z.object({action:z.literal('activate'),orderId:id,nonce:z.string().uuid(),signature:z.string().regex(/^0x[0-9a-fA-F]+$/).min(130).max(8194)}).strict(),
   z.object({action:z.literal('sync'),orderId:id,transactionHash:hash.optional()}).strict(),
@@ -24,12 +24,13 @@ export async function POST(request:Request){
   checkOrigin(request);const ownerId=owner(request);
   if(!request.headers.get('content-type')?.includes('application/json'))return Response.json({error:'JSON required.'},{status:415});
   const raw=await request.text();if(new TextEncoder().encode(raw).length>65536)return Response.json({error:'Request too large.'},{status:413});
-  const body=schema.parse(JSON.parse(raw)),configured=await configuredOrderChain(request),{chain,deployment,localCall}=configured;
+  const body=schema.parse(JSON.parse(raw)),configured=await configuredOrderChain(request),{chain,deployment,localCall,planner}=configured;
   if(body.action==='create'){
    const snapshot=await read(ownerId),prior=snapshot.state.chainOrders?.find(o=>o.requestId===body.requestId),normalized=normalizeInput(body.input),bytes=inputEvidence({id:'chain-'+body.requestId,input:normalized},body.buyer as `0x${string}`);
    const spec=prior?.spec??(localCall?await localCall<DeliverySpec>('/drafts',bytes):body.spec);
    if(!spec||spec.datasetHash!==bytes.datasetHash||body.spec&&canonical(body.spec)!==canonical(spec))throw new DomainError('Evidence URLs and hash must match the committed order input.');
-   const {action:_,...fields}=body,draft={...fields,spec,input:normalized} as OrderDraft;
+   if(body.planner==='llm'&&!planner)throw new DomainError('Model service is not configured.','UNAVAILABLE');
+   const {action:_,...fields}=body,draft={...fields,spec,input:normalized,...(body.planner==='llm'?{model:planner!.descriptor}:{})} as OrderDraft;
    const result=await updateWorkspace(ownerId,state=>createOrder(state,draft,deployment));return Response.json({...result,order:findOrder(result.state,'chain-'+body.requestId)},{headers:{'Cache-Control':'no-store'}});
   }
   const {state}=await read(ownerId),order=findOrder(state,body.orderId);
@@ -45,7 +46,7 @@ export async function POST(request:Request){
    else{const funding=await chain.funding(order,auth.transactionHash);result=await updateWorkspace(ownerId,current=>activateOrder(current,body.orderId,body.nonce,funding));}
   }else if(body.action==='sync'){
    if(body.transactionHash){const evidence=await chain.settlement(order,body.transactionHash as `0x${string}`);result=await updateWorkspace(ownerId,current=>finishOrder(current,body.orderId,evidence));}
-   else{const execution=await runOrder({read,updateWorkspace},ownerId,body.orderId,chain);if(execution.status==='retryable')throw new DomainError('Order checkpoint retained. Retry synchronization after chain recovery.','UNAVAILABLE');result=await read(ownerId);}
+   else{const execution=await runOrder({read,updateWorkspace},ownerId,body.orderId,chain,{planner});if(execution.status==='retryable')throw new DomainError('Order checkpoint retained. Retry synchronization after chain recovery.','UNAVAILABLE');result=await read(ownerId);}
   }else{
    const view=await chain.inspect(order);
    result=await updateWorkspace(ownerId,current=>{

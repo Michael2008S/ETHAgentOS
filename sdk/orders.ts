@@ -6,7 +6,7 @@ export class AgentOrderClient {
   readonly session:AgentWalletSession;readonly baseURL:string;readonly headers:Record<string,string>;
   constructor(session:AgentWalletSession,baseURL='',headers:Record<string,string>={}){this.session=session;this.baseURL=baseURL;this.headers=headers;}
   private async post(body:unknown){const response=await fetch(this.baseURL+'/api/orders',{method:'POST',headers:{'Content-Type':'application/json',...this.headers},credentials:'include',body:JSON.stringify(body),signal:AbortSignal.timeout(60000)});const data=await response.json() as {order:ChainOrder;error?:string};if(!response.ok)throw new Error(data.error??'Onchain order request failed.');return data.order;}
-  async create(input:Omit<OrderDraft,'buyer'|'requestId'|'spec'|'scenario'|'timeoutSeconds'> & Partial<Pick<OrderDraft,'requestId'|'spec'|'scenario'|'timeoutSeconds'>>){
+  async create(input:Omit<OrderDraft,'buyer'|'requestId'|'spec'|'scenario'|'timeoutSeconds'|'model'> & Partial<Pick<OrderDraft,'requestId'|'spec'|'scenario'|'timeoutSeconds'>>){
     const order=await this.post({action:'create',...input,requestId:input.requestId??crypto.randomUUID(),buyer:this.session.account});
     if(canonical(order.deployment).toLowerCase()!==canonical(this.session.deployment).toLowerCase()||order.buyer.toLowerCase()!==this.session.account.toLowerCase())throw new Error('Server order differs from the connected wallet deployment.');return order;
   }

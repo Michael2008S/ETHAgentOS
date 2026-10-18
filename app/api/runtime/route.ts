@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const results = [];
     for (let i=0; i<pending.length; i+=4) results.push(...await Promise.all(pending.slice(i,i+4).map(t => runTask({read,execute},ownerId,t.id,{delayMs:0}))));
     const orders=pendingOrders((await read(ownerId)).state).slice(0,8),orderResults=[];
-    if(orders.length){const {chain}=await configuredOrderChain(request);for(const order of orders)orderResults.push(await runOrder({read,updateWorkspace},ownerId,order.id,chain));}
+    if(orders.length){const {chain,planner}=await configuredOrderChain(request);for(const order of orders)orderResults.push(await runOrder({read,updateWorkspace},ownerId,order.id,chain,{planner}));}
     const current = await read(ownerId);
     return Response.json({...current, runtime:{results,orderResults,pending:pendingTasks(current.state).length+pendingOrders(current.state).length}}, {headers:{'Cache-Control':'no-store'}});
   } catch (error) {
