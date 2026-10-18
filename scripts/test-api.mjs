@@ -25,6 +25,8 @@ await command({type:'update_policy',policy:{...s.policy,active:false}});
 s=await command({type:'advance',taskId:revokedId,expectedStep:2});
 assert.equal(s.tasks.find(t=>t.id===revokedId).status,'blocked');assert.equal(s.tasks.find(t=>t.id===revokedId).reserved,0);assert.equal(s.tasks.find(t=>t.id===revokedId).paid,0);
 const receipt=await fetch(base+'/api/receipts/'+task.id,{headers});assert.equal(receipt.status,200);assert.equal((await receipt.json()).integrityValid,true);
+const exported=await fetch(base+'/api/exports?kind=receipt&taskId='+encodeURIComponent(task.id),{headers});assert.equal(exported.status,200);assert.match(exported.headers.get('content-disposition'),/^attachment; filename=/);assert.deepEqual(await exported.json(),s.tasks.find(t=>t.id===task.id).receipt);
+const crossOwner=await fetch(base+'/api/exports?kind=receipt&taskId='+encodeURIComponent(task.id),{headers:{...headers,'x-agentos-sandbox':'other-'+runId}});assert.equal(crossOwner.status,404);
 const denied=await fetch(base+'/api/command',{method:'POST',headers:{...headers,Origin:'https://different.example'},body:JSON.stringify({type:'topup',amount:1,requestId:'csrf'})});assert.equal(denied.status,403);
 const invalid=await fetch(base+'/api/command',{method:'POST',headers,body:'{broken'});assert.equal(invalid.status,400);
 console.log('API integration PASS: D1 CAS concurrency, duplicate settlement, revoke after reservation, receipt integrity, origin guard, invalid input.');
