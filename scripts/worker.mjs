@@ -6,9 +6,9 @@ process.on('SIGINT',()=>{stopped=true;});process.on('SIGTERM',()=>{stopped=true;
 console.log(`AgentOS local recovery worker watching ${base}`);
 while(!stopped){
   try {
-    const response=await fetch(base+'/api/runtime',{method:'POST',headers,signal:AbortSignal.timeout(20000)});
+    const response=await fetch(base+'/api/runtime/drain',{method:'POST',headers,signal:AbortSignal.timeout(90000)});
     if(!response.ok)throw new Error(`Runtime HTTP ${response.status}`);
-    const data=await response.json();const summary=JSON.stringify({pending:data.runtime.pending,results:data.runtime.results});
+    const data=await response.json();const summary=JSON.stringify(data);
     if(summary!==last){console.log(summary);last=summary;}
   }catch(error){const message=error instanceof Error?error.message:'Worker request failed';if(message!==last){console.error(message);last=message;}}
   if(!stopped)await new Promise(resolve=>setTimeout(resolve,2000));

@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit && tsc -p cre/tsconfig.json",
     "contracts:compile": "node scripts/compile-contracts.mjs",
     "cre:build": "node scripts/cre-build.mjs",
-    "db:local": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_parallel_roland_deschain.sql",
+    "db:local": "node scripts/db-local.mjs",
     "test:api": "node scripts/test-api.mjs",
     "worker": "node scripts/worker.mjs",
     "demo": "node scripts/demo.mjs",
@@ -35,7 +35,8 @@
     "demo:model": "node scripts/demo-model.mjs",
     "demo:identity": "node scripts/demo-identity.mjs",
     "supplier:local": "node scripts/supplier-local.mjs",
-    "demo:supplier": "node scripts/demo-supplier.mjs"
+    "demo:supplier": "node scripts/demo-supplier.mjs",
+    "demo:queue": "node scripts/demo-queue.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

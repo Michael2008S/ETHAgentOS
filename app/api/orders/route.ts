@@ -9,6 +9,7 @@ import type { DeliverySpec } from '@/cre/workflow/verify';
 import { authorizeSupplier } from '@/lib/agentos/supplier-chain';
 import { inspectIdentity } from '@/lib/agentos/identity';
 import { canonical } from '@/cre/workflow/verify';
+import { deferInline } from '@/lib/agentos/auth';
 const id=z.string().min(1).max(128),hash=z.string().regex(/^0x[0-9a-fA-F]{64}$/),address=z.string().regex(/^0x[0-9a-fA-F]{40}$/).refine(s=>!/^0x0{40}$/.test(s));
 const input=z.object({dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe(),records:z.array(z.object({block:z.number().int().nonnegative().safe(),from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:z.number().int().nonnegative().safe()}).strict()).min(1).max(100).optional()}).strict();
 const https=z.string().url().max(4096).refine(s=>{const u=new URL(s);return u.protocol==='https:'&&!u.username&&!u.password&&!u.hash;});
@@ -64,7 +65,7 @@ export async function POST(request:Request){
     orderEvent(o,'Cancellation requested','No new skill operations will run. Any funded escrow still requires a mined refund.');return next;
    });
   }
-  scheduleOrders(ownerId,result.state,request);return Response.json({...result,order:findOrder(result.state,body.orderId)},{headers:{'Cache-Control':'no-store'}});
+  if(!deferInline(request))scheduleOrders(ownerId,result.state,request);return Response.json({...result,order:findOrder(result.state,body.orderId)},{headers:{'Cache-Control':'no-store'}});
  }catch(error){return failure(error);}
 }
 export async function GET(request:Request){

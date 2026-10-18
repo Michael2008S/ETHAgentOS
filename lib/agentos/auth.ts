@@ -21,3 +21,19 @@ export function checkOrigin(request: Request) {
   const origin = request.headers.get('origin');
   if (origin && origin !== new URL(request.url).origin) throw new DomainError('Cross-origin writes are not allowed.', 'FORBIDDEN');
 }
+
+/** Fault injection for isolated local integration tests; ignored by hosted requests. */
+export function deferInline(request: Request) {
+  return import.meta.env?.DEV && isLoopback(new URL(request.url)) && request.headers.has('x-agentos-sandbox') && request.headers.get('x-agentos-queue-only') === '1';
+}
+
+/** A private service caller may drain only already-authorized, server-selected jobs. */
+export function drainScope(request: Request, privateOrigin?: string) {
+  checkOrigin(request);
+  const url = new URL(request.url);
+  if (isLoopback(url)) return owner(request);
+  // The Sites gateway enforces owner-private access, including service access.
+  // Keep this opt-in disabled if the Site's audience changes.
+  if (!privateOrigin || url.protocol !== 'https:' || url.origin !== privateOrigin || request.headers.has('x-agentos-sandbox')) throw new DomainError('Private runtime drain is not configured.', 'FORBIDDEN');
+  return undefined;
+}

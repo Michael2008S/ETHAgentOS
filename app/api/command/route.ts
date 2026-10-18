@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { owner, checkOrigin, execute } from '@/lib/agentos/store';
 import { DomainError } from '@/lib/agentos/engine';
 import { scheduleTasks } from '@/lib/agentos/background';
-import { isLoopback } from '@/lib/agentos/auth';
+import { isLoopback, deferInline } from '@/lib/agentos/auth';
 const id = z.string().min(1).max(128);
 const skill = z.enum(['event-analysis', 'treasury-report']);
 const taskInput = z.object({dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe(),records:z.array(z.object({block:z.number().int().nonnegative().safe(),from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:z.number().int().nonnegative().safe()}).strict()).min(1).max(100).optional()}).strict();
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     if (parsed.data.type === 'create_task' && parsed.data.executionMode === 'manual' && (!isLoopback(new URL(request.url)) || !request.headers.has('x-agentos-sandbox'))) throw new DomainError('Manual execution is restricted to isolated local tests.', 'FORBIDDEN');
     const ownerId = owner(request);
     const result = await execute(ownerId, parsed.data);
-    if (parsed.data.type === 'create_task' || parsed.data.type === 'resume_task') scheduleTasks(ownerId, result.state, parsed.data.taskId);
+    if (!deferInline(request) && (parsed.data.type === 'create_task' || parsed.data.type === 'resume_task')) scheduleTasks(ownerId, result.state, parsed.data.taskId);
     return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
     const status = e instanceof DomainError ? ({ UNAUTHORIZED: 401, FORBIDDEN: 403, NOT_FOUND: 404, CONFLICT: 409, IDEMPOTENCY_CONFLICT: 409 }[e.code] ?? 400) : e instanceof SyntaxError ? 400 : 500;

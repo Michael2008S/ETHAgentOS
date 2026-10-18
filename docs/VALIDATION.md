@@ -1,5 +1,14 @@
 # 验证记录
 
+## 2026-10-19 持久化恢复队列
+
+- `npm test`：70 项全部通过，包括 7 项新增队列验证；`npm run typecheck` 通过。
+
+- SQLite 实际事务测试覆盖 CAS 失败不入队、后续 SQL 失败整批回滚、并发领取、租约过期、旧 token/revision 回执拒绝、owner/manual 隔离、退避和 dead 终止、旧数据回填及暂停任务到期。
+- `npm run demo:queue`：实际 HTTP/D1 五组场景通过。仅隔离本地测试丢弃 inline continuation，不打开页面或调用旧恢复 API；五个并发消费者只领取一次、付款一次。撤权、过期、错误结果、越权均不付款；真实 Qwen 订单在注资后由独立队列多次调用完成，579 分/两条记录，单个 EVM Settled 事件。证据 `outputs/queue-demo-fadcbbb9-e4c7-4801-94aa-f827d2fe6d00.json`。
+- `npm run typecheck`、构建、API 回归、预注资五场景通过。预注资证据 `outputs/prefund-demo-88f960ae-8595-45d3-9b6d-aa28c97526cd.json`。本地 worker 已改用队列消费者并重启，保留数据库和链状态。
+- CRE 官方 CLI 三场景再次通过，证据 `outputs/cre-demo-53c06e41-4b07-4809-8b3b-6ecb165d7aec.json`；未使用 broadcast，账户 Deploy Access 未启用。
+
 ## 2026-10-19 独立供应商增量验证
 
 - `npm test`：63 项全部通过，`npm run typecheck` 通过。新增签名/请求/job/成果绑定、配置和重定向拒绝、响应大小与错误脱敏、租约、未注资和越权零调用、取消/撤权后的晚到结果拒绝。真实 EVM 测试另覆盖成果保存后供应商服务离线仍可付款，以及最终授权前撤销委托会退款。
@@ -7,7 +16,7 @@
 - 实际停止并重启自建供应商进程，执行 `node scripts/test-supplier-journal.mjs outputs/supplier-demo-570aeb22-2a3f-4583-840b-8766d0b0c08b.json`，原已付款订单返回相同 payload 与签名，重启后只读取一次、日志任务数不增加。证据 `outputs/supplier-journal-c1399a20-6757-416b-96c0-33d5853e24fb.json`。
 - 原有 API、预注资五场景、真实模型三场景与身份六组场景回归通过：`outputs/prefund-demo-2ff212a9-a0da-4b10-819d-55c0a01e6daa.json`、`outputs/model-demo-04eff3bb-c004-4f1c-bac9-667e1334761f.json`、`outputs/identity-demo-5e01ab66-c0d5-4f4f-b410-60127c9724db.json`。
 - 浏览器由身份 #2 的持有者在链上授权供应商签名地址，创建 `chain-4c40ac8c-06d7-4269-94cc-ea74164500b5`，顺序为注资确认、模型计划、供应商执行、签名/独立复算、最终付款。只调用一次，成果 579 分/两条记录，付款交易 `0x5bf51abc7adf96984b9dab584f1ab8358e151f7551346e214a82dc2b5cebc11f`。沙盒余额仍为 82.00；默认工作区上下文保存于 `outputs/browser-supplier-order.json`。
-- 本轮实测的是独立本地进程与本地 EVM；远程 HTTPS 供应商、公开链、MCP/A2A 发现、通用插件沙箱和生产 SLA 尚未验收。开发时更改翻译字典会触发一次 HMR LanguageProvider 错误，整页刷新恢复，持久化订单不受影响；该开发期热更新缺陷仍待修复。
+- 本轮实测的是独立本地进程与本地 EVM；远程 HTTPS 供应商、公开链、MCP/A2A 发现、通用插件沙箱和生产 SLA 尚未验收。此前翻译字典 HMR 的 LanguageProvider 错误已修复，见下方热更新验证。
 
 ## 2026-10-19 身份与信誉增量验证
 
@@ -82,7 +91,7 @@
 
 - 真实 DON 部署及 execution 验证。CRE CLI dry-run 与 SDK/CLI WASM 编译已于 2026-10-19 通过。
 - 公共测试网合约部署、真实浏览器扩展签名与持续链重组监控。网页本地测试钱包、服务端复核签名、预注资后台执行与 D1 凭证历史已验收。
-- ERC-8004 上链注册、链上声誉、CCIP、Data Feeds、x402。
+- ERC-8004 公共测试网注册与信誉；本地 EVM 的官方注册表流程已验证。CCIP、Data Feeds、x402 尚未实现。
 - 第三方安全审计、任意外部 Agent 或 LLM 的攻击评测、生产负载测试。
 
 网页与合约采用不同的演示单位：网页是整数分 testUSD，合约是 token 最小单位。接入 adapter 时必须读取并校验 decimals，不能直接复用网页金额。

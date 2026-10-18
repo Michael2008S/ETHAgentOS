@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { seed, transition, DomainError } from './engine';
 import type { Command, Workspace } from './types';
+import { commitWithJobs } from './queue';
 export { owner, checkOrigin } from './auth';
 function db() { if (!env.DB) throw new Error('Database unavailable. Configure DB and apply the migration.'); return env.DB; }
 export async function read(ownerId: string): Promise<{ state: Workspace; revision: number }> {
@@ -19,9 +20,7 @@ export async function updateWorkspace(ownerId: string, reduce: (state: Workspace
     const { state, revision } = await read(ownerId);
     const next = await reduce(state);
     if (JSON.stringify(next) === JSON.stringify(state)) return {state, revision};
-    // A single-row compare-and-swap atomically commits task, budget, ledger and receipt.
-    const result = await db().prepare('UPDATE agentos_workspaces SET revision = revision + 1, data = ? WHERE owner_id = ? AND revision = ?').bind(JSON.stringify(next), ownerId, revision).run();
-    if (result.meta.changes === 1) return { state: next, revision: revision + 1 };
+    if (await commitWithJobs(db(), ownerId, revision, state, next)) return { state: next, revision: revision + 1 };
   }
   throw new DomainError('Workspace is busy. Retry the same request identifier.', 'CONFLICT');
 }
