@@ -15,5 +15,5 @@ export function buildExport(state: Workspace, kind: ExportKind, taskId?: string)
     if(!task.output)throw new DomainError('Artifact not found.','NOT_FOUND');
     return {body:task.output,filename:`${filename}-output.json`};
   }
-  return {body:{version:'agentos.context.v1',taskId:task.id,agentId:task.agentId,input:task.input,output:task.output,sha256:task.outputHash,events:task.events,receipt:task.receipt},filename:`${filename}-context.json`};
+  return {body:{version:'agentos.context.v1',taskId:task.id,agentId:task.agentId,input:task.input,inputHash:task.inputHash??task.receipt?.inputHash,output:task.output,sha256:task.outputHash,events:task.events,receipt:task.receipt},filename:`${filename}-context.json`};
 }

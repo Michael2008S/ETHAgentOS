@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { digest } from '../lib/agentos/engine.ts';
 const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177';
 if(!['localhost','127.0.0.1','[::1]'].includes(new URL(base).hostname))throw new Error('API test is restricted to loopback development servers.');
 // The trusted local gateway still owns identity; this namespace isolates test records.
@@ -40,8 +41,15 @@ await command({type:'update_agent',agentId:'relay',enabled:true,price:400});
 s=await command({type:'create_task',executionMode:'manual',requestId:serviceId+'-new',taskId:serviceId+'-new',agentId:'relay',title:'New quote',budget:1000,scenario:'success'});
 assert.equal(s.tasks.find(t=>t.id===serviceId+'-new').quote,400);
 await command({type:'cancel_task',taskId:serviceId+'-new'});
+const input={dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:[{block:1,from:'a',to:'b',cents:567},{block:2,from:'a',to:'c',cents:890}]};
+const custom={type:'create_task',executionMode:'manual',requestId:'input-'+runId,taskId:'input-'+runId,agentId:'sage',title:'Custom treasury report',budget:1000,scenario:'success',input};
+await command(custom);
+for(const expectedStep of [0,1,2,3,4,5])s=await command({type:'advance',taskId:custom.taskId,expectedStep});
+const customTask=s.tasks.find(t=>t.id===custom.taskId);assert.equal(customTask.output.totalCents,1457);assert.equal(customTask.receipt.inputHash,await digest(input));
+const changedInput=await fetch(base+'/api/command',{method:'POST',headers,body:JSON.stringify({...custom,input:{...input,blockTo:3}})});assert.equal(changedInput.status,409);
+const invalidInput=await fetch(base+'/api/command',{method:'POST',headers,body:JSON.stringify({...custom,requestId:custom.requestId+'-invalid',taskId:custom.taskId+'-invalid',input:{...input,records:[{...input.records[0],cents:-1}]}})});assert.equal(invalidInput.status,400);
 const denied=await fetch(base+'/api/command',{method:'POST',headers:{...headers,Origin:'https://different.example'},body:JSON.stringify({type:'topup',amount:1,requestId:'csrf'})});assert.equal(denied.status,403);
 const invalid=await fetch(base+'/api/command',{method:'POST',headers,body:'{broken'});assert.equal(invalid.status,400);
-console.log('API integration PASS: D1 CAS concurrency, duplicate settlement, revoke after reservation, owner-scoped exports, service availability and quote snapshots, origin guard, invalid input.');
+console.log('API integration PASS: D1 CAS concurrency, duplicate settlement, revoke after reservation, owner-scoped exports, service settings, custom input commitments, origin guard, invalid input.');
 
 } finally { await command({type:'update_policy',policy:initial.policy}); }

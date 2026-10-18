@@ -1,4 +1,4 @@
-import type { Command, Event, Receipt, Task, Workspace } from './types.ts';
+import type { Command, Event, Receipt, Task, TaskInput, Workspace } from './types.ts';
 import { SKILLS } from './types.ts';
 import { DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS, taskIsOverdue } from './lifecycle.ts';
 
@@ -80,11 +80,32 @@ function checkPolicy(s: Workspace, t: Task, now: string): string | null {
   if (spentToday + otherReservations + t.budget > s.policy.dailyBudget) return 'Daily allowance (UTC), including in-flight reservations, would be exceeded.';
   return null;
 }
+export function normalizeInput(input?: TaskInput): TaskInput {
+  if (input === undefined) return { dataset:'eth-shenzhen-fixture-v1', blockFrom:7210000, blockTo:7210100 };
+  if (!input || !['eth-shenzhen-fixture-v1','custom-transfers-v1'].includes(input.dataset) || !Number.isSafeInteger(input.blockFrom) || !Number.isSafeInteger(input.blockTo) || input.blockFrom < 0 || input.blockTo < input.blockFrom) throw new DomainError('Invalid input dataset or block range.');
+  const normalized: TaskInput = {dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo};
+  if (input.dataset === 'eth-shenzhen-fixture-v1') {
+    if (input.records !== undefined) throw new DomainError('Fixture input cannot override records.');
+    return normalized;
+  }
+  if (!Array.isArray(input.records) || input.records.length < 1 || input.records.length > 100) throw new DomainError('Custom input requires 1–100 transfer records.');
+  let total = 0;
+  normalized.records = input.records.map(row => {
+    if (!row || !Number.isSafeInteger(row.block) || row.block < 0 || !Number.isSafeInteger(row.cents) || row.cents < 0 || [row.from,row.to].some(value => typeof value !== 'string' || !value.trim() || value.length > 128)) throw new DomainError('Invalid transfer record. Use whole blocks and nonnegative integer cents.');
+    total += row.cents;
+    if (!Number.isSafeInteger(total)) throw new DomainError('Transfer total exceeds the safe integer range.');
+    return {block:row.block,from:row.from.trim(),to:row.to.trim(),cents:row.cents};
+  });
+  if (canonical(normalized).length > 32768) throw new DomainError('Custom input is too large.');
+  return normalized;
+}
 export function expectedOutput(t: Pick<Task, 'skill' | 'input'>): Record<string, unknown> {
-  const rows = DATASET.filter(r => r.block >= t.input.blockFrom && r.block <= t.input.blockTo);
+  const rows = (t.input.records ?? DATASET).filter(r => r.block >= t.input.blockFrom && r.block <= t.input.blockTo);
   const base = { dataset: t.input.dataset, blockFrom: t.input.blockFrom, blockTo: t.input.blockTo, transferCount: rows.length, totalCents: rows.reduce((sum, r) => sum + r.cents, 0) };
   if (t.skill === 'event-analysis') return { ...base, uniqueRecipients: new Set(rows.map(r => r.to)).size };
-  return { ...base, allocations: rows.reduce<Record<string, number>>((acc, row) => { acc[row.to] = (acc[row.to] ?? 0) + row.cents; return acc; }, {}) };
+  const allocations = new Map<string, number>();
+  for (const row of rows) allocations.set(row.to, (allocations.get(row.to) ?? 0) + row.cents);
+  return { ...base, allocations: Object.fromEntries(allocations) };
 }
 // Every adapter tool call passes through this capability boundary.
 export function authorizeOperation(skill: Task['skill'], operation: string) {
@@ -106,9 +127,10 @@ export function assertInvariants(s: Workspace) {
 export async function transition(input: Workspace, command: Command, now = new Date().toISOString()): Promise<Workspace> {
   const s = structuredClone(input);
   if (command.type === 'create_task') {
+    const taskInput = normalizeInput(command.input);
     const prior = s.tasks.find(t => t.requestId === command.requestId);
     if (prior) {
-      if (prior.id !== command.taskId || prior.agentId !== command.agentId || prior.title !== command.title.trim() || prior.budget !== command.budget || prior.scenario !== command.scenario || (prior.executionMode ?? 'automatic') !== (command.executionMode ?? 'automatic') || (prior.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS) !== (command.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS)) throw new DomainError('Request ID was already used with different task parameters.', 'IDEMPOTENCY_CONFLICT');
+      if (prior.id !== command.taskId || prior.agentId !== command.agentId || prior.title !== command.title.trim() || prior.budget !== command.budget || prior.scenario !== command.scenario || (prior.executionMode ?? 'automatic') !== (command.executionMode ?? 'automatic') || (prior.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS) !== (command.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS) || canonical(prior.input) !== canonical(taskInput)) throw new DomainError('Request ID was already used with different task parameters.', 'IDEMPOTENCY_CONFLICT');
       return s;
     }
     if (s.tasks.some(t => t.id === command.taskId)) throw new DomainError('Task ID already exists.');
@@ -124,8 +146,8 @@ export async function transition(input: Workspace, command: Command, now = new D
     if (s.tasks.length >= 300) throw new DomainError('This prototype supports up to 300 tasks per workspace.');
     const timeoutSeconds = command.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS;
     if (!Number.isSafeInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > MAX_TIMEOUT_SECONDS) throw new DomainError('Execution window must be 1–86400 whole seconds.');
-    const task: Task = { timeoutSeconds, deadlineAt: new Date(Date.parse(now) + timeoutSeconds * 1000).toISOString(), executionMode: command.executionMode ?? 'automatic', id: command.taskId, requestId: command.requestId, title, agentId: agent.id, skill: agent.skill, scenario: command.scenario, budget: command.budget, quote: agent.price, reserved: 0, paid: 0, step: 0, status: 'queued', createdAt: now, updatedAt: now, input: { dataset: 'eth-shenzhen-fixture-v1', blockFrom: 7210000, blockTo: 7210100 }, output: null, outputHash: null, receipt: null, events: [], policySnapshot: null };
-    event(task, now, 'Task accepted', `Assigned to ${agent.name}. Local fixture adapter ${agent.skill}@1.0.0.`);
+    const task: Task = { timeoutSeconds, deadlineAt: new Date(Date.parse(now) + timeoutSeconds * 1000).toISOString(), executionMode: command.executionMode ?? 'automatic', id: command.taskId, requestId: command.requestId, title, agentId: agent.id, skill: agent.skill, scenario: command.scenario, budget: command.budget, quote: agent.price, reserved: 0, paid: 0, step: 0, status: 'queued', createdAt: now, updatedAt: now, input: taskInput, inputHash: await digest(taskInput), output: null, outputHash: null, receipt: null, events: [], policySnapshot: null };
+    event(task, now, 'Task accepted', `Assigned to ${agent.name}. ${taskInput.records ? 'Custom input adapter' : 'Local fixture adapter'} ${agent.skill}@1.0.0.`);
     s.tasks.unshift(task);
   } else if (command.type === 'update_agent') {
     const agent = s.agents.find(a => a.id === command.agentId);
@@ -197,7 +219,7 @@ export async function transition(input: Workspace, command: Command, now = new D
           t.output = expectedOutput(t);
           if (t.scenario === 'invalid-delivery') t.output.totalCents = Number(t.output.totalCents) + 1;
           t.outputHash = await digest(t.output);
-          event(t, now, 'Artifact generated', 'Built-in deterministic adapter completed. SHA-256 digest recorded; no LLM or live RPC was called.', 'success'); t.step = 3;
+          event(t, now, 'Artifact generated', t.input.records ? 'Custom transfer analysis completed. Input and output remain local; no LLM or live RPC was called.' : 'Built-in deterministic adapter completed. SHA-256 digest recorded; no LLM or live RPC was called.', 'success'); t.step = 3;
         } catch (error) {
           if (error instanceof DomainError && error.code === 'CAPABILITY_DENIED') deny(s, t, now, error.message + ' No payment was made.');
           else throw error;
@@ -206,7 +228,7 @@ export async function transition(input: Workspace, command: Command, now = new D
         const expected = expectedOutput(t);
         if (canonical(expected) !== canonical(t.output)) {
           release(s, t, now, 'Reservation returned after invalid delivery'); t.status = 'refunded';
-          event(t, now, 'Delivery rejected', 'Independent fixture recomputation disagrees with the submitted total. No service payment was made.', 'error');
+          event(t, now, 'Delivery rejected', 'Independent input recomputation disagrees with the delivery. No service payment was made.', 'error');
         } else { event(t, now, 'Delivery verified locally', 'All expected fields match the reference calculation. This local verifier is not a deployed Chainlink DON.', 'success'); t.step = 4; }
       } else if (t.step === 4) {
         if (t.reserved < t.quote || !t.output || !t.outputHash) throw new DomainError('Task is not ready to settle.');

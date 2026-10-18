@@ -13,6 +13,7 @@ const patterns: [RegExp, (...parts: string[]) => string][] = [
   [/^(.*) testUSD settled$/, n => `${n} testUSD 已结算`],
   [/^(\d+) unauthorized executions blocked$/, n => `已拦截 ${n} 次越权执行`],
   [/^(\d+) services · 2 skill adapters$/, n => `${n} 个服务 · 2 个技能适配器`],
+  [/^Assigned to (.+)\. Custom input adapter (.+)\.$/, (name, skill) => `已分配给 ${name}，使用自定义数据适配器 ${skill}。`],
   [/^Assigned to (.+)\. Local fixture adapter (.+)\.$/, (name, skill) => `已分配给 ${name}，使用本地测试适配器 ${skill}。`],
   [/^(.+) is allowed\. Budget and service quote are within policy\.$/, skill => `${skill} 已获授权，预算与服务报价符合策略。`],
   [/^(.+) testUSD locked against concurrent spending\.$/, amount => `已锁定 ${amount} testUSD，防止并发重复支出。`],

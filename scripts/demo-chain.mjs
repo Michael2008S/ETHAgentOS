@@ -21,13 +21,16 @@ async function sign(tx){const hash=await wallet.sendTransaction({...tx,account:b
 try{
   const token=await deploy('MockToken'),metadata=stringToHex('agentos-local-verifier:v1'),metadataHash=keccak256(metadata),escrow=await deploy('AgentEscrow',[token,forwarder,metadataHash]);
   const deployment={chainId:31337,token,escrow,forwarder,metadataHash,confirmations:1};report.deployment=deployment;
-  const chain=new AgentChainClient(client,deployment),dataset=JSON.stringify(DATASET),datasetHash=keccak256(stringToHex(dataset));
+  const chain=new AgentChainClient(client,deployment);
   await write(token,artifacts.MockToken.abi,'mint',[buyer,20000000n]);
   const onReportABI=parseAbi(['function onReport(bytes metadata,bytes report)']);
   for(const scenario of ['success','invalid-delivery','timeout']){
-    const web=await os.createTask({agentId:'atlas',title:'EVM integration: '+scenario,budget:1000,scenario:scenario==='invalid-delivery'?'invalid-delivery':'success'});
+    const input={dataset:'custom-transfers-v1',blockFrom:0,blockTo:20,records:[{block:12,from:'buyer.eth',to:'builder.eth',cents:3210},{block:17,from:'buyer.eth',to:'research.eth',cents:6540}]};
+    const web=await os.createTask({agentId:'atlas',title:'EVM integration: '+scenario,budget:1000,input,scenario:scenario==='invalid-delivery'?'invalid-delivery':'success'});
     const completed=await os.run(web.id);
     assert.equal(completed.status,scenario==='invalid-delivery'?'refunded':'completed');
+    assert.equal(completed.output.totalCents,scenario==='invalid-delivery'?9751:9750);
+    const dataset=JSON.stringify((completed.input.records??DATASET).filter(row=>row.block>=completed.input.blockFrom&&row.block<=completed.input.blockTo)),datasetHash=keccak256(stringToHex(dataset));
     const spec={datasetUrl:'https://evidence.example/committed-transfers.json',datasetHash,artifactUrl:`https://delivery.example/${web.id}.json`};
     // URLs are commitments for this local test, not live HTTP endpoints; the real fetched bytes are supplied below.
     const {intent,transactions}=await chain.prepareFunding({workspace,taskId:web.id,buyer,seller,quoteCents:completed.quote,deadline:(await client.getBlock()).timestamp+120n,spec});
@@ -46,7 +49,7 @@ try{
     }
     const settled=await chain.verifyEvidence(intent,settlement.transactionHash,'settlement',expectedHash);
     assert.equal(settled.status,scenario==='success'?'paid':'refunded');
-    report.cases.push({scenario,webTaskId:web.id,webStatus:completed.status,funding:funded,settlement:settled});
+    report.cases.push({scenario,webTaskId:web.id,webStatus:completed.status,input:completed.input,inputHash:completed.inputHash,totalCents:completed.output.totalCents,funding:funded,settlement:settled});
     console.log(`PASS web artifact → committed evidence → local verification → EVM ${settled.status}: ${scenario}`);
   }
   const sellerBalance=await client.readContract({address:token,abi:artifacts.MockToken.abi,functionName:'balanceOf',args:[seller]});

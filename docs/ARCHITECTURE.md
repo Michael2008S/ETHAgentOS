@@ -7,13 +7,13 @@
 | Identity | 本地 profile；ERC-8004 注册 document/calldata adapter | 测试网 register、解析 tokenURI、身份与支付地址绑定 |
 | Wallet | 模拟余额；AgentVault 合约 | 钱包连接、签名确认、链上余额同步 |
 | Memory | 任务输入、结果、事件、收据 | 可检索知识、租户级私有向量存储 |
-| Skills | 两个确定性适配器，版本、capability 清单 | MCP/A2A 适配、隔离外部执行进程 |
+| Skills | 两个确定性适配器，内置/自定义数据、版本、capability 清单 | MCP/A2A 适配、隔离外部执行进程 |
 | Reputation | 基于当前 workspace 的完成任务计数 | 验证过的反馈源、ERC-8004 Reputation Registry |
 | Payments | 模拟账本与单链 ERC-20 托管源码 | 测试网交易回执与 UI 同步；x402 采购 |
 | Permissions | 服务端 typed operation gate；预算；实时撤销 | 签名 session grant、目标合约与 selector 授权 |
 | Escrow | 原子预留/结算/退款；独立 Solidity 合约 | 端到端链上集成 |
-| Marketplace | 可注册本地服务的目录、报价与任务分配 | 外部供应商发现、真实服务 SLA |
-| Execution | 服务端后台执行、持久化状态机、幂等请求、有限退避重试、恢复 API 与本地 worker | 独立持久队列、外部执行租约、任务期限 |
+| Marketplace | 可注册/启停本地服务的目录、固定报价与任务分配 | 外部供应商发现、真实服务 SLA |
+| Execution | 服务端后台执行、持久化状态机、幂等请求、有限退避重试、恢复 API、本地 worker 与任务期限 | 独立持久队列、外部执行租约 |
 
 ## 两条执行路径
 
@@ -21,7 +21,7 @@
 flowchart LR
  U[Mission Control / SDK] --> A[Typed command API]
  A --> P[Policy + capabilities]
- P --> E[Deterministic fixture adapters]
+ P --> E[Deterministic data adapters]
  E --> V[Local recomputation]
  V --> D[D1 CAS: task + ledger + receipt]
  B[Owner wallet] --> G[AgentVault grants]
@@ -31,7 +31,7 @@ flowchart LR
  F --> C
 ```
 
-上半部已接通网站。下半部提供合约和工作流实现，**两者尚未联调**。
+上半部已接通网站。下半部提供合约和工作流实现，通过 `demo:chain` 将自定义网页成果接入本地 EVM 验证；网页资金视图仍未接入，真实 CRE HTTP/DON/测试网尚未联调。
 
 ## 并发与恢复
 
@@ -43,7 +43,7 @@ flowchart LR
 
 ## 信任边界
 
-- 模型/外部工具不能直接转账；当前 fixture 只允许 dataset.read 与 artifact.write。未来接入模型时仍必须把输出解析为有限 typed operations；不能把字符串当脚本运行。
+- 模型/外部工具不能直接转账；当前数据适配器只允许 dataset.read 与 artifact.write。未来接入模型时仍必须把输出解析为有限 typed operations；不能把字符串当脚本运行。
 - 演示攻击是一个确定性恶意 tool-operation 测试用例，并不意味着已经评测真实模型对 prompt injection 的普遍抵抗能力。
 - 本地 SHA-256 收据验证数据完整性，不提供签发方真实性：任何人都可以修改内容再重算 hash。真实凭证需要签名或链上事件。
 - D1 由服务运营者管理。当前操作日志不是防运营者篡改的审计链。

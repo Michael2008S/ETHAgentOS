@@ -5,8 +5,9 @@ import { scheduleTasks } from '@/lib/agentos/background';
 import { isLoopback } from '@/lib/agentos/auth';
 const id = z.string().min(1).max(128);
 const skill = z.enum(['event-analysis', 'treasury-report']);
+const taskInput = z.object({dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe(),records:z.array(z.object({block:z.number().int().nonnegative().safe(),from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:z.number().int().nonnegative().safe()}).strict()).min(1).max(100).optional()}).strict();
 const command = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('create_task'), timeoutSeconds: z.number().int().min(1).max(86400).optional(), executionMode: z.enum(['automatic','manual']).optional(), requestId: id, taskId: id, agentId: id, title: z.string().min(1).max(160), budget: z.number().int().positive(), scenario: z.enum(['success', 'injection', 'interruption', 'invalid-delivery']) }),
+  z.object({ type: z.literal('create_task'), input: taskInput.optional(), timeoutSeconds: z.number().int().min(1).max(86400).optional(), executionMode: z.enum(['automatic','manual']).optional(), requestId: id, taskId: id, agentId: id, title: z.string().min(1).max(160), budget: z.number().int().positive(), scenario: z.enum(['success', 'injection', 'interruption', 'invalid-delivery']) }),
   z.object({ type: z.literal('advance'), taskId: id, expectedStep: z.number().int().min(0).max(6) }),
   z.object({ type: z.literal('resume_task'), taskId: id }),
   z.object({ type: z.literal('cancel_task'), taskId: id }),
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
     checkOrigin(request);
     if (!request.headers.get('content-type')?.includes('application/json')) return Response.json({ error: 'JSON required.' }, { status: 415 });
     const raw = await request.text();
-    if (raw.length > 8192) return Response.json({ error: 'Request too large.' }, { status: 413 });
+    if (new TextEncoder().encode(raw).length > 65536) return Response.json({ error: 'Request too large.' }, { status: 413 });
     const parsed = command.safeParse(JSON.parse(raw));
     if (!parsed.success) return Response.json({ error: parsed.error.issues.map(i => i.message).join('; ') }, { status: 400 });
     if (parsed.data.type === 'create_task' && parsed.data.executionMode === 'manual' && (!isLoopback(new URL(request.url)) || !request.headers.has('x-agentos-sandbox'))) throw new DomainError('Manual execution is restricted to isolated local tests.', 'FORBIDDEN');
