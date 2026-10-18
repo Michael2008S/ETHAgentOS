@@ -3,8 +3,8 @@ import type { DeliverySpec } from './verify.ts';
 export type Config={schedule:string;chainName:string;escrowAddress:Address;taskId:Hex;gasLimit:string;spec:DeliverySpec};
 const hex=(value:unknown,length:number)=>typeof value==='string'&&new RegExp(`^0x[0-9a-fA-F]{${length}}$`).test(value)&&!/^0x0+$/.test(value);
 function https(value: unknown): value is string {
-  if(typeof value!=='string')return false;
-  try {const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password&&!url.hash&&!url.hostname.includes('YOUR_');}catch{return false;}
+  // Avoid browser URL globals in the QuickJS/WASM runtime; require a plain DNS authority.
+  return typeof value==='string'&&/^https:\/\/[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+(?:\:[0-9]{1,5})?(?:[/?][^\s#]*)?$/.test(value)&&!value.includes('YOUR_');
 }
 /** Reject placeholders before any HTTP fetch or chain write. No keys are part of this config. */
 export function validateConfig(value: unknown): Config {
