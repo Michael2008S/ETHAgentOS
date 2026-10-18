@@ -572,5 +572,8 @@
   "Supplier identity authority changed. Rebind before execution.": "供应商身份授权已改变，请重新绑定后执行。",
   "Request hash": "请求哈希",
   "Output hash": "成果哈希",
-  "Full supplier evidence": "完整供应商凭证"
+  "Full supplier evidence": "完整供应商凭证",
+  "Invalid JSON request.": "请求 JSON 格式无效。",
+  "Runtime temporarily unavailable. Durable checkpoints are retained. Retry after recovery.": "运行时暂不可用，持久化检查点已保留，请在服务恢复后重试。",
+  "Onchain provider is unavailable. Retry the same reconciliation after recovery.": "链上服务暂不可用，请在恢复后重试同一凭证对账。"
 }

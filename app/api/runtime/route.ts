@@ -1,6 +1,6 @@
 import { owner, checkOrigin, read, execute,updateWorkspace } from '@/lib/agentos/store';
 import { runTask, pendingTasks } from '@/lib/agentos/runner';
-import { DomainError } from '@/lib/agentos/engine';
+import { apiFailure } from '@/lib/agentos/api-failure';
 import { pendingOrders } from '@/lib/agentos/orders';
 import { configuredOrderChain } from '@/lib/agentos/order-runtime';
 import { runOrder } from '@/lib/agentos/order-runner';
@@ -18,7 +18,6 @@ export async function POST(request: Request) {
     const current = await read(ownerId);
     return Response.json({...current, runtime:{results,orderResults,pending:pendingTasks(current.state).length+pendingOrders(current.state).length}}, {headers:{'Cache-Control':'no-store'}});
   } catch (error) {
-    const status = error instanceof DomainError ? ({UNAUTHORIZED:401,FORBIDDEN:403,CONFLICT:409}[error.code] ?? 400) : 500;
-    return Response.json({error:error instanceof Error ? error.message : 'Runtime tick failed.'},{status});
+    return apiFailure(error,'runtime');
   }
 }

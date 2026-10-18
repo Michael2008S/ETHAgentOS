@@ -31,6 +31,8 @@ The owner-private Site may opt into a shared service drain by setting server-onl
 
 A scheduled cloud task obtains service access using Sites `get_site`, calls the parameterless drain and reads the aggregate response. Never store credentials in source, prompts or browser code. A saved schedule is not evidence that a scheduled occurrence ran; record actual writer verification separately. Timing is best effort and does not guarantee a short escrow deadline. For public-chain settlement, the trusted RPC, external evidence publishing and authorized CRE/DON deployment are additional requirements.
 
+The private v11 writer was exercised through official service access and its completed queue record read back in a second invocation. The platform rejected a one-minute schedule because it allows at most one scheduled run per hour. No schedule was created. A deployment for a separate minute-level consumer remains outstanding; an hourly cleanup would not guarantee the default five-minute execution window.
+
 ## Verification
 
 `node --test tests/queue.test.mjs` exercises real SQLite SQL transactions, rollback, CAS races, concurrent claims, crash recovery, acknowledgement fencing, migration backfill and scope checks. `npm run demo:queue` uses the actual HTTP/D1 service, deliberately drops the inline continuation only in an isolated local test, and recovers via separate consumer requests. It verifies one payment, owner/manual isolation, permission revocation, expiry, rejection, and a pre-funded real Qwen/EVM order across queue checkpoints. The test-only header is ignored on hosted requests.

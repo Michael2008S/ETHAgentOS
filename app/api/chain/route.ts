@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { z } from 'zod';
 import { owner,checkOrigin,read,updateWorkspace } from '@/lib/agentos/store';
-import { DomainError } from '@/lib/agentos/engine';
+import { apiFailure } from '@/lib/agentos/api-failure';
 import { serverChain } from '@/lib/agentos/chain-config';
 import { createChainChallenge,verifyChainClaim,saveChainReceipt, type ChainClaim } from '@/lib/agentos/chain-reconciliation';
 const address=z.string().regex(/^0x[0-9a-fA-F]{40}$/).refine(s=>!/^0x0{40}$/.test(s));
@@ -28,7 +28,6 @@ export async function POST(request:Request){
     const result=await updateWorkspace(ownerId,current=>saveChainReceipt(current,verified.challenge,verified.record));
     return Response.json({...result,record:result.state.chainReceipts!.find(r=>r.id===verified.record.id)},{headers:{'Cache-Control':'no-store'}});
   }catch(error){
-    const status=error instanceof DomainError?({UNAUTHORIZED:401,FORBIDDEN:403,NOT_FOUND:404,CONFLICT:409,UNAVAILABLE:503}[error.code]??400):error instanceof SyntaxError||error instanceof z.ZodError?400:502;
-    return Response.json({error:error instanceof z.ZodError?'Invalid chain reconciliation request.':error instanceof Error?error.message:'Chain reconciliation failed.'},{status,headers:{'Cache-Control':'no-store'}});
+    return apiFailure(error,'chain');
   }
 }

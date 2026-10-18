@@ -8,6 +8,15 @@
 - `npm run demo:queue`：实际 HTTP/D1 五组场景通过。仅隔离本地测试丢弃 inline continuation，不打开页面或调用旧恢复 API；五个并发消费者只领取一次、付款一次。撤权、过期、错误结果、越权均不付款；真实 Qwen 订单在注资后由独立队列多次调用完成，579 分/两条记录，单个 EVM Settled 事件。证据 `outputs/queue-demo-fadcbbb9-e4c7-4801-94aa-f827d2fe6d00.json`。
 - `npm run typecheck`、构建、API 回归、预注资五场景通过。预注资证据 `outputs/prefund-demo-88f960ae-8595-45d3-9b6d-aa28c97526cd.json`。本地 worker 已改用队列消费者并重启，保留数据库和链状态。
 - CRE 官方 CLI 三场景再次通过，证据 `outputs/cre-demo-53c06e41-4b07-4809-8b3b-6ecb165d7aec.json`；未使用 broadcast，账户 Deploy Access 未启用。
+- 私有 v11 线上验证：通过 Sites 官方服务访问，`POST /api/runtime/drain` 首次领取并完成 1 条，第二次零领取且 completed 仍为 1。服务访问读取 owner 工作区队列返回 401，带 owner 参数的 drain 返回 400，说明没有将服务身份当成用户身份。证据 `outputs/hosted-queue-verification.json`。网页任务 `Hosted queue smoke 2026-10-19` 完成 6/6，单次结算 2.40 测试积分，余额 97.60。
+- 没有宣称该线上任务完全由独立消费者推进：正常请求的 inline continuation 同时可用。丢失原请求后的独立恢复已在本地真实 HTTP/D1 故障注入中验证。线上只验证了预期服务访问方式、实际队列写回与终态读回。
+- Sites 定时任务拒绝每分钟频率，限制为每小时最多一次。本次没有创建调度，没有发生过待验收的定时执行；分钟级外部消费者仍需部署。
+
+## 2026-10-19 API 故障响应
+
+- 全套 `npm test` 72 项通过，类型检查通过；真实 HTTP/D1/EVM 凭证对账的付款、拒绝退款与超时退款三个场景回归通过，含签名、并发重放、工作区隔离与导出。证据 `outputs/reconciliation-demo-903fe17b-226b-4cea-9510-bee70459ea8b.json`。
+
+- 两项测试覆盖嵌套 RPC 异常中的合成 key、URL、请求体和 stack 脱敏，以及 401/403/404/409/503 状态、无缓存、无效 JSON 不回显。链上凭证 API 的未知提供商故障返回 502，runtime 的暂时故障返回 503，并提示保留检查点后重试。
 
 ## 2026-10-19 独立供应商增量验证
 
