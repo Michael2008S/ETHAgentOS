@@ -1,5 +1,6 @@
 import { DomainError } from './engine.ts';
 import type { Command, TaskStatus, Workspace } from './types.ts';
+import { taskIsOverdue } from './lifecycle.ts';
 
 export type RuntimeStore = {
   read(ownerId: string): Promise<{state: Workspace}>;
@@ -9,7 +10,7 @@ export type RunResult = { taskId: string; status: TaskStatus | 'missing' | 'retr
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
 /** Bounded worker invocation. Checkpoints, not this process, are the durable source of truth. */
-export async function runTask(store: RuntimeStore, ownerId: string, taskId: string, options: {delayMs?: number; maxTransitions?: number; maxRetries?: number} = {}): Promise<RunResult> {
+export async function runTask(store: RuntimeStore, ownerId: string, taskId: string, options: {delayMs?: number; maxTransitions?: number; maxRetries?: number; now?: () => string} = {}): Promise<RunResult> {
   const delay = options.delayMs ?? 750, limit = options.maxTransitions ?? 16, retryLimit = options.maxRetries ?? 3;
   let transitions = 0, retries = 0;
   while (transitions < limit) {
@@ -17,6 +18,10 @@ export async function runTask(store: RuntimeStore, ownerId: string, taskId: stri
       const {state} = await store.read(ownerId);
       const task = state.tasks.find(t => t.id === taskId);
       if (!task) return {taskId, status:'missing', transitions, retries};
+      if (taskIsOverdue(task, options.now?.())) {
+        await store.execute(ownerId, {type:'expire_task', taskId});
+        transitions++; continue;
+      }
       if (!['queued','running'].includes(task.status)) return {taskId, status:task.status, transitions, retries};
       if (delay) await sleep(delay);
       await store.execute(ownerId, {type:'advance', taskId, expectedStep:task.step});
@@ -32,6 +37,6 @@ export async function runTask(store: RuntimeStore, ownerId: string, taskId: stri
   return {taskId, status:'retryable', transitions, retries};
 }
 
-export function pendingTasks(state: Workspace, staleBefore?: string) {
-  return state.tasks.filter(t => t.executionMode !== 'manual' && ['queued','running'].includes(t.status) && (!staleBefore || t.updatedAt < staleBefore)).sort((a,b) => a.createdAt.localeCompare(b.createdAt));
+export function pendingTasks(state: Workspace, staleBefore?: string, now = new Date().toISOString()) {
+  return state.tasks.filter(t => t.executionMode !== 'manual' && (taskIsOverdue(t, now) || ['queued','running'].includes(t.status) && (!staleBefore || t.updatedAt < staleBefore))).sort((a,b) => Number(taskIsOverdue(b, now)) - Number(taskIsOverdue(a, now)) || a.createdAt.localeCompare(b.createdAt));
 }

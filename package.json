@@ -20,7 +20,8 @@
     "test:api": "node scripts/test-api.mjs",
     "worker": "node scripts/worker.mjs",
     "demo": "node scripts/demo.mjs",
-    "demo:chain": "node scripts/demo-chain.mjs"
+    "demo:chain": "node scripts/demo-chain.mjs",
+    "demo:deadline": "node scripts/demo-deadline.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

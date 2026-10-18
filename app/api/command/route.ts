@@ -6,10 +6,11 @@ import { isLoopback } from '@/lib/agentos/auth';
 const id = z.string().min(1).max(128);
 const skill = z.enum(['event-analysis', 'treasury-report']);
 const command = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('create_task'), executionMode: z.enum(['automatic','manual']).optional(), requestId: id, taskId: id, agentId: id, title: z.string().min(1).max(160), budget: z.number().int().positive(), scenario: z.enum(['success', 'injection', 'interruption', 'invalid-delivery']) }),
+  z.object({ type: z.literal('create_task'), timeoutSeconds: z.number().int().min(1).max(86400).optional(), executionMode: z.enum(['automatic','manual']).optional(), requestId: id, taskId: id, agentId: id, title: z.string().min(1).max(160), budget: z.number().int().positive(), scenario: z.enum(['success', 'injection', 'interruption', 'invalid-delivery']) }),
   z.object({ type: z.literal('advance'), taskId: id, expectedStep: z.number().int().min(0).max(6) }),
   z.object({ type: z.literal('resume_task'), taskId: id }),
   z.object({ type: z.literal('cancel_task'), taskId: id }),
+  z.object({ type: z.literal('expire_task'), taskId: id }),
   z.object({ type: z.literal('update_policy'), policy: z.object({ active: z.boolean(), maxTaskBudget: z.number().int().positive(), dailyBudget: z.number().int().positive(), allowedSkills: z.array(skill).max(2) }) }),
   z.object({ type: z.literal('topup'), amount: z.number().int().positive(), requestId: id }),
   z.object({ type: z.literal('register_agent'), agent: z.object({ name: z.string().min(1).max(40), description: z.string().max(240), skill }), requestId: id }),

@@ -8,7 +8,7 @@ export class AgentOSClient {
     const data=await res.json() as {state:Workspace;revision:number;error?:string};if(!res.ok)throw new Error(data.error||`HTTP ${res.status}`);return data;
   }
   async workspace(){return (await this.request('/api/workspace')).state;}
-  async createTask(input:{agentId:string;title:string;budget:number;scenario?:Scenario;requestId?:string}) {
+  async createTask(input:{agentId:string;title:string;budget:number;timeoutSeconds?:number;scenario?:Scenario;requestId?:string}) {
     const requestId=input.requestId||crypto.randomUUID();const {state}=await this.request('/api/command',{...input,scenario:input.scenario||'success',type:'create_task',requestId,taskId:requestId});return state.tasks.find(t=>t.requestId===requestId)!;
   }
   async run(taskId:string,options:{timeoutMs?:number;pollMs?:number}={}):Promise<Task> {

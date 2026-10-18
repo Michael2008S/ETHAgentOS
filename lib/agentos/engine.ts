@@ -1,5 +1,6 @@
 import type { Command, Event, Receipt, Task, Workspace } from './types.ts';
 import { SKILLS } from './types.ts';
+import { DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS, taskIsOverdue } from './lifecycle.ts';
 
 export class DomainError extends Error { code: string; constructor(message: string, code = 'INVALID_COMMAND') { super(message); this.code = code; } }
 // Public, deterministic fixture. Never represented as live blockchain data.
@@ -96,7 +97,7 @@ export function assertInvariants(s: Workspace) {
   for (const t of s.tasks) {
     if (!Number.isSafeInteger(t.reserved) || t.reserved < 0 || !Number.isSafeInteger(t.paid) || t.paid < 0) throw new DomainError('Invalid task balance.', 'INVARIANT');
     if (t.paid > t.budget || t.paid > 0 && (t.reserved !== 0 || !t.receipt)) throw new DomainError('Invalid settlement.', 'INVARIANT');
-    if (['completed', 'blocked', 'refunded', 'cancelled'].includes(t.status) && t.reserved !== 0) throw new DomainError('Terminal task retains reservation.', 'INVARIANT');
+    if (['completed', 'blocked', 'refunded', 'cancelled', 'expired'].includes(t.status) && t.reserved !== 0) throw new DomainError('Terminal task retains reservation.', 'INVARIANT');
     if (s.ledger.filter(l => l.kind === 'settle' && l.taskId === t.id).reduce((sum, l) => sum + l.amount, 0) !== t.paid) throw new DomainError('Task and ledger disagree.', 'INVARIANT');
   }
 }
@@ -107,7 +108,7 @@ export async function transition(input: Workspace, command: Command, now = new D
   if (command.type === 'create_task') {
     const prior = s.tasks.find(t => t.requestId === command.requestId);
     if (prior) {
-      if (prior.id !== command.taskId || prior.agentId !== command.agentId || prior.title !== command.title.trim() || prior.budget !== command.budget || prior.scenario !== command.scenario || (prior.executionMode ?? 'automatic') !== (command.executionMode ?? 'automatic')) throw new DomainError('Request ID was already used with different task parameters.', 'IDEMPOTENCY_CONFLICT');
+      if (prior.id !== command.taskId || prior.agentId !== command.agentId || prior.title !== command.title.trim() || prior.budget !== command.budget || prior.scenario !== command.scenario || (prior.executionMode ?? 'automatic') !== (command.executionMode ?? 'automatic') || (prior.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS) !== (command.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS)) throw new DomainError('Request ID was already used with different task parameters.', 'IDEMPOTENCY_CONFLICT');
       return s;
     }
     if (s.tasks.some(t => t.id === command.taskId)) throw new DomainError('Task ID already exists.');
@@ -120,7 +121,9 @@ export async function transition(input: Workspace, command: Command, now = new D
     const title = command.title.trim();
     if (!title || title.length > 160) throw new DomainError('Task title must be 1–160 characters.');
     if (s.tasks.length >= 300) throw new DomainError('This prototype supports up to 300 tasks per workspace.');
-    const task: Task = { executionMode: command.executionMode ?? 'automatic', id: command.taskId, requestId: command.requestId, title, agentId: agent.id, skill: agent.skill, scenario: command.scenario, budget: command.budget, quote: agent.price, reserved: 0, paid: 0, step: 0, status: 'queued', createdAt: now, updatedAt: now, input: { dataset: 'eth-shenzhen-fixture-v1', blockFrom: 7210000, blockTo: 7210100 }, output: null, outputHash: null, receipt: null, events: [], policySnapshot: null };
+    const timeoutSeconds = command.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS;
+    if (!Number.isSafeInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > MAX_TIMEOUT_SECONDS) throw new DomainError('Execution window must be 1–86400 whole seconds.');
+    const task: Task = { timeoutSeconds, deadlineAt: new Date(Date.parse(now) + timeoutSeconds * 1000).toISOString(), executionMode: command.executionMode ?? 'automatic', id: command.taskId, requestId: command.requestId, title, agentId: agent.id, skill: agent.skill, scenario: command.scenario, budget: command.budget, quote: agent.price, reserved: 0, paid: 0, step: 0, status: 'queued', createdAt: now, updatedAt: now, input: { dataset: 'eth-shenzhen-fixture-v1', blockFrom: 7210000, blockTo: 7210100 }, output: null, outputHash: null, receipt: null, events: [], policySnapshot: null };
     event(task, now, 'Task accepted', `Assigned to ${agent.name}. Local fixture adapter ${agent.skill}@1.0.0.`);
     s.tasks.unshift(task);
   } else if (command.type === 'update_policy') {
@@ -144,12 +147,17 @@ export async function transition(input: Workspace, command: Command, now = new D
   } else {
     const t = s.tasks.find(t => t.id === command.taskId);
     if (!t) throw new DomainError('Task not found.', 'NOT_FOUND');
-    if (command.type === 'resume_task') {
+    if (taskIsOverdue(t, now)) {
+      release(s, t, now, 'Reservation returned after deadline');
+      t.status = 'expired'; event(t, now, 'Task expired', 'Execution deadline passed before payment. All unpaid reserved funds were released.', 'warning');
+    } else if (command.type === 'expire_task') {
+      return s;
+    } else if (command.type === 'resume_task') {
       if (t.status !== 'paused') return s;
       t.status = 'running'; event(t, now, 'Execution resumed', 'Durable checkpoint recovered. Existing settlement will be reused.', 'success');
     } else if (command.type === 'cancel_task') {
       if (t.paid > 0) throw new DomainError('A settled task cannot be cancelled. Resume it to finalize the receipt.');
-      if (['completed', 'blocked', 'refunded', 'cancelled'].includes(t.status)) return s;
+      if (['completed', 'blocked', 'refunded', 'cancelled', 'expired'].includes(t.status)) return s;
       release(s, t, now, 'Reservation returned after cancellation');
       t.status = 'cancelled'; event(t, now, 'Task cancelled', 'All unpaid reserved funds are available again.', 'warning');
     } else if (command.type === 'advance') {

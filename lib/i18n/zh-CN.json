@@ -298,5 +298,14 @@
   "Recover pending server tasks.": "恢复服务端待执行任务。",
   "Request ID was already used with different task parameters.": "该请求 ID 已用于另一组任务参数。",
   "Request ID was already used with a different allocation.": "该请求 ID 已用于不同的资金分配。",
-  "Request ID was already used with a different agent profile.": "该请求 ID 已用于不同的智能体档案。"
+  "Request ID was already used with a different agent profile.": "该请求 ID 已用于不同的智能体档案。",
+  "Expired": "已超时",
+  "Execution deadline": "执行截止时间",
+  "Execution window · seconds": "执行期限 · 秒",
+  "Unpaid reservations are released after this window.": "超过此期限，未付款的预留资金会被释放。",
+  "Unpaid tasks expire; committed payments remain final.": "未付款任务超时终止；已完成的付款保持有效。",
+  "Task expired": "任务已超时",
+  "Execution deadline passed before payment. All unpaid reserved funds were released.": "付款前已超过执行期限，未付款的预留资金已全部释放。",
+  "Execution window must be 1–86400 whole seconds.": "执行期限须为 1–86400 整数秒。",
+  "Reservation returned after deadline": "超时后返还预留资金"
 }

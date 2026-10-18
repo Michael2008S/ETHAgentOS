@@ -39,6 +39,7 @@ npm run typecheck         # 网站、SDK、CRE 各自类型检查
 npm run contracts:compile # 生成 ABI 与 bytecode（忽略的 artifacts 目录）
 npm run cre:build         # 需要 Bun >=1.2.21；生成 outputs/agentos-cre.wasm
 npm run demo              # 完整闭环，独立沙盒，不需要打开浏览器
+npm run demo:deadline     # 自动超时、预留释放、已付款跨期限恢复
 npm run demo:chain        # 网页成果 → 本地校验器 → 真实本地 EVM 托管与退款
 npm run test:api          # 并发、撤销、收据 API 回归
 npm run worker            # 可选：本地常驻恢复 worker
@@ -73,6 +74,8 @@ CRE 构建使用已安装的 `@chainlink/cre-sdk` 编译器。安装 Bun 并加�
 ## 自动执行与恢复
 
 创建和恢复任务会通过框架的后台请求上下文执行；页面和 SDK 只观察状态，不再发送自动 advance 命令。每次后台调用有有限重试和步骤上限，失败时保留数据库检查点。`POST /api/runtime` 是当前 owner 的恢复入口；本地 `npm run worker` 可定期调用它。托管环境的长期调度仍需独立队列或定时调用，一次请求的后台处理不提供无限期调度保证。
+
+每个任务有 1–86400 秒执行期限，默认 300 秒；截止时间由服务端创建且重试不会延长。每次未付款状态迁移都会重新检查期限，超时标记为 Expired 并释放预留资金；已提交付款的任务可在期限后恢复，保持原收据。旧任务按创建时间加 300 秒处理。`npm run demo:deadline` 在独立本地沙盒验证自动超时、并发退款和付款后的恢复。
 
 `npm run demo` 自动验证成功、越权、错误交付、中断恢复、权限撤销、取消及并发重放，结果记录在忽略的 `outputs/demo-*.json`。精确的预留后撤销检查由 `npm run test:api` 完成，不依赖网络轮询命中短暂阶段。测试工作区仅在 loopback 可用，不改动默认演示数据。
 

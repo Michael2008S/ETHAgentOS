@@ -68,5 +68,5 @@ test('amounts reject fractional, negative, unsafe and underquoted values',async(
 test('top-up retries are idempotent; daily usage resets in UTC',async()=>{
  let s=await run(await transition(seed(now),create(),now)); s.policy.dailyBudget=600;
  s=await transition(s,{type:'topup',amount:500,requestId:'top'},now);s=await transition(s,{type:'topup',amount:500,requestId:'top'},now);assert.equal(wallet(s).deposited,10500);
- s=await transition(s,create('b'),now);s=await transition(s,{type:'advance',taskId:'b',expectedStep:0},'2026-10-16T00:00:00.000Z'); assert.equal(s.tasks[0].step,1);assertInvariants(s);
+ s=await transition(s,create('b'),'2026-10-16T00:00:00.000Z');s=await transition(s,{type:'advance',taskId:'b',expectedStep:0},'2026-10-16T00:00:00.000Z'); assert.equal(s.tasks[0].step,1);assertInvariants(s);
 });
