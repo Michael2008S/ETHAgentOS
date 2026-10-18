@@ -294,5 +294,9 @@
   "Allocation": "分配金额",
   "Per-task limit": "单任务限额",
   "Daily limit": "每日限额",
-  "Execute": "执行"
+  "Execute": "执行",
+  "Recover pending server tasks.": "恢复服务端待执行任务。",
+  "Request ID was already used with different task parameters.": "该请求 ID 已用于另一组任务参数。",
+  "Request ID was already used with a different allocation.": "该请求 ID 已用于不同的资金分配。",
+  "Request ID was already used with a different agent profile.": "该请求 ID 已用于不同的智能体档案。"
 }

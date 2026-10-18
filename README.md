@@ -16,7 +16,7 @@
 
 ## 状态边界
 
-**网页是可运行的模拟环境。** Agent 是两个确定性 fixture 适配器，没有调用 LLM；余额是 testUSD 测试积分，没有真实资金；身份是本地档案。浏览器打开时驱动任务，关闭后保留检查点，重开后继续；尚无后台调度器。注册自定义 Agent 当前只绑定已有适配器，不会执行任意第三方代码。
+**网页是可运行的模拟环境。** Agent 是两个确定性 fixture 适配器，没有调用 LLM；余额是 testUSD 测试积分，没有真实资金；身份是本地档案。任务由服务端后台推进，关闭浏览器不影响当前执行。请求中止或服务重启后，持久检查点可通过恢复 API 或本地恢复 worker 继续。注册自定义 Agent 当前只绑定已有适配器，不会执行任意第三方代码。
 
 Solidity 在本地 EVM 中测试；CRE 源码有独立 TypeScript 检查和纯校验器测试。**尚未执行 CRE CLI/WASM 模拟、部署 DON、连接测试网钱包或广播链上交易。网页账本与合约没有同步适配器。** 不应将界面收据展示为链上证明或 Chainlink 签名。x402、CCIP、Data Feeds、链上 Reputation Registry 是后续扩展。
 
@@ -37,6 +37,9 @@ npm run dev -- --host 127.0.0.1 --port 5177
 npm test                  # 状态机、独立校验器、身份适配器与内存 EVM 合约测试
 npm run typecheck         # 网站、SDK、CRE 各自类型检查
 npm run contracts:compile # 生成 ABI 与 bytecode（忽略的 artifacts 目录）
+npm run demo              # 完整闭环，独立沙盒，不需要打开浏览器
+npm run test:api          # 并发、撤销、收据 API 回归
+npm run worker            # 可选：本地常驻恢复 worker
 ```
 
 Ganache 在 Node 26 上可能提示 µWS 原生模块不可用并回退到 JS；测试不依赖其 HTTP 服务。
@@ -53,6 +56,12 @@ Ganache 在 Node 26 上可能提示 µWS 原生模块不可用并回退到 JS；
 | `cre/workflow/` | 买方承诺证据校验、节点共识、EVM report |
 | `sdk/` | 客户端及 ERC-8004 注册交易构建 |
 | `docs/` | 架构、演示稿、Chainlink 接入步骤与验证记录 |
+
+## 自动执行与恢复
+
+创建和恢复任务会通过框架的后台请求上下文执行；页面和 SDK 只观察状态，不再发送自动 advance 命令。每次后台调用有有限重试和步骤上限，失败时保留数据库检查点。`POST /api/runtime` 是当前 owner 的恢复入口；本地 `npm run worker` 可定期调用它。托管环境的长期调度仍需独立队列或定时调用，一次请求的后台处理不提供无限期调度保证。
+
+`npm run demo` 自动验证成功、越权、错误交付、中断恢复、权限撤销、取消及并发重放，结果记录在忽略的 `outputs/demo-*.json`。精确的预留后撤销检查由 `npm run test:api` 完成，不依赖网络轮询命中短暂阶段。测试工作区仅在 loopback 可用，不改动默认演示数据。
 
 ## SDK
 

@@ -13,7 +13,7 @@
 | Permissions | 服务端 typed operation gate；预算；实时撤销 | 签名 session grant、目标合约与 selector 授权 |
 | Escrow | 原子预留/结算/退款；独立 Solidity 合约 | 端到端链上集成 |
 | Marketplace | 可注册本地服务的目录、报价与任务分配 | 外部供应商发现、真实服务 SLA |
-| Execution | 持久化状态机、幂等请求、恢复 | 队列调度器、超时、租约、退避重试 |
+| Execution | 服务端后台执行、持久化状态机、幂等请求、有限退避重试、恢复 API 与本地 worker | 独立持久队列、外部执行租约、任务期限 |
 
 ## 两条执行路径
 

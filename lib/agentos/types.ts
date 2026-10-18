@@ -5,11 +5,11 @@ export type Agent = { id: string; name: string; role: string; description: strin
 export type Event = { id: string; at: string; level: 'info' | 'success' | 'warning' | 'error'; title: string; detail: string; step: number };
 export type Policy = { active: boolean; maxTaskBudget: number; dailyBudget: number; allowedSkills: Skill[] };
 export type Receipt = { version: 'agentos.receipt.v1'; mode: 'simulation'; taskId: string; agentId: string; amount: number; currency: 'testUSD'; inputHash: string; outputHash: string; policyHash: string; settledAt: string; settlementId: string; digest: string };
-export type Task = { id: string; requestId: string; title: string; agentId: string; skill: Skill; scenario: Scenario; budget: number; quote: number; reserved: number; paid: number; step: number; status: TaskStatus; createdAt: string; updatedAt: string; input: { dataset: string; blockFrom: number; blockTo: number }; output: Record<string, unknown> | null; outputHash: string | null; receipt: Receipt | null; events: Event[]; policySnapshot: Policy | null };
+export type Task = { executionMode?: 'automatic' | 'manual'; id: string; requestId: string; title: string; agentId: string; skill: Skill; scenario: Scenario; budget: number; quote: number; reserved: number; paid: number; step: number; status: TaskStatus; createdAt: string; updatedAt: string; input: { dataset: string; blockFrom: number; blockTo: number }; output: Record<string, unknown> | null; outputHash: string | null; receipt: Receipt | null; events: Event[]; policySnapshot: Policy | null };
 export type LedgerEntry = { id: string; taskId: string | null; kind: 'deposit' | 'reserve' | 'release' | 'settle'; amount: number; at: string; note: string };
 export type Workspace = { version: 1; agents: Agent[]; tasks: Task[]; ledger: LedgerEntry[]; policy: Policy; createdAt: string };
 export type Command =
-  | { type: 'create_task'; requestId: string; taskId: string; agentId: string; title: string; budget: number; scenario: Scenario }
+  | { type: 'create_task'; executionMode?: 'automatic' | 'manual'; requestId: string; taskId: string; agentId: string; title: string; budget: number; scenario: Scenario }
   | { type: 'advance'; taskId: string; expectedStep: number }
   | { type: 'resume_task'; taskId: string }
   | { type: 'cancel_task'; taskId: string }

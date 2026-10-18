@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import { owner, checkOrigin, execute } from '@/lib/agentos/store';
 import { DomainError } from '@/lib/agentos/engine';
+import { scheduleTasks } from '@/lib/agentos/background';
+import { isLoopback } from '@/lib/agentos/auth';
 const id = z.string().min(1).max(128);
 const skill = z.enum(['event-analysis', 'treasury-report']);
 const command = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('create_task'), requestId: id, taskId: id, agentId: id, title: z.string().min(1).max(160), budget: z.number().int().positive(), scenario: z.enum(['success', 'injection', 'interruption', 'invalid-delivery']) }),
+  z.object({ type: z.literal('create_task'), executionMode: z.enum(['automatic','manual']).optional(), requestId: id, taskId: id, agentId: id, title: z.string().min(1).max(160), budget: z.number().int().positive(), scenario: z.enum(['success', 'injection', 'interruption', 'invalid-delivery']) }),
   z.object({ type: z.literal('advance'), taskId: id, expectedStep: z.number().int().min(0).max(6) }),
   z.object({ type: z.literal('resume_task'), taskId: id }),
   z.object({ type: z.literal('cancel_task'), taskId: id }),
@@ -20,7 +22,11 @@ export async function POST(request: Request) {
     if (raw.length > 8192) return Response.json({ error: 'Request too large.' }, { status: 413 });
     const parsed = command.safeParse(JSON.parse(raw));
     if (!parsed.success) return Response.json({ error: parsed.error.issues.map(i => i.message).join('; ') }, { status: 400 });
-    return Response.json(await execute(owner(request), parsed.data), { headers: { 'Cache-Control': 'no-store' } });
+    if (parsed.data.type === 'create_task' && parsed.data.executionMode === 'manual' && (!isLoopback(new URL(request.url)) || !request.headers.has('x-agentos-sandbox'))) throw new DomainError('Manual execution is restricted to isolated local tests.', 'FORBIDDEN');
+    const ownerId = owner(request);
+    const result = await execute(ownerId, parsed.data);
+    if (parsed.data.type === 'create_task' || parsed.data.type === 'resume_task') scheduleTasks(ownerId, result.state, parsed.data.taskId);
+    return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
     const status = e instanceof DomainError ? ({ UNAUTHORIZED: 401, FORBIDDEN: 403, NOT_FOUND: 404, CONFLICT: 409, IDEMPOTENCY_CONFLICT: 409 }[e.code] ?? 400) : e instanceof SyntaxError ? 400 : 500;
     return Response.json({ error: e instanceof Error ? e.message : 'Operation failed.' }, { status });

@@ -15,6 +15,7 @@ export async function execute(ownerId: string, command: Command) {
   for (let attempt = 0; attempt < 12; attempt++) {
     const { state, revision } = await read(ownerId);
     const next = await transition(state, command, now);
+    if (JSON.stringify(next) === JSON.stringify(state)) return {state, revision};
     // A single-row compare-and-swap atomically commits task, budget, ledger and receipt.
     const result = await db().prepare('UPDATE agentos_workspaces SET revision = revision + 1, data = ? WHERE owner_id = ? AND revision = ?').bind(JSON.stringify(next), ownerId, revision).run();
     if (result.meta.changes === 1) return { state: next, revision: revision + 1 };
