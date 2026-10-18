@@ -18,9 +18,20 @@ Functions 不作为新项目依赖；当前官方文档已提示弃用。Data Fe
 
 `npm run cre:build` 使用 SDK 编译器将当前 `cre/workflow/main.ts` 编译为 `outputs/agentos-cre.wasm`，需要 Bun >=1.2.21（可设置 `AGENTOS_BUN_BIN`）。已在 Bun 1.3.8、SDK 1.23.0、Javy 8.1.0 上实际通过。CLI v1.38.0 已安装至忽略的本地工具目录；CLI 模拟尚未完成。WASM 编译不需要钱包，不会部署或广播交易。
 
+官方 CLI 构建也已实跑成功：
+
+```sh
+npm run cre:prepare   # 从 example 生成忽略的本地配置，不覆盖已有文件
+npm run cre:cli-build # 官方 CLI build，输出 outputs/agentos-cli.wasm
+```
+
+YAML 结构来自[官方模板](https://github.com/smartcontractkit/cre-templates/tree/main/building-blocks/indexer-block-trigger/block-trigger-ts)。填写 `cre/workflow/config.local.json` 的实际地址、任务与不可变 HTTPS 证据，再登录 CLI 后执行 `npm run cre:simulate`。该命令使用已构建 WASM，默认不广播交易。工作流启动会拒绝占位地址、无效哈希、非 HTTPS URL 和不合理 gasLimit；构建不代表这些网络配置已验证。
+
+当前实际执行 `cre init` 与 `cre whoami` 均返回未登录、无 `CRE_API_KEY`。账户登录由用户在本机终端完成，不把密钥提交到仓库或聊天。官方模拟要求账户认证；此限制不影响本地 CLI 编译。
+
 ## 网络启用步骤（尚未完成）
 
-1. 按[官方安装文档](https://docs.chain.link/cre/getting-started/cli-installation/macos-linux)安装并登录 CRE CLI，用当前 CLI 的项目初始化流程生成 project.yaml / workflow.yaml；保留官方版本对应的配置结构。此仓库没有捏造可直接部署的 CLI 配置。
+1. 按[官方安装文档](https://docs.chain.link/cre/getting-started/cli-installation/macos-linux)安装并登录 CRE CLI，执行 `npm run cre:prepare`，检查基于官方模板的 project.yaml / workflow.yaml；本地样例仍需实际网络与账户配置。
 2. 将 `workflow/main.ts` 和 `verify.ts` 加入生成的 TypeScript 工作流，安装项目已固定的 SDK 版本。复制 config.example.json 到忽略的 config.local.json，替换全部占位值。公开不可变 fixture 和交付文件，计算 hash。
 3. 从[官方 forwarder 目录](https://docs.chain.link/cre/guides/workflow/using-evm-client/onchain-write/forwarder-directory)核实目标链的 forwarder。拿到实际 workflow metadata 字节（对应登记的 workflow identity）后计算 metadataHash；不能用本地 EVM 测试中的 mock 字节代替真实配置。测试用 forwarder 与生产 forwarder 不混用。
 4. 编译、部署 AgentEscrow，构造器传标准测试 ERC-20、核实后的 forwarder 和 metadataHash；部署 AgentVault、存入测试代币、批准 executor 和 seller，设置小额度 grant。通过 owner 钱包签名，密钥留在钱包/秘密管理系统。

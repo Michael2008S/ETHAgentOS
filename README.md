@@ -41,6 +41,9 @@ npm test                  # 状态机、独立校验器、身份适配器与内�
 npm run typecheck         # 网站、SDK、CRE 各自类型检查
 npm run contracts:compile # 生成 ABI 与 bytecode（忽略的 artifacts 目录）
 npm run cre:build         # 需要 Bun >=1.2.21；生成 outputs/agentos-cre.wasm
+npm run cre:prepare       # 生成本地 CRE 配置，保留已有配置
+npm run cre:cli-build     # 通过官方 CLI 构建 outputs/agentos-cli.wasm
+npm run cre:simulate      # 需实际配置、账户认证；默认不广播
 npm run demo              # 完整闭环，独立沙盒，不需要打开浏览器
 npm run demo:deadline     # 自动超时、预留释放、已付款跨期限恢复
 npm run demo:chain        # 网页成果 → 本地校验器 → 真实本地 EVM 托管与退款

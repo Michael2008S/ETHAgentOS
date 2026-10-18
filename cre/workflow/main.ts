@@ -1,7 +1,7 @@
 import {CronCapability,HTTPClient,EVMClient,handler,Runner,getNetwork,consensusIdenticalAggregation,encodeCallMsg,LAST_FINALIZED_BLOCK_NUMBER,bytesToHex,hexToBase64,type NodeRuntime,type Runtime} from '@chainlink/cre-sdk';
 import {encodeAbiParameters,parseAbiParameters,parseAbi,encodeFunctionData,decodeFunctionResult,zeroAddress,type Address,type Hex} from 'viem';
 import {specHash,verifyDelivery,type DeliverySpec} from './verify.ts';
-type Config={schedule:string;chainName:string;escrowAddress:Address;taskId:Hex;gasLimit:string;spec:DeliverySpec};
+import {parseConfig,type Config} from './config.ts';
 const abi=parseAbi(['function taskCommitment(bytes32 id) view returns(bytes32,uint8,uint64)']);
 function fetchText(runtime:NodeRuntime<Config>,url:string){
  if(!url.startsWith('https://'))throw new Error('Only configured HTTPS endpoints are permitted');
@@ -29,4 +29,4 @@ function onCron(runtime:Runtime<Config>){
  return bytesToHex(write.txHash||new Uint8Array());
 }
 export const initWorkflow=(config:Config)=>[handler(new CronCapability().trigger({schedule:config.schedule}),onCron)];
-export async function main(){const runner=await Runner.newRunner<Config>();await runner.run(initWorkflow);}
+export async function main(){const runner=await Runner.newRunner<Config>({configParser:parseConfig});await runner.run(initWorkflow);}

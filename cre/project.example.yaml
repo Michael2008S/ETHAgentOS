@@ -1,0 +1,6 @@
+# Schema source: smartcontractkit/cre-templates, block-trigger-ts/project.yaml (CLI v1.38.0).
+# Copy with npm run cre:prepare; put private RPC credentials only in ignored local files.
+staging-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://ethereum-sepolia-rpc.publicnode.com

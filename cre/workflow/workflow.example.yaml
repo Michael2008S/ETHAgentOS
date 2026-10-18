@@ -1,0 +1,8 @@
+# Schema source: smartcontractkit/cre-templates, block-trigger-ts/workflow/workflow.yaml.
+staging-settings:
+  user-workflow:
+    workflow-name: agentos-delivery-staging
+  workflow-artifacts:
+    workflow-path: ./main.ts
+    config-path: ./config.local.json
+    secrets-path: ""

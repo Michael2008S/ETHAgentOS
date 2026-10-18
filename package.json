@@ -21,7 +21,10 @@
     "worker": "node scripts/worker.mjs",
     "demo": "node scripts/demo.mjs",
     "demo:chain": "node scripts/demo-chain.mjs",
-    "demo:deadline": "node scripts/demo-deadline.mjs"
+    "demo:deadline": "node scripts/demo-deadline.mjs",
+    "cre:prepare": "node scripts/cre-prepare.mjs",
+    "cre:cli-build": "node scripts/cre-cli.mjs build",
+    "cre:simulate": "node scripts/cre-cli.mjs simulate"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
