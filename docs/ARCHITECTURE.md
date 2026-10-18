@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Identity | 本地 profile；ERC-8004 注册 document/calldata adapter | 测试网 register、解析 tokenURI、身份与支付地址绑定 |
 | Wallet | 模拟余额；AgentVault 合约 | 钱包连接、签名确认、链上余额同步 |
-| Memory | 任务输入、结果、事件、收据 | 可检索知识、租户级私有向量存储 |
+| Memory | 按智能体/内容/哈希检索任务输入、结果、事件、收据；上下文导出 | 租户级私有向量知识库 |
 | Skills | 两个确定性适配器，内置/自定义数据、版本、capability 清单 | MCP/A2A 适配、隔离外部执行进程 |
 | Reputation | 基于当前 workspace 的完成任务计数 | 验证过的反馈源、ERC-8004 Reputation Registry |
 | Payments | 模拟账本与单链 ERC-20 托管源码 | 测试网交易回执与 UI 同步；x402 采购 |

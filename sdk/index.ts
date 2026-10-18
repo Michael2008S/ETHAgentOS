@@ -1,12 +1,14 @@
+import type { MemoryQuery, queryMemory } from '../lib/agentos/memory.ts';
 import type { Command, Scenario, Task, TaskInput, Workspace } from '../lib/agentos/types.ts';
 export class AgentOSClient {
   baseURL: string;
   constructor(baseURL='', privateHeaders: Record<string,string>={}) { this.baseURL=baseURL; this.headers=privateHeaders; }
   private headers: Record<string,string>;
-  private async request(path:string,command?:Command,post=false):Promise<{state:Workspace;revision:number}> {
+  private async request<T={state:Workspace;revision:number}>(path:string,command?:Command,post=false):Promise<T> {
     const res=await fetch(this.baseURL+path,{method:command||post?'POST':'GET',headers:{'Content-Type':'application/json',...this.headers},credentials:'include',...(command?{body:JSON.stringify(command)}:{})});
-    const data=await res.json() as {state:Workspace;revision:number;error?:string};if(!res.ok)throw new Error(data.error||`HTTP ${res.status}`);return data;
+    const data=await res.json() as T & {error?:string};if(!res.ok)throw new Error(data.error||`HTTP ${res.status}`);return data;
   }
+  async memory(filters:Partial<MemoryQuery>={}){return this.request<ReturnType<typeof queryMemory>>('/api/memory?'+new URLSearchParams(Object.entries(filters).map(([key,value])=>[key,String(value)])));}
   async workspace(){return (await this.request('/api/workspace')).state;}
   async createTask(input:{agentId:string;title:string;budget:number;input?:TaskInput;timeoutSeconds?:number;scenario?:Scenario;requestId?:string}) {
     const requestId=input.requestId||crypto.randomUUID();const {state}=await this.request('/api/command',{...input,scenario:input.scenario||'success',type:'create_task',requestId,taskId:requestId});return state.tasks.find(t=>t.requestId===requestId)!;

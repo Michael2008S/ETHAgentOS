@@ -48,8 +48,15 @@ for(const expectedStep of [0,1,2,3,4,5])s=await command({type:'advance',taskId:c
 const customTask=s.tasks.find(t=>t.id===custom.taskId);assert.equal(customTask.output.totalCents,1457);assert.equal(customTask.receipt.inputHash,await digest(input));
 const changedInput=await fetch(base+'/api/command',{method:'POST',headers,body:JSON.stringify({...custom,input:{...input,blockTo:3}})});assert.equal(changedInput.status,409);
 const invalidInput=await fetch(base+'/api/command',{method:'POST',headers,body:JSON.stringify({...custom,requestId:custom.requestId+'-invalid',taskId:custom.taskId+'-invalid',input:{...input,records:[{...input.records[0],cents:-1}]}})});assert.equal(invalidInput.status,400);
+const memoryQuery=new URLSearchParams({q:customTask.receipt.inputHash,agentId:'sage',status:'completed',limit:'1'});
+const memory=await fetch(base+'/api/memory?'+memoryQuery,{headers});assert.equal(memory.status,200);
+const page=await memory.json();assert.equal(page.total,1);assert.equal(page.items[0].id,custom.taskId);
+const memoryExport=await fetch(base+'/api/memory?'+memoryQuery+'&format=export',{headers});assert.equal(memoryExport.status,200);assert.match(memoryExport.headers.get('content-disposition'),/^attachment;/);
+const context=await memoryExport.json();assert.equal(context.total,1);assert.deepEqual(context.items[0].input,input);assert.deepEqual(context.items[0].receipt,customTask.receipt);
+const otherMemory=await fetch(base+'/api/memory?'+memoryQuery,{headers:{...headers,'x-agentos-sandbox':'other-'+runId}});assert.equal((await otherMemory.json()).total,0);
+const invalidQuery=await fetch(base+'/api/memory?limit=9999',{headers});assert.equal(invalidQuery.status,400);
 const denied=await fetch(base+'/api/command',{method:'POST',headers:{...headers,Origin:'https://different.example'},body:JSON.stringify({type:'topup',amount:1,requestId:'csrf'})});assert.equal(denied.status,403);
 const invalid=await fetch(base+'/api/command',{method:'POST',headers,body:'{broken'});assert.equal(invalid.status,400);
-console.log('API integration PASS: D1 CAS concurrency, duplicate settlement, revoke after reservation, owner-scoped exports, service settings, custom input commitments, origin guard, invalid input.');
+console.log('API integration PASS: D1 CAS concurrency, duplicate settlement, revoke after reservation, owner-scoped exports and memory search, service settings, custom input commitments, origin guard, invalid input.');
 
 } finally { await command({type:'update_policy',policy:initial.policy}); }
