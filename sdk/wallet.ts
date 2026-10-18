@@ -1,7 +1,7 @@
 import { createPublicClient, createWalletClient, custom, defineChain, keccak256, stringToHex, type Address, type EIP1193Provider, type Hex } from 'viem';
 import { AgentChainClient, centsToToken, chainTaskId, tokenABI, escrowABI, validateChainDeployment, type ChainDeployment, type ChainEvidence, type ChainIntent, type TransactionIntent } from './chain.ts';
 import { DATASET, verifyReceipt } from '../lib/agentos/engine.ts';
-import { specHash, type DeliverySpec } from '../cre/workflow/verify.ts';
+import { canonical,specHash, type DeliverySpec } from '../cre/workflow/verify.ts';
 import type { Task } from '../lib/agentos/types.ts';
 
 export type WalletDeployment = ChainDeployment & {mode:'local'|'testnet';seller:Address;deployedBlock:string};
@@ -23,12 +23,14 @@ export function walletDeployment(value: unknown): WalletDeployment {
   return {...d};
 }
 export const walletNamespace=(buyer:Address)=>'wallet:'+buyer.toLowerCase();
+export function inputEvidence(task:Pick<Task,'id'|'input'>,buyer:Address){
+  const id=chainTaskId(walletNamespace(buyer),task.id),rows=(task.input.records??DATASET).filter(row=>row.block>=task.input.blockFrom&&row.block<=task.input.blockTo),datasetText=JSON.stringify(rows);
+  return {id,datasetText,datasetHash:keccak256(stringToHex(datasetText))};
+}
 export function deliveryBytes(task: Task, buyer: Address) {
   if(!task.output)throw new Error('This task has no delivery artifact.');
-  const id=chainTaskId(walletNamespace(buyer),task.id);
-  const rows=(task.input.records??DATASET).filter(row=>row.block>=task.input.blockFrom&&row.block<=task.input.blockTo);
-  const datasetText=JSON.stringify(rows),artifactText=JSON.stringify({taskId:id,totalCents:task.output.totalCents,transferCount:task.output.transferCount});
-  return {id,datasetText,artifactText,datasetHash:keccak256(stringToHex(datasetText))};
+  const bytes=inputEvidence(task,buyer),artifactText=JSON.stringify({taskId:bytes.id,totalCents:task.output.totalCents,transferCount:task.output.transferCount});
+  return {...bytes,artifactText};
 }
 export class AgentWalletSession {
   readonly client;
@@ -61,7 +63,7 @@ export class AgentWalletSession {
     const [native,balance]=await Promise.all([this.client.getBalance({address:this.account}),this.client.readContract({address:this.deployment.token,abi:tokenABI,functionName:'balanceOf',args:[this.account]})]);
     return {native:native.toString(),token:balance.toString(),decimals};
   }
-  async task(task:Task,spec?:DeliverySpec){
+  async task(task:Pick<Task,'id'|'quote'>,spec?:DeliverySpec){
     await this.assertSession();const {decimals}=await this.chain.validateDeployment();
     const id=chainTaskId(walletNamespace(this.account),task.id);
     const [buyer,seller,amount,deadline,commitment,status,outputHash]=await this.client.readContract({address:this.deployment.escrow,abi:escrowABI,functionName:'tasks',args:[id]});
@@ -88,13 +90,21 @@ export class AgentWalletSession {
     for(const transaction of transactions)hash=await this.send(transaction,onSubmitted);
     return this.chain.verifyEvidence(intent,hash!,'funding');
   }
-  async refund(task:Task,onSubmitted?:(hash:Hex)=>void){
+  async fundOrder(order:import('../lib/agentos/orders.ts').ChainOrder,windowSeconds=3600,onSubmitted?:(hash:Hex)=>void){
+    if(order.status!=='awaiting-funding'||order.funding||order.output||order.buyer.toLowerCase()!==this.account.toLowerCase()||canonical(order.deployment).toLowerCase()!==canonical(this.deployment).toLowerCase())throw new Error('Only the configured buyer may fund this unexecuted order.');
+    if(!Number.isSafeInteger(windowSeconds)||windowSeconds<30||windowSeconds>604800)throw new Error('Order escrow window must be 30–604800 seconds.');
+    const bytes=inputEvidence(order,this.account);if(bytes.datasetHash!==order.spec.datasetHash)throw new Error('Order input commitment differs.');
+    const {intent,transactions}=await this.chain.prepareFunding({workspace:walletNamespace(this.account),taskId:order.id,buyer:this.account,seller:this.deployment.seller,quoteCents:order.quote,deadline:(await this.client.getBlock()).timestamp+BigInt(windowSeconds),spec:order.spec});
+    let hash:Hex|undefined;for(const transaction of transactions)hash=await this.send(transaction,onSubmitted);
+    return this.chain.verifyEvidence(intent,hash!,'funding');
+  }
+  async refund(task:Pick<Task,'id'|'quote'>,onSubmitted?:(hash:Hex)=>void){
     const current=await this.task(task);if(current.status!=='funded')throw new Error('No funded escrow is available to refund.');
     if((await this.client.getBlock()).timestamp<current.intent!.deadline)throw new Error('Escrow deadline has not passed.');
     const hash=await this.send(this.chain.refundTransaction(current.id),onSubmitted);
     return this.chain.verifyEvidence(current.intent!,hash,'settlement');
   }
-  async evidence(task:Task,hash:Hex,phase:'funding'|'settlement',spec?:DeliverySpec){
+  async evidence(task:Pick<Task,'id'|'quote'>,hash:Hex,phase:'funding'|'settlement',spec?:DeliverySpec){
     const current=await this.task(task,spec);if(!current.intent)throw new Error('Task is not funded.');
     return this.chain.verifyEvidence(current.intent,hash,phase);
   }

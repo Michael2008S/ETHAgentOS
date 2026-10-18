@@ -1,0 +1,37 @@
+import { keccak256,stringToHex,type Hex,type PublicClient } from 'viem';
+import { AgentChainClient,centsToToken,escrowABI,type ChainIntent } from '../../sdk/chain.ts';
+import { inputEvidence,type WalletDeployment } from '../../sdk/wallet.ts';
+import { canonical,specHash } from '../../cre/workflow/verify.ts';
+import { matchingDeployment } from './chain-reconciliation.ts';
+import { DomainError } from './engine.ts';
+import { orderArtifact,type ChainOrder } from './orders.ts';
+
+export type LocalOrderCall=(path:string,body:unknown)=>Promise<{hash:Hex}>;
+export function orderChain(client:PublicClient,deployment:WalletDeployment,localCall?:LocalOrderCall){
+  const chain=new AgentChainClient(client,deployment);
+  async function inspect(order:ChainOrder){
+    if(!matchingDeployment(order.deployment,deployment))throw new DomainError('Order deployment differs from the server configuration.','CONFLICT');
+    const {decimals}=await chain.validateDeployment(),bytes=inputEvidence(order,order.buyer);
+    const [task,block]=await Promise.all([client.readContract({address:deployment.escrow,abi:escrowABI,functionName:'tasks',args:[bytes.id]}),client.getBlock()]);
+    const intent:ChainIntent={id:bytes.id,buyer:order.buyer,seller:deployment.seller,amount:centsToToken(order.quote,decimals),deadline:task[3],specHash:specHash(order.spec)};
+    if(task[5]!==0&&(task[0].toLowerCase()!==intent.buyer.toLowerCase()||task[1].toLowerCase()!==intent.seller.toLowerCase()||task[2]!==intent.amount||task[4]!==intent.specHash))throw new DomainError('Order escrow does not match its frozen commitment.','CONFLICT');
+    return {intent,status:task[5],timestamp:block.timestamp,outputHash:task[6]};
+  }
+  return {
+    inspect,
+    verifySignature:(order:ChainOrder,message:string,signature:Hex)=>client.verifyMessage({address:order.buyer,message,signature}),
+    async funding(order:ChainOrder,hash:Hex){const current=await inspect(order);if(![1,3].includes(current.status))throw new DomainError('A funded or refunded escrow is required for confirmation.');return {evidence:await chain.verifyEvidence(current.intent,hash,'funding'),deadline:current.intent.deadline,chainNow:current.timestamp,currentStatus:current.status};},
+    async settlement(order:ChainOrder,hash:Hex){
+      const current=await inspect(order),evidence=await chain.verifyEvidence(current.intent,hash,'settlement');
+      if(evidence.status==='paid'&&(!order.output||order.failure||evidence.outputHash!==keccak256(stringToHex(canonical(JSON.parse(orderArtifact(order,current.intent.id)))))))throw new DomainError('Paid escrow does not match an authorized, verified order output.','CONFLICT');
+      return evidence;
+    },
+    async settle(order:ChainOrder){
+      if(!localCall)return null;
+      const current=await inspect(order);
+      if(current.status===1&&current.timestamp<current.intent.deadline)await localCall('/artifacts',{id:current.intent.id,artifactText:orderArtifact(order,current.intent.id)});
+      return (await localCall('/settle',{id:current.intent.id})).hash;
+    },
+  };
+}
+export type OrderChain=ReturnType<typeof orderChain>;

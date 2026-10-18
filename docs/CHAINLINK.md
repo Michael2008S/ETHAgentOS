@@ -40,6 +40,6 @@ YAML 结构来自[官方模板](https://github.com/smartcontractkit/cre-template
 5. 用同一 DeliverySpec 计算 specHash，openTask 并保存 taskId、deadline。artifact JSON 格式为 `{ "taskId": "0x…", "totalCents": 75000, "transferCount": 6 }`。
 6. 用官方 CLI 模拟生成的 workflow；需要广播测试交易时按官方文档启用广播，并确认使用测试资金。本地 CLI dry-run 已通过，公共网络广播和 DON 仍未验收。[模拟文档](https://docs.chain.link/cre/guides/operations/simulating-workflows)。
 7. 按账户权限申请 workflow 部署，并验证 report 通过真实 forwarder 到达合约。记录 execution ID、交易 hash、余额变化、相同任务二次 report 拒绝和超时退款。
-8. 网站已提供 EIP-1193 连接、链上余额、回执核验、买方签名及服务端复核写回 D1。仍需实现预注资任务执行与持续链重组监控，并验收公共网络配置。不得把本地 D1 余额简单切换标签当作链上资金。
+8. 网站已提供 EIP-1193 连接、链上余额、回执核验、买方签名、预注资后台执行及服务端复核写回 D1。仍需持续链重组监控并验收公共网络配置。不得把本地 D1 余额简单切换标签当作链上资金。
 
 ERC-8004 身份适配器位于 `sdk/identity.ts`。返回注册文档和 register(string) calldata；需 owner 签名，并在获得 agentId 后补 registrations。身份协议本身不承担付款。[ERC-8004 规范](https://ercs.ethereum.org/ERCS/erc-8004)。

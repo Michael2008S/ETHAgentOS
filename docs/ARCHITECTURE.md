@@ -11,7 +11,7 @@
 | Reputation | 基于当前 workspace 的完成任务计数 | 验证过的反馈源、ERC-8004 Reputation Registry |
 | Payments | 模拟账本、单链 ERC-20 托管、回执核验与 UI 同步；买方签名绑定工作区、服务端复核、D1 幂等历史 | 公共测试网、持续重组监控与 x402 采购 |
 | Permissions | 服务端 typed operation gate；预算；实时撤销 | 签名 session grant、目标合约与 selector 授权 |
-| Escrow | 原子预留/结算/退款；独立 Solidity 合约、网页真实本地托管与回执核验 | 预注资任务执行、生产对账 |
+| Escrow | 原子预留/结算/退款；真实托管回执、输入预承诺、先注资后后台执行、失败链上退款 | 公共网络验收与持续重组监控 |
 | Marketplace | 可注册/启停本地服务的目录、固定报价与任务分配 | 外部供应商发现、真实服务 SLA |
 | Execution | 服务端后台执行、持久化状态机、幂等请求、有限退避重试、恢复 API、本地 worker 与任务期限 | 独立持久队列、外部执行租约 |
 
@@ -19,19 +19,26 @@
 
 ```mermaid
 flowchart LR
- U[Mission Control / SDK] --> A[Typed command API]
+ U[Mission Control / SDK] --> A[Sandbox task API]
  A --> P[Policy + capabilities]
  P --> E[Deterministic data adapters]
  E --> V[Local recomputation]
- V --> D[D1 CAS: task + ledger + receipt]
- B[Owner wallet] --> G[AgentVault grants]
+ V -->|sandbox| D[D1 task + ledger + receipt]
+ B[Buyer wallet] --> G[ERC20 approve + openTask]
  G --> C[AgentEscrow]
- H[Committed evidence + delivery] --> R[CRE workflow source]
- R --> F[Authorized forwarder + metadata]
- F --> C
+ C --> R[Server funding and signature verification]
+ R --> Q[D1 order checkpoints]
+ Q --> P
+ V -->|onchain| H[Immutable delivery artifact]
+ H --> L[Local HTTP + EOA verifier]
+ L --> C
+ H -. public configuration pending .-> W[CRE DON]
+ W -. authenticated report .-> C
+ C --> F[Canonical receipt verifier]
+ F --> Q
 ```
 
-上半部已接通网站。下半部通过 `demo:chain` 和钱包页面将自定义网页成果接入本地 EVM，并读取实际余额和回执。买方通过一次性挑战签名，服务端重新核验链上证据并写回 D1，实际通过 `demo:reconcile` 验收。两条资金账本仍独立；CRE CLI 已通过本地 RPC 与真实 HTTPS 的 dry-run；DON/公共测试网尚未联调。
+两条支付模式均已接通网页。预注资订单通过 `demo:prefund` 验证先确认真实托管、再执行并结算的链路；既有成果还可通过 `demo:chain`/`demo:reconcile` 接入独立托管并保存回执。资金账本分别记录。AgentVault 合约当前独立测试，网页预注资入口由买方直接调用 AgentEscrow。CRE CLI 已通过本地 RPC 与真实 HTTPS 的 dry-run；DON/公共测试网尚未联调。
 
 ## 并发与恢复
 

@@ -17,7 +17,7 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
   async function deploy(name,args=[]){const hash=await wallet.deployContract({...artifacts[name],account:buyer,args,gas:6000000n});return(await client.waitForTransactionReceipt({hash})).contractAddress;}
   const token=await deploy('MockToken'),metadata=stringToHex('agentos-local-verifier:v1'),metadataHash=keccak256(metadata),escrow=await deploy('AgentEscrow',[token,forwarder,metadataHash]);
   await client.waitForTransactionReceipt({hash:await wallet.writeContract({address:token,abi:artifacts.MockToken.abi,functionName:'mint',args:[buyer,100000000n],account:buyer,gas:6000000n})});
-  const config={mode:'local',chainId:31337,token,escrow,forwarder,metadataHash,confirmations:1,seller,deployedBlock:'0'},deliveries=new Map();
+  const config={mode:'local',chainId:31337,token,escrow,forwarder,metadataHash,confirmations:1,seller,deployedBlock:'0'},deliveries=new Map(),settlements=new Map();
   let base;
   const server=createServer(async(req,res)=>{
     const json=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data));};
@@ -30,7 +30,7 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
       const specMatch=path.match(/^\/spec\/(0x[0-9a-f]{64})$/);
       if(req.method==='GET'&&specMatch){const record=deliveries.get(specMatch[1]);return record?json(200,record.spec):json(404,{error:'Delivery not found.'});}
       const match=path.match(/^\/(dataset|artifact)\/(0x[0-9a-f]{64})$/);
-      if(req.method==='GET'&&match){const record=deliveries.get(match[2]);if(!record)return json(404,{error:'Delivery not found.'});res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(match[1]==='dataset'?record.datasetText:record.artifactText);return;}
+      if(req.method==='GET'&&match){const record=deliveries.get(match[2]);if(!record||match[1]==='artifact'&&!record.artifactText)return json(404,{error:'Delivery not ready.'});res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(match[1]==='dataset'?record.datasetText:record.artifactText);return;}
       if(req.method!=='POST')return json(404,{error:'Route not found.'});
       let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>65536)throw new Error('Local request too large.');}const body=JSON.parse(raw);
       if(path==='/rpc'){
@@ -44,12 +44,42 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
         if(method==='eth_sendTransaction'&&(params[0]?.from?.toLowerCase()!==buyer.toLowerCase()||![token,escrow].some(address=>address.toLowerCase()===params[0]?.to?.toLowerCase())))return json(200,{jsonrpc:'2.0',id,error:{code:-32602,message:'Local wallet only signs buyer calls to this test deployment.'}});
         try{return json(200,{jsonrpc:'2.0',id,result:await provider.request({method,params})});}catch(error){return json(200,{jsonrpc:'2.0',id,error:{code:error.code??-32000,message:error.message}});}
       }
+      if(path==='/drafts'){
+        if(!/^0x[0-9a-f]{64}$/.test(body.id)||typeof body.datasetText!=='string')throw new Error('Invalid local input commitment.');
+        const records=JSON.parse(body.datasetText);if(!Array.isArray(records))throw new Error('Invalid input.');if(records.length)normalizeInput({dataset:'custom-transfers-v1',blockFrom:0,blockTo:Number.MAX_SAFE_INTEGER,records});
+        const existing=deliveries.get(body.id);if(existing&&existing.datasetText!==body.datasetText)throw new Error('This input commitment already exists.');
+        const spec={datasetUrl:base+'/dataset/'+body.id,datasetHash:keccak256(stringToHex(body.datasetText)),artifactUrl:base+'/artifact/'+body.id};
+        if(!existing){deliveries.set(body.id,{datasetText:body.datasetText,artifactText:null,spec,locked:true});await provider.request({method:'evm_mine',params:[]});}return json(200,spec);
+      }
+      if(path==='/artifacts'){
+        const record=deliveries.get(body.id);if(!record?.locked||typeof body.artifactText!=='string')throw new Error('Committed order input is missing.');
+        const artifact=JSON.parse(body.artifactText);if(artifact.taskId!==body.id||!('rejectionReason' in artifact)&&(!Number.isSafeInteger(artifact.totalCents)||!Number.isSafeInteger(artifact.transferCount)))throw new Error('Invalid order artifact.');
+        if(record.artifactText&&record.artifactText!==body.artifactText)throw new Error('Published order artifact is immutable.');record.artifactText=body.artifactText;return json(200,{published:true});
+      }
+      if(path==='/settle'){
+        if(!deliveries.get(body.id)?.locked)throw new Error('Unknown pre-funded order.');
+        if(!settlements.has(body.id)){
+          const action=(async()=>{
+            const task=await client.readContract({address:escrow,abi:escrowABI,functionName:'tasks',args:[body.id]});
+            if([2,3].includes(task[5])){const logs=await client.getContractEvents({address:escrow,abi:escrowABI,eventName:'Settled',args:{id:body.id},fromBlock:0n});if(!logs.length)throw new Error('Settlement event unavailable.');return {hash:logs.at(-1).transactionHash,mode:'local EOA verifier; not CRE DON'};}
+            if(task[5]!==1)throw new Error('Order has no funded escrow.');
+            if((await client.getBlock()).timestamp>=task[3]){
+              const hash=await wallet.writeContract({address:escrow,abi:escrowABI,functionName:'refundExpired',args:[body.id],account:buyer,gas:6000000n});await client.waitForTransactionReceipt({hash});return {hash,mode:'local expired escrow refund'};
+            }
+            const record=deliveries.get(body.id);if(task[4]!==specHash(record.spec))throw new Error('Order specification differs from its escrow.');
+            const [data,artifact]=await Promise.all([fetch(record.spec.datasetUrl),fetch(record.spec.artifactUrl)]);if(!data.ok||!artifact.ok)throw new Error('Order delivery is not ready.');
+            const verdict=verifyDelivery(await data.text(),await artifact.text(),body.id,record.spec.datasetHash);
+            const hash=await wallet.writeContract({address:escrow,abi:parseAbi(['function onReport(bytes metadata,bytes report)']),functionName:'onReport',args:[metadata,encodeSettlementReport(body.id,task[4],verdict.outputHash,verdict.accepted)],account:forwarder,gas:6000000n});const receipt=await client.waitForTransactionReceipt({hash});if(receipt.status!=='success')throw new Error('Order report reverted.');return {hash,accepted:verdict.accepted,mode:'local EOA verifier; not CRE DON'};
+          })();settlements.set(body.id,action);action.catch(()=>settlements.delete(body.id));
+        }
+        return json(200,await settlements.get(body.id));
+      }
       if(path==='/deliveries'){
         if(!/^0x[0-9a-f]{64}$/.test(body.id)||typeof body.datasetText!=='string'||typeof body.artifactText!=='string')throw new Error('Invalid local delivery.');
         const records=JSON.parse(body.datasetText);if(!Array.isArray(records))throw new Error('Invalid local dataset.');if(records.length)normalizeInput({dataset:'custom-transfers-v1',blockFrom:0,blockTo:Number.MAX_SAFE_INTEGER,records});
         const artifact=JSON.parse(body.artifactText);if(artifact.taskId!==body.id||!Number.isSafeInteger(artifact.totalCents)||!Number.isSafeInteger(artifact.transferCount))throw new Error('Invalid local artifact.');
         const spec={datasetUrl:base+'/dataset/'+body.id,datasetHash:keccak256(stringToHex(body.datasetText)),artifactUrl:base+'/artifact/'+body.id};
-        deliveries.set(body.id,{datasetText:body.datasetText,artifactText:body.artifactText,spec});return json(200,spec);
+        if(deliveries.get(body.id)?.locked)throw new Error('Pre-funded order evidence cannot be replaced.');deliveries.set(body.id,{datasetText:body.datasetText,artifactText:body.artifactText,spec});return json(200,spec);
       }
       if(path==='/verify'){
         const record=deliveries.get(body.id);if(!record)throw new Error('Local delivery is missing.');

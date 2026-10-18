@@ -28,7 +28,8 @@
     "chain:local": "node scripts/local-chain.mjs",
     "demo:wallet": "node scripts/demo-wallet.mjs",
     "demo:cre": "node scripts/cre-cli.mjs build && node scripts/demo-cre.mjs",
-    "demo:reconcile": "node scripts/demo-reconciliation.mjs"
+    "demo:reconcile": "node scripts/demo-reconciliation.mjs",
+    "demo:prefund": "node scripts/demo-prefund.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
