@@ -98,4 +98,9 @@ export class AgentWalletSession {
     const current=await this.task(task,spec);if(!current.intent)throw new Error('Task is not funded.');
     return this.chain.verifyEvidence(current.intent,hash,phase);
   }
+  async signReconciliation(message:string){
+    if(!message.startsWith('AgentOS chain reconciliation v1\n')||message.length>16384||!message.includes(`Buyer: ${this.account}`))throw new Error('Unexpected reconciliation message.');
+    await this.assertSession();
+    return this.signer.signMessage({account:this.account,message});
+  }
 }

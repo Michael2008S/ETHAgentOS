@@ -3,9 +3,10 @@ import type { Workspace } from './types.ts';
 import { taskContext } from './memory.ts';
 import { deliveryBytes } from '../../sdk/wallet.ts';
 import type { Address } from 'viem';
-export type ExportKind = 'ledger' | 'artifact' | 'receipt' | 'context' | 'chain-dataset' | 'chain-artifact';
+export type ExportKind = 'ledger' | 'artifact' | 'receipt' | 'context' | 'chain-dataset' | 'chain-artifact' | 'chain-receipts';
 export function buildExport(state: Workspace, kind: ExportKind, taskId?: string, buyer?:string) {
   if (kind === 'ledger') return {body:state.ledger,filename:'agentos-ledger.json'};
+  if (kind === 'chain-receipts') return {body:{version:'agentos.chain-history.v1',receipts:state.chainReceipts??[]},filename:'agentos-chain-receipts.json'};
   if (!['artifact','receipt','context','chain-dataset','chain-artifact'].includes(kind)) throw new DomainError('Unknown export format.');
   const task=state.tasks.find(t=>t.id===taskId);
   if(!task)throw new DomainError('Task not found.','NOT_FOUND');
@@ -24,5 +25,5 @@ export function buildExport(state: Workspace, kind: ExportKind, taskId?: string,
     if(!task.output)throw new DomainError('Artifact not found.','NOT_FOUND');
     return {body:task.output,filename:`${filename}-output.json`};
   }
-  return {body:taskContext(task),filename:`${filename}-context.json`};
+  return {body:taskContext(task,state.chainReceipts),filename:`${filename}-context.json`};
 }

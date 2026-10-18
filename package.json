@@ -27,7 +27,8 @@
     "cre:simulate": "node scripts/cre-cli.mjs simulate",
     "chain:local": "node scripts/local-chain.mjs",
     "demo:wallet": "node scripts/demo-wallet.mjs",
-    "demo:cre": "node scripts/cre-cli.mjs build && node scripts/demo-cre.mjs"
+    "demo:cre": "node scripts/cre-cli.mjs build && node scripts/demo-cre.mjs",
+    "demo:reconcile": "node scripts/demo-reconciliation.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

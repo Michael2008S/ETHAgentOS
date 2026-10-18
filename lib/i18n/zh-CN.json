@@ -414,5 +414,16 @@
   "Local chain request failed.": "本地链请求失败。",
   "Use public immutable HTTPS evidence URLs.": "请使用公开、不可变的 HTTPS 证据 URL。",
   "CLI simulation passed · DON pending": "CLI 模拟通过 · DON 待部署",
-  "Local EVM verified · testnet pending": "本地 EVM 已验证 · 测试网待验收"
+  "Local EVM verified · testnet pending": "本地 EVM 已验证 · 测试网待验收",
+  "Sign & save receipt to workspace": "签名并保存凭证到工作区",
+  "Receipt saved by server verification": "服务端核验并保存成功",
+  "A one-time wallet signature binds this receipt to your workspace. No tokens are transferred.": "通过一次性钱包签名，将凭证绑定到当前工作区；不会转移代币。",
+  "Saved chain receipts": "已保存的链上凭证",
+  "Server-verified snapshots. Recheck onchain before relying on an old receipt. Sandbox credits are unchanged.": "这些是服务端核验的历史快照，使用旧凭证前应重新读取链上状态；不改变沙盒积分。",
+  "No chain receipts saved yet.": "尚未保存链上凭证。",
+  "Block": "区块",
+  "Export chain receipts": "导出链上凭证",
+  "Server chain reconciliation is not configured.": "服务端尚未配置链上凭证对账。",
+  "Wallet signature does not authorize this workspace receipt.": "钱包签名无法授权当前工作区凭证。",
+  "Reconciliation challenge expired. Request a new signature.": "对账签名挑战已过期，请重新签署。"
 }

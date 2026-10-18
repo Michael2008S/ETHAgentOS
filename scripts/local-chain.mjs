@@ -2,12 +2,13 @@ import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import ganache from 'ganache';
 import { createPublicClient, createWalletClient, custom, keccak256, parseAbi, stringToHex } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 import { compile } from './compile-contracts.mjs';
 import { normalizeInput } from '../lib/agentos/engine.ts';
 import { encodeSettlementReport, escrowABI } from '../sdk/chain.ts';
 import { specHash, verifyDelivery } from '../cre/workflow/verify.ts';
 
-const rpcMethods=new Set(['eth_chainId','eth_accounts','eth_blockNumber','eth_call','eth_getBalance','eth_getTransactionReceipt','eth_getTransactionByHash','eth_getBlockByNumber','eth_getBlockByHash','eth_estimateGas','eth_gasPrice','eth_maxPriorityFeePerGas','eth_feeHistory','eth_getTransactionCount','eth_sendTransaction','web3_clientVersion','net_version','eth_getCode','eth_getLogs']);
+const rpcMethods=new Set(['personal_sign','eth_chainId','eth_accounts','eth_blockNumber','eth_call','eth_getBalance','eth_getTransactionReceipt','eth_getTransactionByHash','eth_getBlockByNumber','eth_getBlockByHash','eth_estimateGas','eth_gasPrice','eth_maxPriorityFeePerGas','eth_feeHistory','eth_getTransactionCount','eth_sendTransaction','web3_clientVersion','net_version','eth_getCode','eth_getLogs']);
 export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:5177'}={}){
   const origin=new URL(appOrigin);if(!['127.0.0.1','localhost','[::1]'].includes(origin.hostname))throw new Error('Local chain requires a loopback app origin.');
   const provider=ganache.provider({logging:{quiet:true},chain:{hardfork:'shanghai',chainId:31337}});
@@ -26,6 +27,8 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
       if(req.method==='OPTIONS'){res.writeHead(204,{'Access-Control-Allow-Headers':'Content-Type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'});res.end();return;}
       const path=new URL(req.url,base).pathname;
       if(req.method==='GET'&&path==='/config')return json(200,config);
+      const specMatch=path.match(/^\/spec\/(0x[0-9a-f]{64})$/);
+      if(req.method==='GET'&&specMatch){const record=deliveries.get(specMatch[1]);return record?json(200,record.spec):json(404,{error:'Delivery not found.'});}
       const match=path.match(/^\/(dataset|artifact)\/(0x[0-9a-f]{64})$/);
       if(req.method==='GET'&&match){const record=deliveries.get(match[2]);if(!record)return json(404,{error:'Delivery not found.'});res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(match[1]==='dataset'?record.datasetText:record.artifactText);return;}
       if(req.method!=='POST')return json(404,{error:'Route not found.'});
@@ -33,6 +36,11 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
       if(path==='/rpc'){
         const {id,method,params=[]}=body;
         if(!rpcMethods.has(method))return json(200,{jsonrpc:'2.0',id,error:{code:-32601,message:'Method is not enabled in the local test wallet.'}});
+        if(method==='personal_sign'){
+          if(params[1]?.toLowerCase()!==buyer.toLowerCase()||typeof params[0]!=='string'||!/^0x[0-9a-fA-F]+$/.test(params[0])||params[0].length>32770||!Buffer.from(params[0].slice(2),'hex').toString().startsWith('AgentOS chain reconciliation v1\n'))return json(200,{jsonrpc:'2.0',id,error:{code:-32602,message:'Local wallet only signs AgentOS receipt challenges for its buyer.'}});
+          const account=privateKeyToAccount(provider.getInitialAccounts()[buyer.toLowerCase()].secretKey);
+          return json(200,{jsonrpc:'2.0',id,result:await account.signMessage({message:{raw:params[0]}})});
+        }
         if(method==='eth_sendTransaction'&&(params[0]?.from?.toLowerCase()!==buyer.toLowerCase()||![token,escrow].some(address=>address.toLowerCase()===params[0]?.to?.toLowerCase())))return json(200,{jsonrpc:'2.0',id,error:{code:-32602,message:'Local wallet only signs buyer calls to this test deployment.'}});
         try{return json(200,{jsonrpc:'2.0',id,result:await provider.request({method,params})});}catch(error){return json(200,{jsonrpc:'2.0',id,error:{code:error.code??-32000,message:error.message}});}
       }

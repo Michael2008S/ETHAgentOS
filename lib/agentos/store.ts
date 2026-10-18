@@ -11,9 +11,13 @@ export async function read(ownerId: string): Promise<{ state: Workspace; revisio
   return { state: JSON.parse(row.data), revision: row.revision };
 }
 export async function execute(ownerId: string, command: Command) {
+  return updateWorkspace(ownerId, state => transition(state, command, new Date().toISOString()));
+}
+/** Trusted server reducers share the same atomic workspace commit as the runtime. */
+export async function updateWorkspace(ownerId: string, reduce: (state: Workspace) => Promise<Workspace> | Workspace) {
   for (let attempt = 0; attempt < 12; attempt++) {
     const { state, revision } = await read(ownerId);
-    const next = await transition(state, command, new Date().toISOString());
+    const next = await reduce(state);
     if (JSON.stringify(next) === JSON.stringify(state)) return {state, revision};
     // A single-row compare-and-swap atomically commits task, budget, ledger and receipt.
     const result = await db().prepare('UPDATE agentos_workspaces SET revision = revision + 1, data = ? WHERE owner_id = ? AND revision = ?').bind(JSON.stringify(next), ownerId, revision).run();

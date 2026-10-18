@@ -7,27 +7,29 @@ import { AgentWalletSession, deliveryBytes, localWalletProvider, walletDeploymen
 import type { ChainEvidence } from '@/sdk/chain';
 import type { DeliverySpec } from '@/cre/workflow/verify';
 import type { Task } from '@/lib/agentos/types';
+import { reconcileReceipt } from '@/sdk/reconciliation';
+import type { SavedChainReceipt } from '@/lib/agentos/chain-reconciliation';
 
 const localBase='http://127.0.0.1:8545';
 type Balance=Awaited<ReturnType<AgentWalletSession['balances']>>;
 type ChainTask=Awaited<ReturnType<AgentWalletSession['task']>>;
-export function ChainPanel({tasks}:{tasks:Task[]}){
+export function ChainPanel({tasks,receipts=[],onSaved}:{tasks:Task[];receipts?:SavedChainReceipt[];onSaved?:()=>Promise<void>}){
   const {tr}=useLanguage(),lock=useRef(false);
   const [loopback,setLoopback]=useState(false),[session,setSession]=useState<AgentWalletSession|null>(null),[config,setConfig]=useState('');
   const [selected,setSelected]=useState(''),[balances,setBalances]=useState<Balance|null>(null),[current,setCurrent]=useState<ChainTask|null>(null),[proof,setProof]=useState<ChainEvidence|null>(null);
   const [datasetUrl,setDatasetUrl]=useState(''),[artifactUrl,setArtifactUrl]=useState(''),[windowSeconds,setWindowSeconds]=useState(3600),[spec,setSpec]=useState<DeliverySpec|undefined>();
-  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[tx,setTx]=useState(''),[phase,setPhase]=useState<'funding'|'settlement'>('settlement');
+  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[tx,setTx]=useState(''),[phase,setPhase]=useState<'funding'|'settlement'>('settlement'),[saved,setSaved]=useState(false);
   const candidates=tasks.filter(task=>task.status==='completed'),task=candidates.find(task=>task.id===selected)??candidates[0];
   useEffect(()=>setLoopback(['localhost','127.0.0.1','[::1]'].includes(location.hostname)),[]);
   async function local<T=unknown>(path:string,body?:unknown):Promise<T>{const r=await fetch(localBase+path,{method:body?'POST':'GET',...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(20000)});const data=await r.json() as T & {error?:string};if(!r.ok)throw new Error(data.error??'Local chain request failed.');return data;}
   async function refresh(active=session,chosen=task){if(!active)return;const [balance,status]=await Promise.all([active.balances(),chosen?active.task(chosen):Promise.resolve(null)]);setBalances(balance);setCurrent(status);}
   useEffect(()=>{
-    setProof(null);setSpec(undefined);setTx('');setCurrent(null);if(!session)return;
+    setProof(null);setSpec(undefined);setTx('');setCurrent(null);setSaved(false);if(!session)return;
     let stopped=false;const poll=async()=>{try{const [balance,status]=await Promise.all([session.balances(),task?session.task(task):Promise.resolve(null)]);if(!stopped){setBalances(balance);setCurrent(status);}}catch(reason){if(!stopped)setError(reason instanceof Error?reason.message:'Wallet refresh failed.');}};
     void poll();const timer=setInterval(()=>void poll(),5000);return()=>{stopped=true;clearInterval(timer);};
   },[session,task?.id]);
   async function perform(action:()=>Promise<void>){if(lock.current)return;lock.current=true;setBusy(true);setError('');try{await action();}catch(reason){setError(reason instanceof Error?reason.message:'Wallet operation failed.');}finally{try{await refresh();}catch{}lock.current=false;setBusy(false);}}
-  function record(evidence:ChainEvidence){setProof(evidence);setTx(evidence.transactionHash);setPhase(evidence.phase);}
+  function record(evidence:ChainEvidence){setProof(evidence);setTx(evidence.transactionHash);setPhase(evidence.phase);setSaved(false);}
   const bytes=session&&task?deliveryBytes(task,session.account):null;
   return <section className="panel chain-panel"><div className="panel-heading"><div><h2>{tr('Onchain wallet & escrow')}</h2><p>{tr('Chain balances and receipts are read from the configured EVM network.')}</p></div><Wallet size={20}/></div>
     <div className="chain-body"><p className="form-note">{tr('Sandbox credits and onchain test tokens have separate ledgers. Funding here creates a separate escrow for an already completed delivery.')}</p>
@@ -47,8 +49,12 @@ export function ChainPanel({tasks}:{tasks:Task[]}){
           })}>{tr('Approve tokens & fund escrow')}</button><button className="btn secondary" disabled={busy} onClick={()=>void perform(async()=>{await refresh();})}><RefreshCw size={14}/>{tr('Read chain state')}</button><button className="btn secondary" disabled={busy||current?.status!=='funded'} onClick={()=>void perform(async()=>{record(await session.refund(task,hash=>setTx(hash)));})}>{tr('Refund expired escrow')}</button></div>
           {session.deployment.mode==='local'&&<details className="local-verifier"><summary>{tr('Local verification demo')}</summary><p className="form-note">{tr('These controls affect only the temporary local test chain. Reports are signed by its local EOA verifier.')}</p><div className="chain-actions"><button className="btn secondary" disabled={busy||current?.status!=='funded'} onClick={()=>void perform(async()=>{const result=await local<{hash:Hex}>('/verify',{id:current!.id});record(await session.evidence(task,result.hash,'settlement',spec));})}>{tr('Verify delivery & settle locally')}</button><button className="btn secondary" disabled={busy||current?.status!=='funded'} onClick={()=>void perform(async()=>{await local('/tamper',{id:current!.id});})}>{tr('Tamper local artifact')}</button><button className="btn secondary" disabled={busy||current?.status!=='funded'} onClick={()=>void perform(async()=>{await local('/time',{seconds:Math.max(1,Number(current!.intent!.deadline-(await session.client.getBlock()).timestamp)+1)});})}>{tr('Advance local test time')}</button></div></details>}
           <div className="form-grid"><label className="field">{tr('Transaction hash')}<input value={tx} onChange={e=>setTx(e.target.value)} placeholder="0x…"/></label><label className="field">{tr('Receipt phase')}<select value={phase} onChange={e=>setPhase(e.target.value as 'funding'|'settlement')}><option value="funding">{tr('Funding')}</option><option value="settlement">{tr('Settlement')}</option></select></label></div><button className="btn secondary" disabled={busy||!/^0x[0-9a-fA-F]{64}$/.test(tx)} onClick={()=>void perform(async()=>{record(await session.evidence(task,tx as Hex,phase,spec));})}>{tr('Verify chain transaction')}</button>
-          {proof&&<div className="chain-proof" role="status"><b>{tr('Chain transaction verified')}</b><p>{tr('Status')}: {tr(proof.status[0].toUpperCase()+proof.status.slice(1))} · {tr('Confirmations')}: {proof.confirmations}</p><code>{proof.transactionHash}</code><details><summary>{tr('Inspect chain evidence')}</summary><pre className="artifact-json">{JSON.stringify(proof,null,2)}</pre></details></div>}
+          {proof&&<div className="chain-proof" role="status"><b>{tr('Chain transaction verified')}</b><p>{tr('Status')}: {tr(proof.status[0].toUpperCase()+proof.status.slice(1))} · {tr('Confirmations')}: {proof.confirmations}</p><code>{proof.transactionHash}</code><details><summary>{tr('Inspect chain evidence')}</summary><pre className="artifact-json">{JSON.stringify(proof,null,2)}</pre></details><div className="chain-actions"><button className="btn secondary small" disabled={busy} onClick={()=>void perform(async()=>{
+            const commitment=spec??(session.deployment.mode==='local'?await local<DeliverySpec>('/spec/'+current!.id):{datasetUrl,artifactUrl,datasetHash:bytes!.datasetHash});
+            await reconcileReceipt(session,task.id,proof,commitment);setSaved(true);await onSaved?.();
+          })}>{tr('Sign & save receipt to workspace')}</button>{saved&&<span>{tr('Receipt saved by server verification')}</span>}</div><small>{tr('A one-time wallet signature binds this receipt to your workspace. No tokens are transferred.')}</small></div>}
         </>:<p className="form-note">{tr('Complete a task first to connect its delivery to escrow.')}</p>}
       </>}{busy&&<p role="status" className="form-note">{tr('Waiting for wallet or chain confirmation…')}</p>}{error&&<p className="chain-error" role="alert">{tr(error)}</p>}
+      <details className="chain-history"><summary>{tr('Saved chain receipts')} · {receipts.length}</summary><a className="text-button" href="/api/exports?kind=chain-receipts" download>{tr('Export chain receipts')}</a><p className="form-note">{tr('Server-verified snapshots. Recheck onchain before relying on an old receipt. Sandbox credits are unchanged.')}</p>{receipts.length===0?<p className="form-note">{tr('No chain receipts saved yet.')}</p>:[...receipts].reverse().map(item=><article key={item.id} className="chain-proof"><b>{tasks.find(t=>t.id===item.webTaskId)?.title??item.webTaskId} · {tr(item.evidence.status[0].toUpperCase()+item.evidence.status.slice(1))}</b><p>{item.deployment.mode==='local'?tr('Local EVM · 31337'):tr('Sepolia · 11155111')} · {tr('Block')} {item.evidence.blockNumber} · {new Date(item.verifiedAt).toLocaleString()}</p><code>{item.evidence.transactionHash}</code><details><summary>{tr('Inspect chain evidence')}</summary><pre className="artifact-json">{JSON.stringify(item,null,2)}</pre></details></article>)}</details>
     </div></section>;
 }
