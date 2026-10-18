@@ -18,7 +18,8 @@
     "db:local": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_parallel_roland_deschain.sql",
     "test:api": "node scripts/test-api.mjs",
     "worker": "node scripts/worker.mjs",
-    "demo": "node scripts/demo.mjs"
+    "demo": "node scripts/demo.mjs",
+    "demo:chain": "node scripts/demo-chain.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

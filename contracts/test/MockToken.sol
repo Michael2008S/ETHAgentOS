@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 contract MockToken {
+    uint8 public constant decimals = 6;
     mapping(address=>uint256) public balanceOf;
     mapping(address=>mapping(address=>uint256)) public allowance;
     function mint(address to,uint256 n) external {balanceOf[to]+=n;}

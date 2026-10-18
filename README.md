@@ -38,11 +38,20 @@ npm test                  # 状态机、独立校验器、身份适配器与内�
 npm run typecheck         # 网站、SDK、CRE 各自类型检查
 npm run contracts:compile # 生成 ABI 与 bytecode（忽略的 artifacts 目录）
 npm run demo              # 完整闭环，独立沙盒，不需要打开浏览器
+npm run demo:chain        # 网页成果 → 本地校验器 → 真实本地 EVM 托管与退款
 npm run test:api          # 并发、撤销、收据 API 回归
 npm run worker            # 可选：本地常驻恢复 worker
 ```
 
 Ganache 在 Node 26 上可能提示 µWS 原生模块不可用并回退到 JS；测试不依赖其 HTTP 服务。
+
+## 本地 EVM 联调
+
+`npm run demo:chain` 会在独立网页沙盒生成任务成果，再新建 Ganache 测试链，部署六位小数测试代币和 AgentEscrow。链适配器生成未签名的批准/托管交易，脚本仅使用该临时链的测试账户签名；随后验证任务承诺与成果，执行付款、拒绝退款、超时退款，并拒绝重复付款。交易回执、合约地址、区块哈希与核验结果保存到 `outputs/chain-demo-*.json`。
+
+`sdk/chain.ts` 校验 chainId、代币、forwarder、workflow metadataHash、确认数、规范区块哈希、对应事件和历史区块中的任务状态。金额按代币 decimals 精确转换，不能表示的金额会拒绝。它不保管私钥，也不会自行发起真实网络交易。
+
+这是实际执行交易的本地 EVM 联调，不是 DON 或公共测试网证据。当前演示脚本把网页成果接到独立 EVM 链路；网页钱包仍显示 testUSD 模拟账本，尚未实现真实钱包连接、链上资金视图和生产对账。证据 URL 仅用作本地承诺，脚本直接提供测试字节；CRE 的 HTTP/DON 执行仍须另行验证。
 
 ## 代码导航
 
@@ -55,6 +64,7 @@ Ganache 在 Node 26 上可能提示 µWS 原生模块不可用并回退到 JS；
 | `contracts/` | 托管和预算钱包；不含真实部署地址 |
 | `cre/workflow/` | 买方承诺证据校验、节点共识、EVM report |
 | `sdk/` | 客户端及 ERC-8004 注册交易构建 |
+| `sdk/chain.ts` | EVM 资金交易构建、合约身份与交易证据核验 |
 | `docs/` | 架构、演示稿、Chainlink 接入步骤与验证记录 |
 
 ## 自动执行与恢复
