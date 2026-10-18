@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Download, FileCheck2, Loader2 } from 'lucide-react';
-import { useLanguage } from '@/lib/i18n/provider';
+import { useLanguage } from '@/lib/i18n/context';
 import { TASK_STATUSES, type queryMemory } from '@/lib/agentos/memory';
 import type { Agent } from '@/lib/agentos/types';
 

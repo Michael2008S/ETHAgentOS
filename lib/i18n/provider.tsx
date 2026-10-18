@@ -1,8 +1,7 @@
 'use client';
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { isLanguage, LANGUAGE_KEY, translate, type Language } from './translate';
-type LocaleContext = { language: Language; setLanguage: (next: Language) => void; tr: (text: string) => string };
-const Context = createContext<LocaleContext | null>(null);
+import { LanguageContext, useLanguage } from './context';
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, updateLanguage] = useState<Language>('zh-CN');
   useEffect(() => {
@@ -19,12 +18,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(LANGUAGE_KEY, next); } catch { /* Switching still works without storage. */ }
   }, []);
   const tr = useCallback((text: string) => translate(language, text), [language]);
-  return <Context.Provider value={{ language, setLanguage, tr }}>{children}</Context.Provider>;
-}
-export function useLanguage() {
-  const context = useContext(Context);
-  if (!context) throw new Error('LanguageProvider is required');
-  return context;
+  return <LanguageContext.Provider value={{ language, setLanguage, tr }}>{children}</LanguageContext.Provider>;
 }
 export function LanguageSwitcher() {
   const { language, setLanguage } = useLanguage();

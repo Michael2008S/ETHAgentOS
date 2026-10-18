@@ -1,7 +1,7 @@
 'use client';
 import { useEffect,useState,type FormEvent } from 'react';
 import { Play,RefreshCw,Download } from 'lucide-react';
-import { useLanguage } from '@/lib/i18n/provider';
+import { useLanguage } from '@/lib/i18n/context';
 import { AgentIdentityClient,type PaidFeedback } from '@/sdk/agent-identity';
 import { AgentOrderClient } from '@/sdk/orders';
 import { inputEvidence,type AgentWalletSession } from '@/sdk/wallet';

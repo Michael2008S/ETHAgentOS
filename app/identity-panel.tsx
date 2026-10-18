@@ -1,7 +1,7 @@
 'use client';
 import { useEffect,useRef,useState } from 'react';
 import type { EIP1193Provider } from 'viem';
-import { useLanguage } from '@/lib/i18n/provider';
+import { useLanguage } from '@/lib/i18n/context';
 import { AgentWalletSession,localWalletProvider,type WalletDeployment } from '@/sdk/wallet';
 import { AgentIdentityClient,type AgentIdentity,type PaidFeedback } from '@/sdk/agent-identity';
 import type { Agent } from '@/lib/agentos/types';

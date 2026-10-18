@@ -60,6 +60,11 @@
 
 - `npm run demo:cre`：官方 CLI/WASM 的本地 RPC + 真实公共 HTTPS 模拟通过 3 场景。正确/错误交付分别产生 accepted=true/false 的报告；承诺不匹配拒绝，未生成报告。CLI 未使用 `--broadcast`，模拟后托管仍为 Funded。证据 `outputs/cre-demo-3549b172-cbb1-469c-99f2-a850d66a1a18.json`。
 
+## 2026-10-19 语言模块热更新
+
+- 将共享语言 context/hook 与 React 组件边界分开。真实 Vite 开发服务中，修改并还原中文字典，无需刷新页面，钱包连接、当前视图和未提交标题 `HMR retained draft 2026-10-19` 全部保留；中英切换后草稿仍在，未创建订单或发生交易。
+- 4 项语言测试、类型检查通过。浏览器截图 `/tmp/agentos-hmr-proof.jpg`。
+
 ## 2026-10-15 初始验证
 
 ## 已执行并通过

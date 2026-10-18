@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatUnits, type EIP1193Provider, type Hex } from 'viem';
 import { Download, RefreshCw, Wallet } from 'lucide-react';
-import { useLanguage } from '@/lib/i18n/provider';
+import { useLanguage } from '@/lib/i18n/context';
 import { AgentWalletSession, deliveryBytes, localWalletProvider, walletDeployment } from '@/sdk/wallet';
 import type { ChainEvidence } from '@/sdk/chain';
 import type { DeliverySpec } from '@/cre/workflow/verify';

@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Activity, ArrowDownLeft, ArrowRight, ArrowUpRight, Blocks, Check, CheckCircle2, ChevronDown, ChevronRight, Circle, Code2, Cpu, Database, Download, ExternalLink, FileCheck2, Fingerprint, GitBranch, Hexagon, LayoutDashboard, Loader2, LockKeyhole, Menu, Network, Play, Plus, Search, Settings2, ShieldCheck, ShieldX, Terminal, Wallet, Workflow, X } from 'lucide-react';
-import { LanguageSwitcher, useLanguage } from '@/lib/i18n/provider';
+import { LanguageSwitcher } from '@/lib/i18n/provider';
+import { useLanguage } from '@/lib/i18n/context';
 import { MemoryPanel } from './memory-panel';
 import { IdentityPanel } from './identity-panel';
 import { ChainPanel } from './chain-panel';
