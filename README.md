@@ -29,6 +29,8 @@ Solidity 在本地 EVM 中测试；CRE 工作流已通过 SDK 与官方 CLI 编�
 
 ## 运行
 
+本轮交付以本地完整 demo 为准，暂不启用托管调度。启动顺序和演示路线见 [本地交付说明](docs/LOCAL-DEMO.md)。
+
 要求 Node.js 24+、npm。使用当前工作目录中的项目：
 
 ```sh
@@ -58,6 +60,7 @@ npm run demo:model        # 真实本地 Qwen + HTTP/D1/EVM，3 场景
 npm run demo:identity     # 官方 ERC-8004 + HTTP/D1/EVM，6 组身份与评价场景
 npm run supplier:local    # 独立技能服务与签名交付日志，127.0.0.1:7461
 npm run demo:supplier     # 13 组独立服务、恢复、权限与付款/退款场景
+npm run demo:queue        # 丢失后台请求后，从 D1 队列独立恢复并单次付款
 npm run test:api          # 并发、撤销、收据 API 回归
 npm run worker            # 可选：本地常驻恢复 worker
 ```
