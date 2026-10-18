@@ -56,9 +56,10 @@ export default defineConfig(async ({ command }) => {
       ...(managedLinux
         ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] }
         : {}),
-      ...(isCodexSeatbeltSandbox
-        ? { watch: { useFsEvents: false, usePolling: true } }
-        : {}),
+      watch: {
+        ...(isCodexSeatbeltSandbox ? { useFsEvents: false, usePolling: true } : {}),
+        ignored: ['**/outputs/**', '**/.sites-runtime/**', '**/.wrangler/**', '**/cre/workflow/.cre_build_tmp.*'],
+      },
     },
     plugins: [
       vinext(),

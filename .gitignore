@@ -60,4 +60,5 @@ next-env.d.ts
 /cre/workflow/config.local.json
 /cre/project.yaml
 /cre/workflow/workflow.yaml
+/cre/workflow/.cre_build_tmp.*
 !/.env.example
