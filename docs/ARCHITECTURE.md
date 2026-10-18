@@ -5,13 +5,13 @@
 | 模块 | 当前实现 | 后续工作 |
 | --- | --- | --- |
 | Identity | 本地 profile；ERC-8004 注册 document/calldata adapter | 测试网 register、解析 tokenURI、身份与支付地址绑定 |
-| Wallet | 模拟余额；AgentVault 合约 | 钱包连接、签名确认、链上余额同步 |
+| Wallet | 模拟余额；AgentVault 合约；网页 EIP-1193/本地钱包与链上余额 | 真实浏览器扩展与公共测试网验收 |
 | Memory | 按智能体/内容/哈希检索任务输入、结果、事件、收据；上下文导出 | 租户级私有向量知识库 |
 | Skills | 两个确定性适配器，内置/自定义数据、版本、capability 清单 | MCP/A2A 适配、隔离外部执行进程 |
 | Reputation | 基于当前 workspace 的完成任务计数 | 验证过的反馈源、ERC-8004 Reputation Registry |
-| Payments | 模拟账本与单链 ERC-20 托管源码 | 测试网交易回执与 UI 同步；x402 采购 |
+| Payments | 模拟账本、单链 ERC-20 托管、本地 EVM 回执核验与 UI 同步 | 公共测试网与 x402 采购 |
 | Permissions | 服务端 typed operation gate；预算；实时撤销 | 签名 session grant、目标合约与 selector 授权 |
-| Escrow | 原子预留/结算/退款；独立 Solidity 合约 | 端到端链上集成 |
+| Escrow | 原子预留/结算/退款；独立 Solidity 合约、网页真实本地托管与回执核验 | 预注资任务执行、生产对账 |
 | Marketplace | 可注册/启停本地服务的目录、固定报价与任务分配 | 外部供应商发现、真实服务 SLA |
 | Execution | 服务端后台执行、持久化状态机、幂等请求、有限退避重试、恢复 API、本地 worker 与任务期限 | 独立持久队列、外部执行租约 |
 
@@ -31,7 +31,7 @@ flowchart LR
  F --> C
 ```
 
-上半部已接通网站。下半部提供合约和工作流实现，通过 `demo:chain` 将自定义网页成果接入本地 EVM 验证；网页资金视图仍未接入，真实 CRE HTTP/DON/测试网尚未联调。
+上半部已接通网站。下半部通过 `demo:chain` 和钱包页面将自定义网页成果接入本地 EVM，并读取实际余额和回执。两条账本仍独立；真实 CRE HTTP/DON/公共测试网尚未联调。
 
 ## 并发与恢复
 

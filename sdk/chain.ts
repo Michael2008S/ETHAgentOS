@@ -29,6 +29,9 @@ export type ChainEvidence = {
 const same=(a:string,b:string)=>a.toLowerCase()===b.toLowerCase();
 const address=(value:string)=>/^0x[0-9a-fA-F]{40}$/.test(value)&&!/^0x0{40}$/.test(value);
 const hash=(value:string)=>/^0x[0-9a-fA-F]{64}$/.test(value);
+export function validateChainDeployment(deployment:ChainDeployment){
+  if(!Number.isSafeInteger(deployment.chainId)||deployment.chainId<=0||!Number.isSafeInteger(deployment.confirmations)||deployment.confirmations<1||![deployment.escrow,deployment.token,deployment.forwarder].every(value=>typeof value==='string'&&address(value))||typeof deployment.metadataHash!=='string'||!hash(deployment.metadataHash))throw new Error('Invalid chain deployment.');
+}
 
 /** Preserve exact cents; never silently round a budget into token base units. */
 export function centsToToken(cents:number,decimals:number):bigint {
@@ -50,8 +53,8 @@ export class AgentChainClient {
   client:PublicClient;
   deployment:ChainDeployment;
   constructor(client:PublicClient,deployment:ChainDeployment){
-    if(!Number.isSafeInteger(deployment.chainId)||deployment.chainId<=0||!Number.isSafeInteger(deployment.confirmations)||deployment.confirmations<1||![deployment.escrow,deployment.token,deployment.forwarder].every(address)||!hash(deployment.metadataHash))throw new Error('Invalid chain deployment.');
-    this.client=client;this.deployment=deployment;
+    validateChainDeployment(deployment);
+    this.client=client;this.deployment={...deployment};
   }
   async validateDeployment(){
     const c=this.client,d=this.deployment;

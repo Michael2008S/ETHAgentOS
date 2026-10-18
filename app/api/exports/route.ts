@@ -5,10 +5,10 @@ import { DomainError } from '@/lib/agentos/engine';
 export async function GET(request: Request) {
   try {
     const url=new URL(request.url),{state}=await read(owner(request));
-    const {body,filename}=buildExport(state,url.searchParams.get('kind') as ExportKind,url.searchParams.get('taskId')??undefined);
-    return new Response(JSON.stringify(body,null,2)+'\n',{headers:{
+    const result=buildExport(state,url.searchParams.get('kind') as ExportKind,url.searchParams.get('taskId')??undefined,url.searchParams.get('buyer')??undefined);
+    return new Response('raw' in result?result.raw:JSON.stringify(result.body,null,2)+'\n',{headers:{
       'Content-Type':'application/json; charset=utf-8',
-      'Content-Disposition':`attachment; filename="${filename}"`,
+      'Content-Disposition':`attachment; filename="${result.filename}"`,
       'Cache-Control':'private, no-store',
       'X-Content-Type-Options':'nosniff',
     }});
