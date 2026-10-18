@@ -13,7 +13,7 @@ function verify(runtime:NodeRuntime<Config>){
  const {spec,taskId}=runtime.config;
  return verifyDelivery(fetchText(runtime,spec.datasetUrl),fetchText(runtime,spec.artifactUrl),taskId,spec.datasetHash);
 }
-function onCron(runtime:Runtime<Config>){
+function onCron(runtime:Runtime<Config>):string{
  const c=runtime.config;
  const network=getNetwork({chainFamily:'evm',chainSelectorName:c.chainName});
  if(!network)throw new Error('Unknown supported network');
@@ -22,11 +22,14 @@ function onCron(runtime:Runtime<Config>){
  const [committed,status]=decodeFunctionResult({abi,functionName:'taskCommitment',data:bytesToHex(result.data)});
  if(status!==1)return 'Task is absent or terminal; no write';
  const expected=specHash(c.spec);if(committed!==expected)throw new Error('Configured specification differs from escrow commitment');
+ runtime.log('Task commitment verified against finalized chain state');
  const verdict=runtime.runInNodeMode(verify,consensusIdenticalAggregation<{accepted:boolean;outputHash:Hex}>())().result();
+ runtime.log('Delivery consensus: accepted='+verdict.accepted+' outputHash='+verdict.outputHash);
  const payload=encodeAbiParameters(parseAbiParameters('bytes32,bytes32,bytes32,bool'),[c.taskId,expected,verdict.outputHash,verdict.accepted]);
  const report=runtime.report({encodedPayload:hexToBase64(payload),encoderName:'evm',signingAlgo:'ecdsa',hashingAlgo:'keccak256'}).result();
+ runtime.log('CRE report generated; submitting through EVM capability');
  const write=evm.writeReport(runtime,{receiver:c.escrowAddress,report,gasConfig:{gasLimit:c.gasLimit}}).result();
- return bytesToHex(write.txHash||new Uint8Array());
+ return JSON.stringify({taskId:c.taskId,accepted:verdict.accepted,outputHash:verdict.outputHash,transactionHash:bytesToHex(write.txHash||new Uint8Array())});
 }
 export const initWorkflow=(config:Config)=>[handler(new CronCapability().trigger({schedule:config.schedule}),onCron)];
 export async function main(){const runner=await Runner.newRunner<Config>({configParser:parseConfig});await runner.run(initWorkflow);}

@@ -412,5 +412,7 @@
   "No funded escrow is available to refund.": "没有可退回的已注资托管。",
   "Wallet transaction reverted.": "钱包交易已回滚。",
   "Local chain request failed.": "本地链请求失败。",
-  "Use public immutable HTTPS evidence URLs.": "请使用公开、不可变的 HTTPS 证据 URL。"
+  "Use public immutable HTTPS evidence URLs.": "请使用公开、不可变的 HTTPS 证据 URL。",
+  "CLI simulation passed · DON pending": "CLI 模拟通过 · DON 待部署",
+  "Local EVM verified · testnet pending": "本地 EVM 已验证 · 测试网待验收"
 }

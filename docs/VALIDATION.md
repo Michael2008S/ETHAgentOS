@@ -12,7 +12,9 @@
 - `npm run test:api`：并发与重复请求、精确预留后撤销、附件内容与跨沙盒拒绝通过。
 - `npm run demo`：独立沙盒的 8 项完整流程通过；`npm run demo:chain`：本地 EVM 的成功付款、拒绝退款、超时退款与重复结算拒绝通过。结果保存在忽略的 `outputs/`，见 `docs/PROGRESS.md`。
 - 浏览器实际操作正常完成、受理后离开页面仍执行、结算暂停后安全恢复且不重复付款、越权零付款、错误交付退款。附件点击有服务端 HTTP 200 记录；未验证浏览器落盘文件。
-- `npm run cre:build`：SDK 将实际工作流编译成 WASM，文件头 `0061736d01000000`；Bun 1.3.8、SDK 1.23.0、Javy 8.1.0。CLI v1.38.0 可运行，尚未通过 CLI 模拟。
+- `npm run cre:build`：SDK 将实际工作流编译成 WASM，文件头 `0061736d01000000`；Bun 1.3.8、SDK 1.23.0、Javy 8.1.0。CLI v1.38.0 已完成 3 场景 dry-run，详见下项。
+
+- `npm run demo:cre`：官方 CLI/WASM 的本地 RPC + 真实公共 HTTPS 模拟通过 3 场景。正确/错误交付分别产生 accepted=true/false 的报告；承诺不匹配拒绝，未生成报告。CLI 未使用 `--broadcast`，模拟后托管仍为 Funded。证据 `outputs/cre-demo-3549b172-cbb1-469c-99f2-a850d66a1a18.json`。
 
 ## 2026-10-15 初始验证
 
@@ -29,8 +31,8 @@
 
 ## 尚未执行
 
-- CRE CLI 模拟、真实 DON 部署及 execution 验证（SDK WASM 编译已于 2026-10-19 通过）。
-- 测试网合约部署、真实 wallet 连接、网页链上对账。
+- 真实 DON 部署及 execution 验证。CRE CLI dry-run 与 SDK/CLI WASM 编译已于 2026-10-19 通过。
+- 公共测试网合约部署、真实浏览器扩展签名、链上状态写回 D1 与预注资任务执行。网页本地测试钱包的真实 EVM 回执读取已验收。
 - ERC-8004 上链注册、链上声誉、CCIP、Data Feeds、x402。
 - 第三方安全审计、任意外部 Agent 或 LLM 的攻击评测、生产负载测试。
 

@@ -22,7 +22,7 @@
 
 **网页是可运行的模拟环境。** Agent 使用两个确定性数据分析适配器，可分析内置或用户提交的转账记录，没有调用 LLM；余额是 testUSD 测试积分，没有真实资金；身份是本地档案。任务由服务端后台推进，关闭浏览器不影响当前执行。请求中止或服务重启后，持久检查点可通过恢复 API 或本地恢复 worker 继续。注册自定义 Agent 当前只绑定已有适配器，不会执行任意第三方代码。
 
-Solidity 在本地 EVM 中测试；CRE 源码有独立 TypeScript 检查、纯校验器测试，并已通过 SDK 编译为 WASM。**尚未完成 CRE CLI 模拟、部署 DON、连接测试网钱包或广播公共测试网交易。网页账本与合约没有同步适配器。** 不应将界面收据展示为链上证明或 Chainlink 签名。x402、CCIP、Data Feeds、链上 Reputation Registry 是后续扩展。
+Solidity 在本地 EVM 中测试；CRE 工作流已通过 SDK 与官方 CLI 编译，并完成真实 HTTPS 读取、节点共识、报告生成和 EVM capability 的 CLI dry-run。**尚未部署 DON、验收真实浏览器钱包扩展或广播公共测试网交易。网页沙盒账本与合约没有同步适配器。** 不应将界面收据展示为链上证明或 Chainlink 签名。x402、CCIP、Data Feeds、链上 Reputation Registry 是后续扩展。
 
 ## 运行
 
@@ -45,6 +45,7 @@ npm run cre:build         # 需要 Bun >=1.2.21；生成 outputs/agentos-cre.was
 npm run cre:prepare       # 生成本地 CRE 配置，保留已有配置
 npm run cre:cli-build     # 通过官方 CLI 构建 outputs/agentos-cli.wasm
 npm run cre:simulate      # 需实际配置、账户认证；默认不广播
+npm run demo:cre          # 先编译，再运行 3 场景的本地 RPC + HTTPS dry-run
 npm run demo              # 完整闭环，独立沙盒，不需要打开浏览器
 npm run demo:deadline     # 自动超时、预留释放、已付款跨期限恢复
 npm run demo:chain        # 网页成果 → 本地校验器 → 真实本地 EVM 托管与退款
@@ -56,13 +57,21 @@ Ganache 在 Node 26 上可能提示 µWS 原生模块不可用并回退到 JS；
 
 CRE 构建使用已安装的 `@chainlink/cre-sdk` 编译器。安装 Bun 并加入 PATH，或通过 `AGENTOS_BUN_BIN` 指定其可执行文件；脚本也支持本地 `.sites-runtime/cre-tools/node_modules/.bin/bun`。首次编译由 SDK 下载并校验 Javy，需访问官方 GitHub 发行文件并写入用户缓存。构建产物不入库；编译成功不代表工作流模拟或 DON 执行成功。
 
+## CRE CLI 模拟
+
+先安装官方 CRE CLI 并执行 `cre login`；脚本支持 PATH 中的 `cre`、本地 `.sites-runtime/cre-bin/cre` 或 `AGENTOS_CRE_BIN`。运行 `npm run cre:prepare` 后，可使用 `npm run demo:cre` 验证正确交付、错误交付和承诺不匹配三个场景。
+
+该演示启动临时 Ganache、部署真实托管合约并注资，将 Sepolia selector 映射到本地 RPC，仅用于模拟。工作流从公共 HTTPS 读取脚本内的合成测试数据，在 CRE runtime 内检查链上承诺、运行共识、生成报告并调用 EVM write capability。正确/错误交付分别得到接受/拒绝；配置篡改在报告前失败。不会使用 `--broadcast`，完成后链上任务仍为 Funded，不能将 dry-run 日志称为已上链付款或 DON attestation。
+
+临时链私钥只传给子进程环境，不写文件；HTTPS URL 只嵌入公开合成数据，不应替换成私人记录或密钥。结果与已脱敏 CLI 日志保存在忽略的 `outputs/cre-demo-*.json`。公共网络部署需要另行配置真实 forwarder、workflow metadata、RPC 与凭证。
+
 ## 本地 EVM 联调
 
 `npm run demo:chain` 会在独立网页沙盒用自定义转账数据生成任务成果，再新建 Ganache 测试链，部署六位小数测试代币和 AgentEscrow。链适配器生成未签名的批准/托管交易，脚本仅使用该临时链的测试账户签名；随后验证任务承诺与成果，执行付款、拒绝退款、超时退款，并拒绝重复付款。交易回执、合约地址、区块哈希与核验结果保存到 `outputs/chain-demo-*.json`。
 
 `sdk/chain.ts` 校验 chainId、代币、forwarder、workflow metadataHash、确认数、规范区块哈希、对应事件和历史区块中的任务状态。金额按代币 decimals 精确转换，不能表示的金额会拒绝。它不保管私钥，也不会自行发起真实网络交易。
 
-这是实际执行交易的本地 EVM 联调，不是 DON 或公共测试网证据。演示脚本与网页钱包均能把已有成果接到独立 EVM 链路；链上视图和 testUSD 模拟账本分开，完整的预注资执行与生产对账仍待完成。证据 URL 仅用作本地承诺，脚本直接提供测试字节；CRE 的 HTTP/DON 执行仍须另行验证。
+这是实际执行交易的本地 EVM 联调，不是 DON 或公共测试网证据。演示脚本与网页钱包均能把已有成果接到独立 EVM 链路；链上视图和 testUSD 模拟账本分开，完整的预注资执行与生产对账仍待完成。`demo:chain` 直接提供测试字节；真实 HTTPS 与 CRE CLI dry-run 由 `demo:cre` 单独验证，DON 执行仍须另行验收。
 
 ## 网页链上钱包
 
