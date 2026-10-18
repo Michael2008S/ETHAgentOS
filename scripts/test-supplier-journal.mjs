@@ -1,0 +1,9 @@
+import assert from 'node:assert/strict';
+import { readFile,writeFile } from 'node:fs/promises';
+import { supplierRequest,supplierJobId,verifySupplierDelivery } from '../lib/agentos/supplier.ts';
+const evidencePath=process.argv[2];if(!evidencePath?.startsWith('outputs/supplier-demo-')||!evidencePath.endsWith('.json')||evidencePath.includes('..'))throw new Error('Pass the relative outputs/supplier-demo-*.json evidence path after restarting the owned supplier process.');
+const evidence=JSON.parse(await readFile(evidencePath,'utf8'));assert.equal(evidence.status,'passed');const order=evidence.cases.find(c=>c.name==='atlas independent signed execution after funding')?.order;assert.ok(order?.supplierDelivery);
+const request=await supplierRequest(order),base='http://127.0.0.1:7461',before=await(await fetch(base+'/stats')).json();
+const response=await fetch(base+'/v1/execute',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':supplierJobId(request)},body:JSON.stringify(request)});assert.equal(response.status,200);const delivery=await response.json();await verifySupplierDelivery(delivery,request);assert.deepEqual(delivery,order.supplierDelivery);
+const after=await(await fetch(base+'/stats')).json();assert.equal(after.jobs,before.jobs);assert.equal(after.requests[supplierJobId(request)],1);
+const report={source:evidencePath,mode:'restart recovery of persisted independent supplier journal',status:'passed',jobId:supplierJobId(request),requestHash:delivery.payload.requestHash,outputHash:delivery.payload.outputHash,signature:delivery.signature,jobCountUnchanged:true,requestsSinceRestart:1,checkedAt:new Date().toISOString()};const path='outputs/supplier-journal-'+crypto.randomUUID()+'.json';await writeFile(path,JSON.stringify(report,null,2));console.log('PASS restarted supplier returned byte-equivalent signed delivery without another job. Evidence: '+path);

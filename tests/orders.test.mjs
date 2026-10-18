@@ -6,7 +6,9 @@ import { compile } from '../scripts/compile-contracts.mjs';
 import { AgentWalletSession,inputEvidence } from '../sdk/wallet.ts';
 import { encodeSettlementReport,escrowABI } from '../sdk/chain.ts';
 import { specHash,verifyDelivery } from '../cre/workflow/verify.ts';
-import { seed } from '../lib/agentos/engine.ts';
+import { privateKeyToAccount,generatePrivateKey } from 'viem/accounts';
+import { createSupplier } from '../lib/agentos/supplier.ts';
+import { seed,DomainError } from '../lib/agentos/engine.ts';
 import { activateOrder,authorizeOrder,createOrder,findOrder } from '../lib/agentos/orders.ts';
 import { orderChain } from '../lib/agentos/order-chain.ts';
 import { runOrder } from '../lib/agentos/order-runner.ts';
@@ -32,9 +34,9 @@ test('pre-funded runtime executes only after escrow, pays once, refunds rejectio
    })());return transactions.get(body.id);
   });
   function specHashValue(id){return keccak256(stringToHex(data.get(id)));}
-  async function draft(scenario='success',model){
+  async function draft(scenario='success',model,supplier){
    const requestId=crypto.randomUUID(),input={dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:[{block:0,from:'x',to:'ignored',cents:999},{block:1,from:'x',to:'a',cents:123},{block:2,from:'x',to:'b',cents:456}]},bytes=inputEvidence({id:'chain-'+requestId,input},buyer),spec={datasetUrl:'https://data.example/'+bytes.id,artifactUrl:'https://artifact.example/'+bytes.id,datasetHash:bytes.datasetHash};
-   data.set(bytes.id,bytes.datasetText);state=await createOrder(state,{requestId,title:'Pre-funded '+scenario,agentId:'atlas',budget:1000,buyer,input,spec,scenario,timeoutSeconds:300,...(model?{planner:'llm',model}:{} )},deployment);return state.chainOrders[0];
+   data.set(bytes.id,bytes.datasetText);state=await createOrder(state,{requestId,title:'Pre-funded '+scenario,agentId:'atlas',budget:1000,buyer,input,spec,scenario,timeoutSeconds:300,...(model?{planner:'llm',model}:{} ),...(supplier?{executor:'supplier',supplier,agentIdentity:{registry:forwarder,registryAgentId:'0',owner:seller,wallet:seller,documentHash:keccak256(metadata)}}:{})},deployment);return state.chainOrders[0];
   }
   async function fund(order){const evidence=await wallet.fundOrder(order,120);state=(await authorizeOrder(state,order.id,'owner',evidence.transactionHash,crypto.randomUUID())).state;const current=await access.funding(findOrder(state,order.id),evidence.transactionHash);state=activateOrder(state,order.id,findOrder(state,order.id).authorization.nonce,current);return evidence;}
   const first=await draft();await runOrder(store,'owner',first.id,access);assert.equal(findOrder(state,first.id).output,null);assert.equal(artifacts.size,0);assert.equal(findOrder(state,first.id).status,'awaiting-funding');
@@ -61,5 +63,19 @@ test('pre-funded runtime executes only after escrow, pays once, refunds rejectio
    assert.equal(rejected.settlement.status,'refunded');assert.equal(rejected.output,null);assert.equal(rejected.failure.includes('provider-secret'),false);assert.deepEqual(state.ledger,ledger);
   }
   assert.equal((await wallet.balances()).token,'90400000');
+  // Controlled supplier transport, actual EVM settlement: a persisted signed output
+  // must settle without contacting the supplier again; final authority can deny it.
+  const supplierAccount=privateKeyToAccount(generatePrivateKey());let supplierCalls=0,authority=true;
+  const supplierModule=await import('../lib/agentos/supplier.ts'),engine=await import('../lib/agentos/engine.ts');
+  const authorize=async()=>{if(!authority)throw new DomainError('Supplier delegation revoked.','SUPPLIER_REJECTED');};
+  const supplier=await createSupplier(supplierModule.parseSupplierConfiguration({url:'https://skills.example/v1/execute',id:'controlled',name:'Controlled supplier',revision:'1',signer:supplierAccount.address,skills:['event-analysis']}),authorize,undefined,async(_,init)=>{
+   supplierCalls++;const request=JSON.parse(init.body),output={dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,transferCount:2,totalCents:579,uniqueRecipients:2},payload={version:'agentos.skill-delivery.v1',requestHash:await engine.digest(request),configHash:request.supplier.configHash,jobId:supplierModule.supplierJobId(request),outputHash:await engine.digest(output),output,issuedAt:new Date().toISOString()};return Response.json({payload,signature:await supplierAccount.signMessage({message:supplierModule.supplierReceiptMessage(payload)})});
+  });
+  for(const revoked of [false,true]){
+   const external=await draft('success',undefined,supplier.descriptor);await fund(external);await runOrder(store,'owner',external.id,access,{supplier,maxSteps:3});assert.equal(findOrder(state,external.id).step,3);assert.ok(findOrder(state,external.id).supplierDelivery);const beforeCalls=supplierCalls;authority=!revoked;
+   await runOrder(store,'owner',external.id,access,{supplierAuthority:authorize});assert.equal(supplierCalls,beforeCalls);assert.equal(findOrder(state,external.id).settlement.status,revoked?'refunded':'paid');authority=true;
+  }
+  assert.equal((await wallet.balances()).token,'88000000');
+
  }finally{await provider.disconnect();}
 });

@@ -1,5 +1,14 @@
 # 验证记录
 
+## 2026-10-19 独立供应商增量验证
+
+- `npm test`：63 项全部通过，`npm run typecheck` 通过。新增签名/请求/job/成果绑定、配置和重定向拒绝、响应大小与错误脱敏、租约、未注资和越权零调用、取消/撤权后的晚到结果拒绝。真实 EVM 测试另覆盖成果保存后供应商服务离线仍可付款，以及最终授权前撤销委托会退款。
+- `npm run demo:supplier`：13 组实际 HTTP/D1/EVM 场景通过。包含未授权供应商拒绝、客户端 URL 注入拒绝、真实 Qwen + Atlas 独立执行、Sage 独立资金库报告、错误交付与中断恢复网页场景、日志提交后响应丢失重试、错误算术和伪造签名退款、能力拦截零调用、离线检查点恢复、取消/供应商委托撤销/工作区权限撤销丢弃晚到结果。每个订单只有一个 Settled 事件，沙盒账本保持独立。证据 `outputs/supplier-demo-570aeb22-2a3f-4583-840b-8766d0b0c08b.json`。
+- 实际停止并重启自建供应商进程，执行 `node scripts/test-supplier-journal.mjs outputs/supplier-demo-570aeb22-2a3f-4583-840b-8766d0b0c08b.json`，原已付款订单返回相同 payload 与签名，重启后只读取一次、日志任务数不增加。证据 `outputs/supplier-journal-c1399a20-6757-416b-96c0-33d5853e24fb.json`。
+- 原有 API、预注资五场景、真实模型三场景与身份六组场景回归通过：`outputs/prefund-demo-2ff212a9-a0da-4b10-819d-55c0a01e6daa.json`、`outputs/model-demo-04eff3bb-c004-4f1c-bac9-667e1334761f.json`、`outputs/identity-demo-5e01ab66-c0d5-4f4f-b410-60127c9724db.json`。
+- 浏览器由身份 #2 的持有者在链上授权供应商签名地址，创建 `chain-4c40ac8c-06d7-4269-94cc-ea74164500b5`，顺序为注资确认、模型计划、供应商执行、签名/独立复算、最终付款。只调用一次，成果 579 分/两条记录，付款交易 `0x5bf51abc7adf96984b9dab584f1ab8358e151f7551346e214a82dc2b5cebc11f`。沙盒余额仍为 82.00；默认工作区上下文保存于 `outputs/browser-supplier-order.json`。
+- 本轮实测的是独立本地进程与本地 EVM；远程 HTTPS 供应商、公开链、MCP/A2A 发现、通用插件沙箱和生产 SLA 尚未验收。开发时更改翻译字典会触发一次 HMR LanguageProvider 错误，整页刷新恢复，持久化订单不受影响；该开发期热更新缺陷仍待修复。
+
 ## 2026-10-19 身份与信誉增量验证
 
 - `npm test`：60 项全部通过；`npm run typecheck` 通过。官方身份/信誉合约实际部署到内存 EVM，验证精确注册文档、工作区隔离、过期挑战、未付款拒评、持有者自评拒绝、NFT 转移清空收款钱包。

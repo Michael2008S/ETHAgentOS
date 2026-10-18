@@ -1,11 +1,12 @@
 import type { Workspace } from './types.ts';
-import { advanceOrder,authorizeSettlement,claimModelLease,commitModelPlan,findOrder,finishOrder,orderEvent,pendingOrders } from './orders.ts';
+import { advanceOrder,authorizeSettlement,claimModelLease,commitModelPlan,claimSupplierLease,commitSupplierDelivery,orderPolicy,findOrder,finishOrder,orderEvent,pendingOrders } from './orders.ts';
 import type { OrderChain } from './order-chain.ts';
 import { DomainError } from './engine.ts';
 import { canonical } from '../../cre/workflow/verify.ts';
 import type { ModelPlan,OrderPlanner } from './model.ts';
+import { supplierRequest,type OrderSupplier,type SupplierDelivery } from './supplier.ts';
 type OrderStore={read(ownerId:string):Promise<{state:Workspace}>;updateWorkspace(ownerId:string,reduce:(state:Workspace)=>Promise<Workspace>|Workspace):Promise<{state:Workspace}>};
-export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:OrderChain,options:{delayMs?:number;now?:()=>string;maxSteps?:number;planner?:OrderPlanner}={}){
+export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:OrderChain,options:{delayMs?:number;now?:()=>string;maxSteps?:number;planner?:OrderPlanner;supplier?:OrderSupplier;supplierAuthority?:OrderSupplier['authorize']}={}){
   let failures=0;
   for(let step=0;step<(options.maxSteps??16);step++){
     try{
@@ -15,6 +16,11 @@ export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:O
       if(view.status===0)throw new DomainError('Confirmed escrow is no longer available. Execution is suspended.','CONFLICT');
       if(view.status===2||view.status===3){const hash=await chain.settle(order);if(!hash)return {orderId:id,status:'awaiting-settlement'};const evidence=await chain.settlement(order,hash);await store.updateWorkspace(ownerId,current=>finishOrder(current,id,evidence,now));continue;}
       if(order.status==='awaiting-settlement'){
+        if(order.executor==='supplier'&&!order.failure&&!order.settlementAuthorization){
+          let denied=orderPolicy(state,order,now)??(order.deadlineAt&&order.deadlineAt<=now?'Execution deadline passed.':null);
+          if(!denied)try{const authority=options.supplierAuthority??options.supplier?.authorize;if(!authority)throw new DomainError('Supplier authorization is temporarily unavailable.','SUPPLIER_UNAVAILABLE');await authority(order);}catch(error){if(error instanceof DomainError&&error.code==='SUPPLIER_REJECTED')denied=error.message;else throw error;}
+          if(denied){await store.updateWorkspace(ownerId,current=>{const next=structuredClone(current),o=findOrder(next,id);if(!o.settlementAuthorization&&!o.settlement)o.failure=denied;return next;});continue;}
+        }
         // Linearize the final authority check and immutable publication intent in D1.
         const prepared=await store.updateWorkspace(ownerId,current=>authorizeSettlement(current,id,view.intent.id,now)),ready=findOrder(prepared.state,id);
         const hash=await chain.settle(ready);if(!hash)return {orderId:id,status:'awaiting-settlement'};
@@ -28,6 +34,15 @@ export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:O
         let result:{plan?:ModelPlan;error?:string};
         try{if(!options.planner||canonical(options.planner.descriptor)!==canonical(leased.model))throw new DomainError('Configured model differs from the authorized order.','MODEL_UNAVAILABLE');result={plan:await options.planner.plan(leased)};}catch(error){result={error:error instanceof DomainError?error.message:'Model inference failed. No skill operation was executed.'};}
         await store.updateWorkspace(ownerId,current=>commitModelPlan(current,id,token,result,options.now?.()??new Date().toISOString()));continue;
+      }
+      if(order.executor==='supplier'&&order.step===2&&!order.supplierDelivery){
+        const token=crypto.randomUUID(),claimed=await store.updateWorkspace(ownerId,current=>claimSupplierLease(current,id,token,now)),leased=findOrder(claimed.state,id);
+        if(leased.status!=='running')continue;if(leased.supplierLease?.token!==token)return {orderId:id,status:'executing'};
+        let result:{delivery?:SupplierDelivery;error?:string;retryable?:boolean};
+        try{if(!options.supplier)throw new DomainError('Supplier is temporarily unavailable. The execution checkpoint is retained.','SUPPLIER_UNAVAILABLE');if(canonical(options.supplier.descriptor)!==canonical(leased.supplier))throw new DomainError('Supplier configuration differs from the authorized order.','SUPPLIER_REJECTED');await options.supplier.authorize(leased);const delivery=await options.supplier.execute(await supplierRequest(leased));await options.supplier.authorize(leased);result={delivery};}
+        catch(error){result={error:error instanceof DomainError?error.message:'Supplier request failed. The execution checkpoint is retained.',retryable:!(error instanceof DomainError)||error.code==='SUPPLIER_UNAVAILABLE'};}
+        await store.updateWorkspace(ownerId,current=>commitSupplierDelivery(current,id,token,result,options.now?.()??new Date().toISOString()));
+        if(result.retryable)throw new DomainError(result.error!,'SUPPLIER_UNAVAILABLE');continue;
       }
       if(options.delayMs)await new Promise(resolve=>setTimeout(resolve,options.delayMs));
       await store.updateWorkspace(ownerId,current=>advanceOrder(current,id,order.step,options.now?.()??new Date().toISOString()));

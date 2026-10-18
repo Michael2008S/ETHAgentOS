@@ -33,7 +33,9 @@
     "model:setup": "node scripts/model-setup.mjs",
     "model:local": "node scripts/model-local.mjs",
     "demo:model": "node scripts/demo-model.mjs",
-    "demo:identity": "node scripts/demo-identity.mjs"
+    "demo:identity": "node scripts/demo-identity.mjs",
+    "supplier:local": "node scripts/supplier-local.mjs",
+    "demo:supplier": "node scripts/demo-supplier.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

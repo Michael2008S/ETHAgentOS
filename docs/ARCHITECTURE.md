@@ -7,12 +7,12 @@
 | Identity | 官方 ERC-8004 本地注册、链上 data URI 校验、持有者签名与支付钱包绑定、订单身份快照 | 公共测试网与真实浏览器扩展验收 |
 | Wallet | 模拟余额；AgentVault 合约；网页 EIP-1193/本地钱包与链上余额 | 真实浏览器扩展与公共测试网验收 |
 | Memory | 按智能体/内容/哈希检索任务输入、结果、事件、收据；上下文导出 | 租户级私有向量知识库 |
-| Skills | 两个确定性适配器，内置/自定义数据、版本、capability 清单 | MCP/A2A 适配、隔离外部执行进程 |
+| Skills | 两个版本化技能、内置或独立 HTTP 执行进程、链上签名委托、成果签名与独立复算 | MCP/A2A 发现与通用代码沙箱 |
 | Reputation | 官方信誉表交易、原买方付款证明核验、独立订单去重评分、撤销与对账 | 公共网络、持续重组监控与全网索引 |
 | Payments | 模拟账本、单链 ERC-20 托管、回执核验与 UI 同步；买方签名绑定工作区、服务端复核、D1 幂等历史 | 公共测试网、持续重组监控与 x402 采购 |
 | Permissions | 服务端 typed operation gate；预算；实时撤销 | 签名 session grant、目标合约与 selector 授权 |
 | Escrow | 原子预留/结算/退款；真实托管回执、输入预承诺、先注资后后台执行、失败链上退款 | 公共网络验收与持续重组监控 |
-| Marketplace | 可注册/启停本地服务的目录、固定报价与任务分配 | 外部供应商发现、真实服务 SLA |
+| Marketplace | 本地目录、固定报价、已配置供应商描述与链上委托，订单固定执行方 | 多供应商发现、真实服务 SLA |
 | Execution | 服务端后台执行、持久化状态机、幂等请求、有限退避重试、恢复 API、本地 worker 与任务期限 | 独立持久队列、外部执行租约 |
 
 ## 两条执行路径
@@ -29,6 +29,9 @@ flowchart LR
  C --> R[Server funding and signature verification]
  R --> Q[D1 order checkpoints]
  Q --> P
+ Q --> X[Authorized HTTP skill supplier]
+ X --> Z[Signed delivery + persisted job]
+ Z --> V
  V -->|onchain| H[Immutable delivery artifact]
  H --> L[Local HTTP + EOA verifier]
  L --> C

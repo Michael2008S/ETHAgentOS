@@ -3,6 +3,7 @@ import { identityABI,reputationABI,registrationTransaction,registrationDataURI,c
 import type { AgentWalletSession,WalletDeployment } from './wallet.ts';
 import type { AgentIdentity,IdentityChallenge,PaidFeedback } from '../lib/agentos/identity.ts';
 import { canonical } from '../cre/workflow/verify.ts';
+import { supplierMetadata,SUPPLIER_METADATA_KEY,type SupplierDescriptor } from '../lib/agentos/supplier.ts';
 
 /** Wallet signs registry calls; API independently verifies chain evidence before saving. */
 export class AgentIdentityClient {
@@ -32,6 +33,11 @@ export class AgentIdentityClient {
   await this.session.assertSession();const signature=await this.session.signer.signMessage({account:this.session.account,message:challenge.message});return this.post({action:'bind',nonce:challenge.nonce,signature});
  }
  async registerAndBind(agentId:string){const registered=await this.register(agentId);await this.bind(agentId,registered.registryAgentId,registered.transactionHash);return registered;}
+ async authorizeSupplier(identity:AgentIdentity,descriptor:SupplierDescriptor|null){
+  if(identity.owner.toLowerCase()!==this.session.account.toLowerCase()||identity.registry.toLowerCase()!==this.session.deployment.identityRegistry?.toLowerCase()||identity.chainId!==this.session.deployment.chainId)throw new Error('Connect the registry owner wallet to authorize a skill supplier.');
+  const value=descriptor?supplierMetadata(descriptor):'0x';await this.send(identity.registry,encodeFunctionData({abi:identityABI,functionName:'setMetadata',args:[BigInt(identity.registryAgentId),SUPPLIER_METADATA_KEY,value]}));
+  const current=await this.session.client.readContract({address:identity.registry,abi:identityABI,functionName:'getMetadata',args:[BigInt(identity.registryAgentId),SUPPLIER_METADATA_KEY]});if(current.toLowerCase()!==value.toLowerCase())throw new Error('Supplier delegation read-back differs from the signed transaction.');
+ }
  async feedback(orderId:string,score:number){
   const {intent,deployment}=await this.post<{intent:PaidFeedback;deployment:WalletDeployment}>({action:'feedback-prepare',orderId,score});this.deployment(deployment);
   if(intent.orderId!==orderId||intent.score!==score||intent.buyer.toLowerCase()!==this.session.account.toLowerCase()||intent.identity.reputationRegistry.toLowerCase()!==deployment.reputationRegistry?.toLowerCase())throw new Error('Feedback differs from the authorized buyer and order.');
