@@ -18,7 +18,7 @@
 
 **网页是可运行的模拟环境。** Agent 是两个确定性 fixture 适配器，没有调用 LLM；余额是 testUSD 测试积分，没有真实资金；身份是本地档案。任务由服务端后台推进，关闭浏览器不影响当前执行。请求中止或服务重启后，持久检查点可通过恢复 API 或本地恢复 worker 继续。注册自定义 Agent 当前只绑定已有适配器，不会执行任意第三方代码。
 
-Solidity 在本地 EVM 中测试；CRE 源码有独立 TypeScript 检查和纯校验器测试。**尚未执行 CRE CLI/WASM 模拟、部署 DON、连接测试网钱包或广播链上交易。网页账本与合约没有同步适配器。** 不应将界面收据展示为链上证明或 Chainlink 签名。x402、CCIP、Data Feeds、链上 Reputation Registry 是后续扩展。
+Solidity 在本地 EVM 中测试；CRE 源码有独立 TypeScript 检查、纯校验器测试，并已通过 SDK 编译为 WASM。**尚未完成 CRE CLI 模拟、部署 DON、连接测试网钱包或广播公共测试网交易。网页账本与合约没有同步适配器。** 不应将界面收据展示为链上证明或 Chainlink 签名。x402、CCIP、Data Feeds、链上 Reputation Registry 是后续扩展。
 
 ## 运行
 
@@ -37,6 +37,7 @@ npm run dev -- --host 127.0.0.1 --port 5177
 npm test                  # 状态机、独立校验器、身份适配器与内存 EVM 合约测试
 npm run typecheck         # 网站、SDK、CRE 各自类型检查
 npm run contracts:compile # 生成 ABI 与 bytecode（忽略的 artifacts 目录）
+npm run cre:build         # 需要 Bun >=1.2.21；生成 outputs/agentos-cre.wasm
 npm run demo              # 完整闭环，独立沙盒，不需要打开浏览器
 npm run demo:chain        # 网页成果 → 本地校验器 → 真实本地 EVM 托管与退款
 npm run test:api          # 并发、撤销、收据 API 回归
@@ -44,6 +45,8 @@ npm run worker            # 可选：本地常驻恢复 worker
 ```
 
 Ganache 在 Node 26 上可能提示 µWS 原生模块不可用并回退到 JS；测试不依赖其 HTTP 服务。
+
+CRE 构建使用已安装的 `@chainlink/cre-sdk` 编译器。安装 Bun 并加入 PATH，或通过 `AGENTOS_BUN_BIN` 指定其可执行文件；脚本也支持本地 `.sites-runtime/cre-tools/node_modules/.bin/bun`。首次编译由 SDK 下载并校验 Javy，需访问官方 GitHub 发行文件并写入用户缓存。构建产物不入库；编译成功不代表工作流模拟或 DON 执行成功。
 
 ## 本地 EVM 联调
 

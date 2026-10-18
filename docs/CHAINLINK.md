@@ -14,14 +14,18 @@ Functions 不作为新项目依赖；当前官方文档已提示弃用。Data Fe
 
 网络故障、hash 不一致或解析失败会中止工作流，不误付款；待合约 deadline 后退款。一个 workflow 配置演示一个 task，扩展队列/日志触发尚未实现。
 
-## 启用步骤（尚未执行）
+## 本地构建
+
+`npm run cre:build` 使用 SDK 编译器将当前 `cre/workflow/main.ts` 编译为 `outputs/agentos-cre.wasm`，需要 Bun >=1.2.21（可设置 `AGENTOS_BUN_BIN`）。已在 Bun 1.3.8、SDK 1.23.0、Javy 8.1.0 上实际通过。CLI v1.38.0 已安装至忽略的本地工具目录；CLI 模拟尚未完成。WASM 编译不需要钱包，不会部署或广播交易。
+
+## 网络启用步骤（尚未完成）
 
 1. 按[官方安装文档](https://docs.chain.link/cre/getting-started/cli-installation/macos-linux)安装并登录 CRE CLI，用当前 CLI 的项目初始化流程生成 project.yaml / workflow.yaml；保留官方版本对应的配置结构。此仓库没有捏造可直接部署的 CLI 配置。
 2. 将 `workflow/main.ts` 和 `verify.ts` 加入生成的 TypeScript 工作流，安装项目已固定的 SDK 版本。复制 config.example.json 到忽略的 config.local.json，替换全部占位值。公开不可变 fixture 和交付文件，计算 hash。
 3. 从[官方 forwarder 目录](https://docs.chain.link/cre/guides/workflow/using-evm-client/onchain-write/forwarder-directory)核实目标链的 forwarder。拿到实际 workflow metadata 字节（对应登记的 workflow identity）后计算 metadataHash；不能用本地 EVM 测试中的 mock 字节代替真实配置。测试用 forwarder 与生产 forwarder 不混用。
 4. 编译、部署 AgentEscrow，构造器传标准测试 ERC-20、核实后的 forwarder 和 metadataHash；部署 AgentVault、存入测试代币、批准 executor 和 seller，设置小额度 grant。通过 owner 钱包签名，密钥留在钱包/秘密管理系统。
 5. 用同一 DeliverySpec 计算 specHash，openTask 并保存 taskId、deadline。artifact JSON 格式为 `{ "taskId": "0x…", "totalCents": 75000, "transferCount": 6 }`。
-6. 用官方 CLI 模拟生成的 workflow；需要广播测试交易时按官方文档启用广播，并确认使用测试资金。当前环境未安装 CRE CLI，因此尚无 WASM 编译或模拟成功证据。[模拟文档](https://docs.chain.link/cre/guides/operations/simulating-workflows)。
+6. 用官方 CLI 模拟生成的 workflow；需要广播测试交易时按官方文档启用广播，并确认使用测试资金。当前已完成 SDK WASM 编译，尚无 CLI 模拟成功证据。[模拟文档](https://docs.chain.link/cre/guides/operations/simulating-workflows)。
 7. 按账户权限申请 workflow 部署，并验证 report 通过真实 forwarder 到达合约。记录 execution ID、交易 hash、余额变化、相同任务二次 report 拒绝和超时退款。
 8. 最后添加网站的 chain adapter，把链上状态作为资金真相源，并实现最终确认与对账。不得把本地 D1 余额简单切换标签当作链上资金。
 
