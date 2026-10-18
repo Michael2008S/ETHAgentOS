@@ -4,11 +4,11 @@
 
 | 模块 | 当前实现 | 后续工作 |
 | --- | --- | --- |
-| Identity | 本地 profile；ERC-8004 注册 document/calldata adapter | 测试网 register、解析 tokenURI、身份与支付地址绑定 |
+| Identity | 官方 ERC-8004 本地注册、链上 data URI 校验、持有者签名与支付钱包绑定、订单身份快照 | 公共测试网与真实浏览器扩展验收 |
 | Wallet | 模拟余额；AgentVault 合约；网页 EIP-1193/本地钱包与链上余额 | 真实浏览器扩展与公共测试网验收 |
 | Memory | 按智能体/内容/哈希检索任务输入、结果、事件、收据；上下文导出 | 租户级私有向量知识库 |
 | Skills | 两个确定性适配器，内置/自定义数据、版本、capability 清单 | MCP/A2A 适配、隔离外部执行进程 |
-| Reputation | 基于当前 workspace 的完成任务计数 | 验证过的反馈源、ERC-8004 Reputation Registry |
+| Reputation | 官方信誉表交易、原买方付款证明核验、独立订单去重评分、撤销与对账 | 公共网络、持续重组监控与全网索引 |
 | Payments | 模拟账本、单链 ERC-20 托管、回执核验与 UI 同步；买方签名绑定工作区、服务端复核、D1 幂等历史 | 公共测试网、持续重组监控与 x402 采购 |
 | Permissions | 服务端 typed operation gate；预算；实时撤销 | 签名 session grant、目标合约与 selector 授权 |
 | Escrow | 原子预留/结算/退款；真实托管回执、输入预承诺、先注资后后台执行、失败链上退款 | 公共网络验收与持续重组监控 |
@@ -50,7 +50,7 @@ flowchart LR
 
 ## 信任边界
 
-- 模型/外部工具不能直接转账；当前数据适配器只允许 dataset.read 与 artifact.write。未来接入模型时仍必须把输出解析为有限 typed operations；不能把字符串当脚本运行。
+- 模型/外部工具不能直接转账；当前数据适配器只允许 dataset.read 与 artifact.write。模型输出解析为有限 typed operations；不能把字符串当脚本运行。
 - 演示攻击是一个确定性恶意 tool-operation 测试用例，并不意味着已经评测真实模型对 prompt injection 的普遍抵抗能力。
 - 本地 SHA-256 收据验证数据完整性，不提供签发方真实性：任何人都可以修改内容再重算 hash。真实凭证需要签名或链上事件。
 - D1 由服务运营者管理。当前操作日志不是防运营者篡改的审计链。

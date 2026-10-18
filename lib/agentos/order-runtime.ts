@@ -14,7 +14,7 @@ export async function configuredOrderChain(request:Request){
     const response=await fetch('http://127.0.0.1:8545'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(20000)});
     const data=await response.json() as T & {error?:string};if(!response.ok)throw new Error(data.error??'Local order settlement failed.');return data;
   }:undefined;
-  return {chain:orderChain(client,deployment,localCall),deployment,localCall,planner:await configuredPlanner(request).catch(()=>undefined)};
+  return {client,chain:orderChain(client,deployment,localCall),deployment,localCall,planner:await configuredPlanner(request).catch(()=>undefined)};
 }
 export function scheduleOrders(ownerId:string,state:Workspace,request:Request){
   const orders=pendingOrders(state).slice(0,8);if(!orders.length)return;

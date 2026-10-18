@@ -42,4 +42,4 @@ YAML 结构来自[官方模板](https://github.com/smartcontractkit/cre-template
 7. 按账户权限申请 workflow 部署，并验证 report 通过真实 forwarder 到达合约。记录 execution ID、交易 hash、余额变化、相同任务二次 report 拒绝和超时退款。
 8. 网站已提供 EIP-1193 连接、链上余额、回执核验、买方签名、预注资后台执行及服务端复核写回 D1。仍需持续链重组监控并验收公共网络配置。不得把本地 D1 余额简单切换标签当作链上资金。
 
-ERC-8004 身份适配器位于 `sdk/identity.ts`。返回注册文档和 register(string) calldata；需 owner 签名，并在获得 agentId 后补 registrations。身份协议本身不承担付款。[ERC-8004 规范](https://ercs.ethereum.org/ERCS/erc-8004)。
+ERC-8004 身份适配器位于 `sdk/identity.ts` 与 `sdk/agent-identity.ts`。已完成官方注册表的本地 EVM 注册、补齐 registrations、工作区签名绑定、订单身份快照、已付款反馈及撤销；公共测试网待验收。详见 `IDENTITY.md`。身份协议本身不承担付款。[ERC-8004 规范](https://ercs.ethereum.org/ERCS/erc-8004)。

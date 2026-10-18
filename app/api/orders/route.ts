@@ -6,6 +6,7 @@ import { configuredOrderChain,scheduleOrders } from '@/lib/agentos/order-runtime
 import { runOrder } from '@/lib/agentos/order-runner';
 import { inputEvidence } from '@/sdk/wallet';
 import type { DeliverySpec } from '@/cre/workflow/verify';
+import { inspectIdentity } from '@/lib/agentos/identity';
 import { canonical } from '@/cre/workflow/verify';
 const id=z.string().min(1).max(128),hash=z.string().regex(/^0x[0-9a-fA-F]{64}$/),address=z.string().regex(/^0x[0-9a-fA-F]{40}$/).refine(s=>!/^0x0{40}$/.test(s));
 const input=z.object({dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe(),records:z.array(z.object({block:z.number().int().nonnegative().safe(),from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:z.number().int().nonnegative().safe()}).strict()).min(1).max(100).optional()}).strict();
@@ -24,13 +25,15 @@ export async function POST(request:Request){
   checkOrigin(request);const ownerId=owner(request);
   if(!request.headers.get('content-type')?.includes('application/json'))return Response.json({error:'JSON required.'},{status:415});
   const raw=await request.text();if(new TextEncoder().encode(raw).length>65536)return Response.json({error:'Request too large.'},{status:413});
-  const body=schema.parse(JSON.parse(raw)),configured=await configuredOrderChain(request),{chain,deployment,localCall,planner}=configured;
+  const body=schema.parse(JSON.parse(raw)),configured=await configuredOrderChain(request),{chain,deployment,localCall,planner,client}=configured;
   if(body.action==='create'){
    const snapshot=await read(ownerId),prior=snapshot.state.chainOrders?.find(o=>o.requestId===body.requestId),normalized=normalizeInput(body.input),bytes=inputEvidence({id:'chain-'+body.requestId,input:normalized},body.buyer as `0x${string}`);
    const spec=prior?.spec??(localCall?await localCall<DeliverySpec>('/drafts',bytes):body.spec);
    if(!spec||spec.datasetHash!==bytes.datasetHash||body.spec&&canonical(body.spec)!==canonical(spec))throw new DomainError('Evidence URLs and hash must match the committed order input.');
    if(body.planner==='llm'&&!planner)throw new DomainError('Model service is not configured.','UNAVAILABLE');
-   const {action:_,...fields}=body,draft={...fields,spec,input:normalized,...(body.planner==='llm'?{model:planner!.descriptor}:{})} as OrderDraft;
+   const bound=prior?prior.agentIdentity:snapshot.state.agentIdentities?.find(i=>i.agentId===body.agentId);
+   const identity=bound?(prior?bound:await inspectIdentity(client,deployment,bound)):undefined;
+   const {action:_,...fields}=body,draft={...fields,spec,input:normalized,...(body.planner==='llm'?{model:planner!.descriptor}:{}),...(identity?{agentIdentity:identity}:{})} as OrderDraft;
    const result=await updateWorkspace(ownerId,state=>createOrder(state,draft,deployment));return Response.json({...result,order:findOrder(result.state,'chain-'+body.requestId)},{headers:{'Cache-Control':'no-store'}});
   }
   const {state}=await read(ownerId),order=findOrder(state,body.orderId);

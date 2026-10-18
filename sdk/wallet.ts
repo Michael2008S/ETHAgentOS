@@ -4,12 +4,12 @@ import { DATASET, verifyReceipt } from '../lib/agentos/engine.ts';
 import { canonical,specHash, type DeliverySpec } from '../cre/workflow/verify.ts';
 import type { Task } from '../lib/agentos/types.ts';
 
-export type WalletDeployment = ChainDeployment & {mode:'local'|'testnet';seller:Address;deployedBlock:string};
-export function localWalletProvider(base:string):EIP1193Provider {
+export type WalletDeployment = ChainDeployment & {mode:'local'|'testnet';seller:Address;deployedBlock:string;identityRegistry?:Address;reputationRegistry?:Address};
+export function localWalletProvider(base:string,role:'buyer'|'seller'='buyer'):EIP1193Provider {
   const url=new URL(base);
   if(url.protocol!=='http:'||url.hostname!=='127.0.0.1'||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw new Error('Local test wallet requires a plain loopback endpoint.');
   return {request:async({method,params}: {method:string;params?:unknown})=>{
-    const response=await fetch(url.origin+'/rpc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:crypto.randomUUID(),method,params}),signal:AbortSignal.timeout(20000)});
+    const response=await fetch(url.origin+(role==='seller'?'/seller-rpc':'/rpc'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:crypto.randomUUID(),method,params}),signal:AbortSignal.timeout(20000)});
     const result=await response.json() as {result:unknown;error?:{message?:string;code?:number}|string};
     const fault=typeof result.error==='string'?{message:result.error}:result.error;
     if(!response.ok||fault)throw Object.assign(new Error(fault?.message??'Local wallet RPC failed.'),{code:fault?.code});return result.result;

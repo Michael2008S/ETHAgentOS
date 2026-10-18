@@ -5,9 +5,10 @@ import { canonical, type DeliverySpec } from '../../cre/workflow/verify.ts';
 import { authorizeOperation, digest, DomainError, expectedOutput, normalizeInput } from './engine.ts';
 import type { Event, Policy, Scenario, Skill, TaskInput, Workspace } from './types.ts';
 import type { ModelDescriptor,ModelPlan } from './model.ts';
+import type { AgentIdentity } from './identity.ts';
 export type OrderStatus='awaiting-funding'|'queued'|'running'|'awaiting-settlement'|'paused'|'completed'|'refunded'|'cancelled';
-export type ChainOrder={id:string;requestId:string;title:string;agentId:string;skill:Skill;quote:number;budget:number;buyer:Address;deployment:WalletDeployment;spec:DeliverySpec;input:TaskInput;inputHash:string;scenario:Scenario;timeoutSeconds:number;status:OrderStatus;step:number;createdAt:string;updatedAt:string;deadlineAt?:string;chainDeadline?:string;settledAt?:string;lastError?:string;planner?:'deterministic'|'llm';model?:ModelDescriptor;modelPlan?:ModelPlan;modelLease?:{token:string;expiresAt:string};output:Record<string,unknown>|null;outputHash:string|null;failure:string|null;funding:ChainEvidence|null;settlement:ChainEvidence|null;policySnapshot:Policy|null;events:Event[];authorization?:{nonce:string;message:string;expiresAt:string;transactionHash:Hex};settlementAuthorization?:{artifactText:string;authorizedAt:string;policyHash:string}};
-export type OrderDraft={planner?:'deterministic'|'llm';model?:ModelDescriptor;requestId:string;title:string;agentId:string;budget:number;buyer:Address;spec:DeliverySpec;input?:TaskInput;scenario:Scenario;timeoutSeconds:number};
+export type ChainOrder={agentIdentity?:AgentIdentity;id:string;requestId:string;title:string;agentId:string;skill:Skill;quote:number;budget:number;buyer:Address;deployment:WalletDeployment;spec:DeliverySpec;input:TaskInput;inputHash:string;scenario:Scenario;timeoutSeconds:number;status:OrderStatus;step:number;createdAt:string;updatedAt:string;deadlineAt?:string;chainDeadline?:string;settledAt?:string;lastError?:string;planner?:'deterministic'|'llm';model?:ModelDescriptor;modelPlan?:ModelPlan;modelLease?:{token:string;expiresAt:string};output:Record<string,unknown>|null;outputHash:string|null;failure:string|null;funding:ChainEvidence|null;settlement:ChainEvidence|null;policySnapshot:Policy|null;events:Event[];authorization?:{nonce:string;message:string;expiresAt:string;transactionHash:Hex};settlementAuthorization?:{artifactText:string;authorizedAt:string;policyHash:string}};
+export type OrderDraft={agentIdentity?:AgentIdentity;planner?:'deterministic'|'llm';model?:ModelDescriptor;requestId:string;title:string;agentId:string;budget:number;buyer:Address;spec:DeliverySpec;input?:TaskInput;scenario:Scenario;timeoutSeconds:number};
 export const pendingOrders=(state:Workspace)=>(state.chainOrders??[]).filter(o=>['queued','running','awaiting-settlement'].includes(o.status));
 export function orderEvent(o:ChainOrder,title:string,detail:string,now=new Date().toISOString(),level:Event['level']='info'){
   o.events.push({id:`${o.id}:${o.events.length}`,at:now,title,detail,level,step:o.step});o.updatedAt=now;
@@ -23,9 +24,9 @@ export function orderPolicy(state:Workspace,order:ChainOrder,now:string){
 }
 export async function createOrder(state:Workspace,draft:OrderDraft,deployment:WalletDeployment,now=new Date().toISOString()):Promise<Workspace>{
   const input=normalizeInput(draft.input),prior=state.chainOrders?.find(o=>o.requestId===draft.requestId);
-  const parameters={...draft,input,planner:draft.planner??'deterministic',model:draft.model??null};
+  const parameters={...draft,input,planner:draft.planner??'deterministic',model:draft.model??null,agentIdentity:draft.agentIdentity??null};
   if(prior){
-    const previous={planner:prior.planner??'deterministic',model:prior.model??null,requestId:prior.requestId,title:prior.title,agentId:prior.agentId,budget:prior.budget,buyer:prior.buyer,spec:prior.spec,input:prior.input,scenario:prior.scenario,timeoutSeconds:prior.timeoutSeconds};
+    const previous={planner:prior.planner??'deterministic',model:prior.model??null,agentIdentity:prior.agentIdentity??null,requestId:prior.requestId,title:prior.title,agentId:prior.agentId,budget:prior.budget,buyer:prior.buyer,spec:prior.spec,input:prior.input,scenario:prior.scenario,timeoutSeconds:prior.timeoutSeconds};
     if(canonical(previous)!==canonical(parameters)||canonical(prior.deployment)!==canonical(deployment))throw new DomainError('Request ID was already used with different chain order parameters.','IDEMPOTENCY_CONFLICT');return state;
   }
   if((state.chainOrders?.length??0)>=300)throw new DomainError('This prototype supports up to 300 onchain orders per workspace.');
@@ -54,7 +55,7 @@ export function commitModelPlan(state:Workspace,id:string,token:string,result:{p
   if(!result.plan||canonical(result.plan.descriptor)!==canonical(o.model))throw new DomainError('Model identity differs from the authorized order.','CONFLICT');
   o.modelPlan=result.plan;orderEvent(o,'Model plan received','Model output remains untrusted until every requested operation passes the capability gate.',now,'success');return next;
 }
-export const orderCommitment=(o:ChainOrder)=>digest({id:o.id,agentId:o.agentId,skill:o.skill,quote:o.quote,budget:o.budget,buyer:o.buyer,input:o.input,spec:o.spec,deployment:o.deployment,scenario:o.scenario,timeoutSeconds:o.timeoutSeconds,planner:o.planner??'deterministic',model:o.model??null});
+export const orderCommitment=(o:ChainOrder)=>digest({id:o.id,agentId:o.agentId,skill:o.skill,quote:o.quote,budget:o.budget,buyer:o.buyer,input:o.input,spec:o.spec,deployment:o.deployment,scenario:o.scenario,timeoutSeconds:o.timeoutSeconds,planner:o.planner??'deterministic',model:o.model??null,...(o.agentIdentity?{agentIdentity:o.agentIdentity}:{})});
 export async function authorizeOrder(state:Workspace,id:string,ownerId:string,transactionHash:Hex,nonce:string,now=new Date().toISOString()){
   const next=structuredClone(state),o=findOrder(next,id);
   if(o.status!=='awaiting-funding')throw new DomainError('This order has already been activated or cancelled.');

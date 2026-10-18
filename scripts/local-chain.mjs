@@ -7,6 +7,7 @@ import { compile } from './compile-contracts.mjs';
 import { normalizeInput } from '../lib/agentos/engine.ts';
 import { encodeSettlementReport, escrowABI } from '../sdk/chain.ts';
 import { specHash, verifyDelivery } from '../cre/workflow/verify.ts';
+import { deployIdentityRegistries } from './compile-identity.mjs';
 
 const rpcMethods=new Set(['personal_sign','eth_chainId','eth_accounts','eth_blockNumber','eth_call','eth_getBalance','eth_getTransactionReceipt','eth_getTransactionByHash','eth_getBlockByNumber','eth_getBlockByHash','eth_estimateGas','eth_gasPrice','eth_maxPriorityFeePerGas','eth_feeHistory','eth_getTransactionCount','eth_sendTransaction','web3_clientVersion','net_version','eth_getCode','eth_getLogs']);
 export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:5177'}={}){
@@ -17,7 +18,8 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
   async function deploy(name,args=[]){const hash=await wallet.deployContract({...artifacts[name],account:buyer,args,gas:6000000n});return(await client.waitForTransactionReceipt({hash})).contractAddress;}
   const token=await deploy('MockToken'),metadata=stringToHex('agentos-local-verifier:v1'),metadataHash=keccak256(metadata),escrow=await deploy('AgentEscrow',[token,forwarder,metadataHash]);
   await client.waitForTransactionReceipt({hash:await wallet.writeContract({address:token,abi:artifacts.MockToken.abi,functionName:'mint',args:[buyer,100000000n],account:buyer,gas:6000000n})});
-  const config={mode:'local',chainId:31337,token,escrow,forwarder,metadataHash,confirmations:1,seller,deployedBlock:'0'},deliveries=new Map(),settlements=new Map();
+  const registries=await deployIdentityRegistries(client,wallet,buyer);
+  const config={mode:'local',chainId:31337,token,escrow,forwarder,metadataHash,confirmations:1,seller,deployedBlock:'0',...registries},deliveries=new Map(),settlements=new Map();
   let base;
   const server=createServer(async(req,res)=>{
     const json=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data));};
@@ -33,15 +35,19 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
       if(req.method==='GET'&&match){const record=deliveries.get(match[2]);if(!record||match[1]==='artifact'&&!record.artifactText)return json(404,{error:'Delivery not ready.'});res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(match[1]==='dataset'?record.datasetText:record.artifactText);return;}
       if(req.method!=='POST')return json(404,{error:'Route not found.'});
       let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>65536)throw new Error('Local request too large.');}const body=JSON.parse(raw);
-      if(path==='/rpc'){
+      if(path==='/rpc'||path==='/seller-rpc'){
         const {id,method,params=[]}=body;
+        const actor=path==='/seller-rpc'?seller:buyer;
         if(!rpcMethods.has(method))return json(200,{jsonrpc:'2.0',id,error:{code:-32601,message:'Method is not enabled in the local test wallet.'}});
+        if(method==='eth_accounts')return json(200,{jsonrpc:'2.0',id,result:[actor]});
         if(method==='personal_sign'){
-          if(params[1]?.toLowerCase()!==buyer.toLowerCase()||typeof params[0]!=='string'||!/^0x[0-9a-fA-F]+$/.test(params[0])||params[0].length>32770||!Buffer.from(params[0].slice(2),'hex').toString().startsWith('AgentOS chain reconciliation v1\n'))return json(200,{jsonrpc:'2.0',id,error:{code:-32602,message:'Local wallet only signs AgentOS receipt challenges for its buyer.'}});
-          const account=privateKeyToAccount(provider.getInitialAccounts()[buyer.toLowerCase()].secretKey);
+          const prefix=actor===seller?'AgentOS identity binding v1\n':'AgentOS chain reconciliation v1\n';
+          if(params[1]?.toLowerCase()!==actor.toLowerCase()||typeof params[0]!=='string'||!/^0x[0-9a-fA-F]+$/.test(params[0])||params[0].length>32770||!Buffer.from(params[0].slice(2),'hex').toString().startsWith(prefix))return json(200,{jsonrpc:'2.0',id,error:{code:-32602,message:'Local wallet only signs its AgentOS scoped challenge.'}});
+          const account=privateKeyToAccount(provider.getInitialAccounts()[actor.toLowerCase()].secretKey);
           return json(200,{jsonrpc:'2.0',id,result:await account.signMessage({message:{raw:params[0]}})});
         }
-        if(method==='eth_sendTransaction'&&(params[0]?.from?.toLowerCase()!==buyer.toLowerCase()||![token,escrow].some(address=>address.toLowerCase()===params[0]?.to?.toLowerCase())))return json(200,{jsonrpc:'2.0',id,error:{code:-32602,message:'Local wallet only signs buyer calls to this test deployment.'}});
+        const targets=actor===seller?[registries.identityRegistry]:[token,escrow,registries.reputationRegistry];
+        if(method==='eth_sendTransaction'&&(params[0]?.from?.toLowerCase()!==actor.toLowerCase()||!targets.some(address=>address.toLowerCase()===params[0]?.to?.toLowerCase())))return json(200,{jsonrpc:'2.0',id,error:{code:-32602,message:'Local wallet only signs its role-specific test contracts.'}});
         try{return json(200,{jsonrpc:'2.0',id,result:await provider.request({method,params})});}catch(error){return json(200,{jsonrpc:'2.0',id,error:{code:error.code??-32000,message:error.message}});}
       }
       if(path==='/drafts'){

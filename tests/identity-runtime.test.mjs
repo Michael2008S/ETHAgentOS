@@ -1,0 +1,28 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import ganache from 'ganache';
+import { createPublicClient,createWalletClient,custom,parseAbi } from 'viem';
+import { deployIdentityRegistries } from '../scripts/compile-identity.mjs';
+import { identityABI,reputationABI,completeRegistrationDocument,registrationDataURI } from '../sdk/identity.ts';
+import { seed } from '../lib/agentos/engine.ts';
+import { bindIdentity,createIdentityChallenge,identityDocument,inspectIdentity,prepareFeedback,verifyRegistration } from '../lib/agentos/identity.ts';
+test('official ERC-8004 identity binds exact profile, prevents self-review and clears payment wallet on transfer',async()=>{
+ const provider=ganache.provider({logging:{quiet:true},chain:{hardfork:'shanghai',chainId:31337}}),client=createPublicClient({transport:custom(provider),cacheTime:0}),signer=createWalletClient({transport:custom(provider),chain:null});
+ try{
+  const [admin,seller,buyer]=await signer.getAddresses(),registries=await deployIdentityRegistries(client,signer,admin),deployment={mode:'local',chainId:31337,token:admin,escrow:admin,forwarder:admin,metadataHash:'0x'+'1'.repeat(64),confirmations:1,seller,deployedBlock:'0',...registries};
+  let state=seed();const {agentURI,document}=await identityDocument(state,'owner','atlas','http://127.0.0.1:5177');
+  const hash=await signer.writeContract({address:registries.identityRegistry,abi:identityABI,functionName:'register',args:[agentURI],account:seller,gas:3000000n});await client.waitForTransactionReceipt({hash});
+  const update=await signer.writeContract({address:registries.identityRegistry,abi:identityABI,functionName:'setAgentURI',args:[0n,registrationDataURI(completeRegistrationDocument(document,31337,registries.identityRegistry,'0'))],account:seller,gas:3000000n});await client.waitForTransactionReceipt({hash:update});
+  const identity=await verifyRegistration(state,'owner','atlas','0',hash,'http://127.0.0.1:5177',client,deployment);assert.equal(identity.wallet.toLowerCase(),seller.toLowerCase());
+  await assert.rejects(verifyRegistration(state,'another-owner','atlas','0',hash,'http://127.0.0.1:5177',client,deployment),/does not bind/);
+  await assert.rejects(verifyRegistration(state,'owner','sage','0',hash,'http://127.0.0.1:5177',client,deployment),/does not bind/);
+  const nonce=crypto.randomUUID();state=await createIdentityChallenge(state,'owner',identity,nonce);state=bindIdentity(state,nonce,identity);assert.equal(state.agentIdentities.length,1);assert.strictEqual(bindIdentity(state,nonce,identity),state);
+  const expired=await createIdentityChallenge(seed(),'owner',identity,'expired','2026-10-18T00:00:00.000Z');assert.throws(()=>bindIdentity(expired,'expired',identity),/expired/);
+  await assert.rejects(prepareFeedback({...state,chainOrders:[{id:'unpaid',status:'awaiting-funding',settlement:null,agentIdentity:identity}]},'unpaid',90,client,deployment),/paid order/);
+  const args=[0n,90n,0,'starred','','','', '0x'+'0'.repeat(64)];
+  await assert.rejects(client.estimateContractGas({address:registries.reputationRegistry,abi:reputationABI,functionName:'giveFeedback',args,account:seller}),/Self-feedback not allowed/);
+  const feedback=await signer.writeContract({address:registries.reputationRegistry,abi:reputationABI,functionName:'giveFeedback',args,account:buyer,gas:1000000n});assert.equal((await client.waitForTransactionReceipt({hash:feedback})).status,'success');
+  const transfer=await signer.writeContract({address:registries.identityRegistry,abi:parseAbi(['function transferFrom(address from,address to,uint256 tokenId)']),functionName:'transferFrom',args:[seller,buyer,0n],account:seller,gas:300000n});await client.waitForTransactionReceipt({hash:transfer});
+  assert.equal(await client.readContract({address:registries.identityRegistry,abi:identityABI,functionName:'getAgentWallet',args:[0n]}),'0x0000000000000000000000000000000000000000');await assert.rejects(inspectIdentity(client,deployment,identity),/ownership, payment wallet/);
+ }finally{await provider.disconnect();}
+});
