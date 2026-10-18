@@ -27,8 +27,21 @@ assert.equal(s.tasks.find(t=>t.id===revokedId).status,'blocked');assert.equal(s.
 const receipt=await fetch(base+'/api/receipts/'+task.id,{headers});assert.equal(receipt.status,200);assert.equal((await receipt.json()).integrityValid,true);
 const exported=await fetch(base+'/api/exports?kind=receipt&taskId='+encodeURIComponent(task.id),{headers});assert.equal(exported.status,200);assert.match(exported.headers.get('content-disposition'),/^attachment; filename=/);assert.deepEqual(await exported.json(),s.tasks.find(t=>t.id===task.id).receipt);
 const crossOwner=await fetch(base+'/api/exports?kind=receipt&taskId='+encodeURIComponent(task.id),{headers:{...headers,'x-agentos-sandbox':'other-'+runId}});assert.equal(crossOwner.status,404);
+await command({type:'update_policy',policy:initial.policy});
+const serviceId='api-'+runId+'-service';
+s=await command({type:'create_task',executionMode:'manual',requestId:serviceId,taskId:serviceId,agentId:'relay',title:'Accepted quote survives price change',budget:1000,scenario:'success'});
+await command({type:'update_agent',agentId:'relay',enabled:true,price:400});
+for(const expectedStep of [0,1])s=await command({type:'advance',taskId:serviceId,expectedStep});
+assert.equal(s.tasks.find(t=>t.id===serviceId).quote,180);assert.equal(s.tasks.find(t=>t.id===serviceId).reserved,1000);
+s=await command({type:'update_agent',agentId:'relay',enabled:false,price:400});
+assert.equal(s.tasks.find(t=>t.id===serviceId).status,'blocked');assert.equal(s.tasks.find(t=>t.id===serviceId).reserved,0);
+const unavailable=await fetch(base+'/api/command',{method:'POST',headers,body:JSON.stringify({type:'create_task',requestId:serviceId+'-denied',taskId:serviceId+'-denied',agentId:'relay',title:'Disabled service',budget:1000,scenario:'success'})});assert.equal(unavailable.status,400);
+await command({type:'update_agent',agentId:'relay',enabled:true,price:400});
+s=await command({type:'create_task',executionMode:'manual',requestId:serviceId+'-new',taskId:serviceId+'-new',agentId:'relay',title:'New quote',budget:1000,scenario:'success'});
+assert.equal(s.tasks.find(t=>t.id===serviceId+'-new').quote,400);
+await command({type:'cancel_task',taskId:serviceId+'-new'});
 const denied=await fetch(base+'/api/command',{method:'POST',headers:{...headers,Origin:'https://different.example'},body:JSON.stringify({type:'topup',amount:1,requestId:'csrf'})});assert.equal(denied.status,403);
 const invalid=await fetch(base+'/api/command',{method:'POST',headers,body:'{broken'});assert.equal(invalid.status,400);
-console.log('API integration PASS: D1 CAS concurrency, duplicate settlement, revoke after reservation, receipt integrity, origin guard, invalid input.');
+console.log('API integration PASS: D1 CAS concurrency, duplicate settlement, revoke after reservation, owner-scoped exports, service availability and quote snapshots, origin guard, invalid input.');
 
 } finally { await command({type:'update_policy',policy:initial.policy}); }

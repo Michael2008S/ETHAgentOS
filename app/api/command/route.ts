@@ -12,6 +12,7 @@ const command = z.discriminatedUnion('type', [
   z.object({ type: z.literal('cancel_task'), taskId: id }),
   z.object({ type: z.literal('expire_task'), taskId: id }),
   z.object({ type: z.literal('update_policy'), policy: z.object({ active: z.boolean(), maxTaskBudget: z.number().int().positive(), dailyBudget: z.number().int().positive(), allowedSkills: z.array(skill).max(2) }) }),
+  z.object({ type: z.literal('update_agent'), agentId: id, enabled: z.boolean(), price: z.number().int().positive().max(1000000) }),
   z.object({ type: z.literal('topup'), amount: z.number().int().positive(), requestId: id }),
   z.object({ type: z.literal('register_agent'), agent: z.object({ name: z.string().min(1).max(40), description: z.string().max(240), skill }), requestId: id }),
 ]);

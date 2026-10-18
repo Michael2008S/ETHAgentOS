@@ -20,4 +20,5 @@ export class AgentOSClient {
   async recover(){return this.request('/api/runtime',undefined,true);}
   async resume(taskId:string){await this.request('/api/command',{type:'resume_task',taskId});return this.run(taskId);}
   async cancel(taskId:string){return this.request('/api/command',{type:'cancel_task',taskId});}
+  async updateAgent(agentId:string,settings:{enabled:boolean;price:number}){return this.request('/api/command',{type:'update_agent',agentId,...settings});}
 }

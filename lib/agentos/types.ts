@@ -15,6 +15,7 @@ export type Command =
   | { type: 'cancel_task'; taskId: string }
   | { type: 'expire_task'; taskId: string }
   | { type: 'update_policy'; policy: Policy }
+  | { type: 'update_agent'; agentId: string; enabled: boolean; price: number }
   | { type: 'topup'; amount: number; requestId: string }
   | { type: 'register_agent'; agent: Pick<Agent, 'name' | 'description' | 'skill'>; requestId: string };
 export const STEPS = ['Authorize', 'Reserve', 'Execute', 'Verify', 'Settle', 'Complete'] as const;

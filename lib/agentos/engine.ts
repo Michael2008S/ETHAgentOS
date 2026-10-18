@@ -116,6 +116,7 @@ export async function transition(input: Workspace, command: Command, now = new D
     if (!['success', 'injection', 'interruption', 'invalid-delivery'].includes(command.scenario)) throw new DomainError('Unknown scenario.');
     const agent = s.agents.find(a => a.id === command.agentId);
     if (!agent) throw new DomainError('Unknown agent.');
+    if (!agent.enabled) throw new DomainError('Agent is disabled.');
     money(command.budget, 'Budget');
     if (command.budget < agent.price) throw new DomainError('Budget must cover the service quote.');
     const title = command.title.trim();
@@ -126,6 +127,19 @@ export async function transition(input: Workspace, command: Command, now = new D
     const task: Task = { timeoutSeconds, deadlineAt: new Date(Date.parse(now) + timeoutSeconds * 1000).toISOString(), executionMode: command.executionMode ?? 'automatic', id: command.taskId, requestId: command.requestId, title, agentId: agent.id, skill: agent.skill, scenario: command.scenario, budget: command.budget, quote: agent.price, reserved: 0, paid: 0, step: 0, status: 'queued', createdAt: now, updatedAt: now, input: { dataset: 'eth-shenzhen-fixture-v1', blockFrom: 7210000, blockTo: 7210100 }, output: null, outputHash: null, receipt: null, events: [], policySnapshot: null };
     event(task, now, 'Task accepted', `Assigned to ${agent.name}. Local fixture adapter ${agent.skill}@1.0.0.`);
     s.tasks.unshift(task);
+  } else if (command.type === 'update_agent') {
+    const agent = s.agents.find(a => a.id === command.agentId);
+    if (!agent) throw new DomainError('Unknown agent.', 'NOT_FOUND');
+    money(command.price, 'Service quote');
+    if (typeof command.enabled !== 'boolean') throw new DomainError('Invalid service availability.');
+    agent.enabled = command.enabled; agent.price = command.price;
+    if (!agent.enabled) for (const task of s.tasks) {
+      if (task.agentId !== agent.id || task.paid > 0 || !['queued', 'running', 'paused'].includes(task.status)) continue;
+      if (taskIsOverdue(task, now)) {
+        release(s, task, now, 'Reservation returned after deadline');
+        task.status = 'expired'; event(task, now, 'Task expired', 'Execution deadline passed before payment. All unpaid reserved funds were released.', 'warning');
+      } else deny(s, task, now, 'Agent is disabled.');
+    }
   } else if (command.type === 'update_policy') {
     money(command.policy.maxTaskBudget, 'Per-task limit'); money(command.policy.dailyBudget, 'Daily limit');
     if (typeof command.policy.active !== 'boolean' || !Array.isArray(command.policy.allowedSkills) || command.policy.allowedSkills.some(k => !SKILLS.some(x => x.id === k))) throw new DomainError('Invalid policy.');

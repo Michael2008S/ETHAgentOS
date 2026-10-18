@@ -307,5 +307,16 @@
   "Task expired": "任务已超时",
   "Execution deadline passed before payment. All unpaid reserved funds were released.": "付款前已超过执行期限，未付款的预留资金已全部释放。",
   "Execution window must be 1–86400 whole seconds.": "执行期限须为 1–86400 整数秒。",
-  "Reservation returned after deadline": "超时后返还预留资金"
+  "Reservation returned after deadline": "超时后返还预留资金",
+  "Disabled": "已停用",
+  "Manage service": "管理服务",
+  "Service enabled": "启用服务",
+  "Disabling immediately blocks unpaid tasks and releases their reservations.": "停用后立即拦截未付款任务并释放其预留资金。",
+  "Service quote · testUSD": "服务报价 · testUSD",
+  "New prices apply to future tasks. Accepted quotes and committed payments remain unchanged.": "新报价用于后续任务，已受理任务的报价和已提交付款保持不变。",
+  "Save service": "保存服务",
+  "Service settings saved. Existing accepted quotes remain unchanged.": "服务设置已保存，已受理任务的报价保持不变。",
+  "No enabled services are available. Enable a service first.": "没有可用服务，请先启用至少一个服务。",
+  "Invalid service availability.": "服务启用状态无效。",
+  "Service quote": "服务报价"
 }

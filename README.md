@@ -10,6 +10,7 @@
 - D1 持久化执行内核：授权 → 预留预算 → 执行 → 校验 → 结算 → 完成。
 - 当前权限逐步检查、技能 capability allowlist、按任务及 UTC 日预算、并发预留、请求幂等、原子结算。
 - 四条可操作演示：成功交付、越权指令拦截、付款后中断与恢复、错误结果退回预算。
+- 服务启停与报价管理：停用即时阻止未付款任务并释放预留；已受理报价固定，已付款恢复保留原收据。
 - 结果和收据导出、SHA-256 完整性验证、任务记录、按已完成任务统计的服务履历。
 - Solidity `AgentEscrow` 与 `AgentVault`：标准 ERC-20 托管、CRE forwarder + workflow metadata 双重限制、重复结算拒绝、超时退款、执行者限额与撤销。
 - 使用真实 `@chainlink/cre-sdk` 的工作流源码、viem ERC-8004 身份注册 calldata 适配器、TypeScript 客户端 SDK。
