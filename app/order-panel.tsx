@@ -10,6 +10,7 @@ import type { Agent,Scenario } from '@/lib/agentos/types';
 import type { ChainOrder,OrderStatus } from '@/lib/agentos/orders';
 import type { ModelDescriptor } from '@/lib/agentos/model';
 import type { SupplierDescriptor } from '@/lib/agentos/supplier';
+import { submissionIntent } from '@/lib/agentos/client-intent';
 const statusLabels:Record<OrderStatus,string>={'awaiting-funding':'Awaiting funding',queued:'Queued',running:'Running','awaiting-settlement':'Awaiting chain settlement',paused:'Needs recovery',completed:'Completed',refunded:'Refunded',cancelled:'Cancelled'};
 export function OrderPanel({session,agents,orders,feedback=[],busy,perform,onChanged}:{session:AgentWalletSession|null;agents:Agent[];orders:ChainOrder[];feedback?:PaidFeedback[];busy:boolean;perform:(action:()=>Promise<void>)=>Promise<void>;onChanged?:()=>Promise<void>}){
   const {tr}=useLanguage(),[mode,setMode]=useState('fixture'),[hashes,setHashes]=useState<Record<string,string>>({}),[limit,setLimit]=useState(10);
@@ -22,8 +23,11 @@ export function OrderPanel({session,agents,orders,feedback=[],busy,perform,onCha
     event.preventDefault();const fields=new FormData(event.currentTarget);
     await perform(async()=>{
       const input=mode==='custom'?normalizeInput({dataset:'custom-transfers-v1',blockFrom:Number(fields.get('blockFrom')),blockTo:Number(fields.get('blockTo')),records:JSON.parse(String(fields.get('records')))}):undefined;
-      const requestId=crypto.randomUUID(),spec=session!.deployment.mode==='testnet'?{datasetUrl:String(fields.get('datasetUrl')),artifactUrl:String(fields.get('artifactUrl')),datasetHash:inputEvidence({id:'chain-'+requestId,input:normalizeInput(input)},session!.account).datasetHash}:undefined;
-      await client!.create({requestId,title:String(fields.get('title')),agentId:String(fields.get('agentId')),budget:Math.round(Number(fields.get('budget'))*100),input,spec,executor:String(fields.get('executor')) as 'builtin'|'supplier',planner:String(fields.get('planner')) as 'deterministic'|'llm',scenario:String(fields.get('scenario')) as Scenario,timeoutSeconds:Number(fields.get('timeoutSeconds'))});await onChanged?.();
+      const payload={title:String(fields.get('title')),agentId:String(fields.get('agentId')),budget:Math.round(Number(fields.get('budget'))*100),input,executor:String(fields.get('executor')) as 'builtin'|'supplier',planner:String(fields.get('planner')) as 'deterministic'|'llm',scenario:String(fields.get('scenario')) as Scenario,timeoutSeconds:Number(fields.get('timeoutSeconds'))};
+      const snapshot=await fetch('/api/workspace').then(r=>{if(!r.ok)throw new Error('Workspace unavailable.');return r.json() as Promise<{scope:string}>;});
+      const intent=await submissionIntent(snapshot.scope,'order',{...payload,buyer:session!.account,deployment:session!.deployment,datasetUrl:String(fields.get('datasetUrl')??''),artifactUrl:String(fields.get('artifactUrl')??'')},sessionStorage),requestId=intent.id;
+      const spec=session!.deployment.mode==='testnet'?{datasetUrl:String(fields.get('datasetUrl')),artifactUrl:String(fields.get('artifactUrl')),datasetHash:inputEvidence({id:'chain-'+requestId,input:normalizeInput(input)},session!.account).datasetHash}:undefined;
+      await client!.create({requestId,...payload,spec});intent.acknowledge();await onChanged?.();
     });
   }
   const run=(action:()=>Promise<unknown>)=>void perform(async()=>{await action();await onChanged?.();});

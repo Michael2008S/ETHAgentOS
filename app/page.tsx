@@ -9,9 +9,10 @@ import { ChainPanel } from './chain-panel';
 import type { Agent, Command, Policy, Scenario, Task, Workspace } from '@/lib/agentos/types';
 import { SKILLS, STEPS } from '@/lib/agentos/types';
 import { taskDeadline } from '@/lib/agentos/lifecycle';
+import { submissionIntent } from '@/lib/agentos/client-intent';
 import { normalizeInput, verifyReceipt, wallet } from '@/lib/agentos/engine';
 type Page = 'overview' | 'tasks' | 'agents' | 'marketplace' | 'vault' | 'permissions' | 'memory' | 'integrations' | 'developer';
-type Snapshot = { state: Workspace; revision: number };
+type Snapshot = { state: Workspace; revision: number; scope:string };
 const money = (n: number) => (n / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const short = (s: string) => s.length > 19 ? `${s.slice(0, 10)}…${s.slice(-6)}` : s;
 const time = (s: string) => new Date(s).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -62,10 +63,12 @@ export default function Home() {
   function newTask(id = 'atlas', sc: Scenario = 'success') { const available = state?.agents.find(a => a.id === id && a.enabled) ?? state?.agents.find(a => a.enabled); if (!available) { setToast('No enabled services are available. Enable a service first.'); return; } setAgentId(available.id); setInputMode('fixture'); setScenario(sc); setModal('task'); }
   function download(kind: 'ledger' | 'artifact' | 'receipt' | 'context', taskId?: string) { const query = new URLSearchParams({ kind, ...(taskId ? { taskId } : {}) }); const a = document.createElement('a'); a.href = '/api/exports?' + query; a.download = ''; a.click(); }
   async function createTask(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault(); const f = new FormData(e.currentTarget), id = crypto.randomUUID();
+    e.preventDefault(); const f = new FormData(e.currentTarget);
     try {
       const input = inputMode === 'custom' ? normalizeInput({dataset:'custom-transfers-v1',blockFrom:Number(f.get('blockFrom')),blockTo:Number(f.get('blockTo')),records:JSON.parse(String(f.get('records')))}) : undefined;
-      if (await send({ type: 'create_task', requestId: id, taskId: 'task-' + id, agentId, title: String(f.get('title')), budget: Math.round(Number(f.get('budget')) * 100), timeoutSeconds: Number(f.get('timeoutSeconds')), input, scenario })) { setModal(null); setSelected('task-' + id); setToast('Task dispatched. Every transition is persisted.'); }
+      const payload={agentId,title:String(f.get('title')),budget:Math.round(Number(f.get('budget'))*100),timeoutSeconds:Number(f.get('timeoutSeconds')),input,scenario};
+      const intent=await submissionIntent(snapshot!.scope,'task',payload,sessionStorage),id=intent.id;
+      if (await send({ type: 'create_task', requestId: id, taskId: 'task-' + id, ...payload })) { intent.acknowledge();setModal(null); setSelected('task-' + id); setToast('Task dispatched. Every transition is persisted.'); }
     } catch (error) { setToast(error instanceof SyntaxError ? 'Transfer records must be a valid JSON array.' : error instanceof Error ? error.message : 'Invalid task input.'); }
   }
   const nav = (id: Page, Icon: typeof Activity, count?: number) => <button className={`nav-item ${page === id ? 'active' : ''}`} onClick={() => navigate(id)}><Icon size={18}/><span>{tr(names[id])}</span>{count !== undefined && <b>{count}</b>}{page === id && <i/>}</button>;
