@@ -40,7 +40,8 @@
     "demo:start": "node scripts/demo-start.mjs",
     "demo:doctor": "node scripts/demo-doctor.mjs",
     "demo:prepare": "node scripts/demo-prepare.mjs",
-    "demo:planning": "node scripts/demo-planning.mjs"
+    "demo:planning": "node scripts/demo-planning.mjs",
+    "demo:showcase": "node scripts/demo-showcase.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
