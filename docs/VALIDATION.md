@@ -1,5 +1,38 @@
 # 验证记录
 
+## 2026-10-20 八项完善与完整 Demo 回归
+
+按约定完成八项改善，分别提交；未部署新站点版本、真实 DON 或托管调度。
+
+- `npm test`：78 项通过，0 失败；类型检查与生产构建通过。原始日志保存在 `outputs/validation-2026-10-20/`。
+- 真实 Chromium 四项浏览器回归通过：创建响应丢失只生成一项任务/一次付款；钱包、自定义草稿和中英文在切页/刷新后保留；订单深链接及 owner 证据隔离；服务降级提示和 390px 宽度。之后加严的两项分别复跑通过：响应丢失后先刷新再提交；跳转到第 11 条历史订单。
+- `npm run demo:full` 共 17 个步骤最终通过，包括实际 HTTP/D1、独立内存 EVM 及现有本地链、Qwen、签名供应商与官方 CRE CLI。总报告 `outputs/full-demo-5f493f20-5356-41b6-be74-937bc5d78615/report.json` 保存每项命令、耗时和原始日志。
+- 首轮模型步骤发生一次推理不可用，订单安全退款，因此首轮失败未算作成功交付。独立真实推理随后在约 3.6 秒完成；未重启链或模型，从失败步骤继续，模型三场景及所有后续步骤通过。该次不可用未复现，原失败日志保存在 `failedAttempts`，没有隐藏或覆盖。
+- 新 showcase 使用 `--fresh`，两笔订单均为本轮新执行；成功订单模型计划、供应商签名、579 分/两条记录复算、当前链上注资/结算、买方 95 分评价全部核验通过。错误交付订单结果不符并退款。
+- 最终 doctor 五项服务检查均成功，warnings 为空。浏览器统一证据页已读回并保存 `outputs/final-demo-proof.png`；服务继续运行，链、D1 和供应商日志均保留。
+- CI 工作流已配置，但本轮没有触发远端 GitHub Actions；CRE 是已登录官方 CLI dry-run，不广播，也不代表真实 DON 执行。小模型采购分类仍需用户审核。
+
+| 命令 | 本轮证据 |
+| --- | --- |
+| `demo` | `outputs/demo-ffaffa8e-91ee-48a3-bbd1-1215d729b71a.json` |
+| `demo:deadline` | `outputs/deadline-demo-2e7b1d13-d030-4f4e-b9db-0209cbf707e7.json` |
+| `demo:wallet` | `outputs/wallet-demo-dffbc3e9-7997-4e3b-b300-ee67c89649e1.json` |
+| `demo:reconcile` | `outputs/reconciliation-demo-3b229d09-dc1b-403f-9946-7d9a1d0144ce.json` |
+| `demo:prefund` | `outputs/prefund-demo-b4d6bc3c-6f0a-41d4-8179-a2143dd7075c.json` |
+| `demo:queue` | `outputs/queue-demo-c6a63477-8fc7-489b-984a-e7872143aaf9.json` |
+| `demo:chain` | `outputs/chain-demo-4687fca5-0459-4d1a-89ee-7b018b18226b.json` |
+| `demo:model` | `outputs/model-demo-c063faea-15a5-4c59-94f1-974c18fddefc.json` |
+| `demo:identity` | `outputs/identity-demo-cbb33b7d-9a7c-4d3f-9a19-ccb01405e540.json` |
+| `demo:supplier` | `outputs/supplier-demo-adb8e805-4a69-47f1-9e91-bb0b78f2f98c.json` |
+| `demo:planning` | `outputs/planning-demo-2f478157-30f7-41d4-95b8-fe9ccfbc9f8b.json` |
+| `demo:showcase` | `outputs/showcase.json` |
+| `demo:evidence` | `outputs/evidence-demo.json` |
+| `demo:cre` | `outputs/cre-demo-29e3fd5e-0522-480c-89b7-ac038b3e4de9.json` |
+
+展示成功订单：`chain-eddf5921-2c6d-49b4-8d57-ec3a54f1d8fb`，付款交易 `0xaf3d27b32b97f1d66557873f3314e5e6d2e1549d275b00571e5216d7826a1dc4`。
+
+展示退款订单：`chain-13321f81-51e4-4db0-ad50-6753b84da2dc`，退款交易 `0x618cc659112c46538dcef2fe2facba66c180faedbe8a5c8664f7d4eb9cdd16fe`。
+
 ## 本地交付收尾
 
 用户确认先以本地完整 demo 交付，暂不启用托管调度；真实 DON 与公网联调保留为后续验收。最终 72 项测试、类型检查、生产构建通过。最后补充中文错误文案后，6 项语言/API 相关测试再次通过。
