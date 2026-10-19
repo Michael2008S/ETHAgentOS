@@ -21,3 +21,9 @@ export const runtimeJobs = sqliteTable('agentos_runtime_jobs', {
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 }, table => [index('runtime_jobs_due').on(table.status, table.availableAt), index('runtime_jobs_owner').on(table.ownerId, table.status)]);
+
+export const runtimeConsumers = sqliteTable('agentos_runtime_consumers', {
+  scope: text('scope').primaryKey(),
+  lastSeen: integer('last_seen').notNull(),
+  status: text('status').notNull(),
+});
