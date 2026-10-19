@@ -603,5 +603,20 @@
   "completed": "已完成",
   "Advanced network configuration": "高级网络配置",
   "Local deployment changed. Reconnect the wallet.": "本地链部署已改变，请重新连接钱包。",
-  "unchecked": "未探测"
+  "unchecked": "未探测",
+  "AI purchase suggestion": "AI 采购建议",
+  "Purchase goal": "采购目标",
+  "Advisory only. Review the service and frozen quote before funding. No order or payment is created by planning.": "仅提供建议。请在注资前审核服务与报价；规划不会创建订单或付款。",
+  "Compare services with AI": "用 AI 比较服务",
+  "Planning…": "正在规划…",
+  "Apply suggestion": "采用此建议",
+  "Planning evidence": "规划证据",
+  "lowest-price": "在授权目录中选择最低报价",
+  "allocation-report": "选择能提供收款方分配报告的技能",
+  "event-summary": "选择事件汇总分析技能",
+  "Suggestion expired or quote changed. Plan again.": "建议已到期或报价已改变，请重新规划。",
+  "No authorized service fits this budget.": "没有符合当前预算与权限的服务。",
+  "Model inference is unavailable. No purchase was created.": "模型暂不可用，未创建采购或付款。",
+  "Model suggestion reason does not match the selected service.": "模型的选择理由与服务不匹配。",
+  "Model selected a service outside the authorized catalog.": "模型选择超出授权目录，已拒绝。"
 }
