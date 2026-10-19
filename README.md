@@ -166,4 +166,10 @@ console.log(result.status, result.receipt);
 
 主张：**让 Agent 的授权、交付与付款进入同一条可审计执行链。** 主展示 AI Agent 基础设施与 CRE 验证结算；具体奖项资格应按比赛最新规则及真实集成证据确认。[赛事页面](https://hackathon.xyz/events/public/c3b55fc8-f30a-4291-b7e3-ca32830b938d)。
 
-先用 `docs/DEMO.md` 演示四条路径，再按 `docs/CHAINLINK.md` 补齐测试网部署证据。当前发布是 owner-private，仅本人可访问；给评委分享前需要明确调整访问范围。
+先用 `docs/DEMO.md` 演示三分钟主线，再按 `docs/CHAINLINK.md` 补齐测试网部署证据。当前发布是 owner-private，仅本人可访问；给评委分享前需要明确调整访问范围。
+
+## 本地演示与浏览器回归
+
+首次安装按 [LOCAL-DEMO.md](docs/LOCAL-DEMO.md) 完成依赖、数据库和模型准备后，运行 `npm run demo:start`；`demo:doctor` 检查实际服务状态，`demo:prepare` 准备本地测试身份/代币。`demo:showcase -- --fresh` 执行新的成功付款与错误交付退款，`demo:evidence` 独立复核统一证据。
+
+`npm run test:browser` 使用独立 Chromium 和隔离工作区，验证丢响应重试、钱包/草稿与语言持久化、订单深链接/证据隔离及故障健康状态。首次运行需安装浏览器：`PLAYWRIGHT_BROWSERS_PATH=.sites-runtime/playwright-browsers npx playwright install chromium`。CI 配置为 GitHub Actions 的 local-validation.yml；配置存在不代表远端已运行。测试追踪仅在失败时保存在忽略目录，不能提交包含用户数据的追踪文件。

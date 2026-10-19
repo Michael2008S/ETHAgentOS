@@ -10,6 +10,7 @@ An atomic SQL claim has a two-minute lease and a unique token. Expired claims ca
 
 ## API and local worker
 
+- `GET /api/runtime/health`: owner-scoped real service probes, queue counts and last consumer contact; missing, busy and stale consumers are distinct. Health reads do not advance work.
 - `GET /api/runtime/queue`: authenticated owner's aggregate counts.
 - `POST /api/runtime/queue`: requeue only that owner's dead jobs; no parameters.
 - `POST /api/runtime/drain`: bounded consumer, at most four claims and a twenty-second loop budget. An in-progress external call may outlast that budget; checkpoints and leases handle interruption. No body or owner/task parameters are accepted.
@@ -21,6 +22,12 @@ Fresh local databases use `npm run db:local` after a build. For an existing pre-
 
 ```sh
 node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0001_chemical_famine.sql
+```
+
+The runtime status panel also requires the consumer contact table. Existing databases with migrations 0000 and 0001 already applied run only:
+
+```sh
+node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0002_dazzling_lady_bullseye.sql
 ```
 
 Do not replay table-creation migrations on an existing database. Publishing the saved Site version applies its new migration through Sites.

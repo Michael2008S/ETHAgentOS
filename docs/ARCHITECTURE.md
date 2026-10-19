@@ -13,7 +13,7 @@
 | Permissions | 服务端 typed operation gate；预算；实时撤销 | 签名 session grant、目标合约与 selector 授权 |
 | Escrow | 原子预留/结算/退款；真实托管回执、输入预承诺、先注资后后台执行、失败链上退款 | 公共网络验收与持续重组监控 |
 | Marketplace | 本地目录、固定报价、已配置供应商描述与链上委托，订单固定执行方 | 多供应商发现、真实服务 SLA |
-| Execution | 服务端后台执行、持久化状态机、幂等请求、有限退避重试、恢复 API、本地 worker 与任务期限 | 独立持久队列、外部执行租约 |
+| Execution | 服务端后台执行、D1 持久队列及租约、幂等请求、有限退避重试、恢复 API、本地 worker 与任务期限 | 生产队列运维、外部执行 SLA |
 
 ## 两条执行路径
 
@@ -45,7 +45,7 @@ flowchart LR
 
 ## 并发与恢复
 
-每个用户持有一份 workspace aggregate，`revision` 是 CAS 版本。任务、预留金额、付款记录、收据在一个 D1 UPDATE 中写入；版本冲突最多重新计算 12 次。CAS 防止两个并发请求对同一旧余额分别成功扣款。达到重试上限返回 409，调用方用同一 requestId 重试。
+每个用户持有一份 workspace aggregate，`revision` 是 CAS 版本。任务、预留金额、付款记录、收据与队列写入通过 D1 原子 batch 提交；版本冲突最多重新计算 12 次。CAS 防止两个并发请求对同一旧余额分别成功扣款。达到重试上限返回 409，调用方用同一 requestId 重试。
 
 `advance` 携带 expectedStep。过期请求保持原状态；任务结算与 receipt 同时持久化。故障演示在已提交付款后转入 paused，resume 只补最后一步。此保证限于当前 D1 aggregate；外部真实转账需以链上 taskId、最终回执及 reconciliation 实现同等保证。
 
@@ -64,4 +64,4 @@ flowchart LR
 
 ## 规模限制
 
-原型单用户最多 300 个任务；整体 JSON aggregate 适合演示和小规模使用。正式版需按 task/account/ledger 拆表，使用可靠队列驱动，加入请求速率、账本体积与存储留存限制。预注资订单支持可选真实 LLM 工具规划，推理在独立服务运行；模型输出经能力检查后调用现有确定性适配器。模型的配置哈希、计划与推理证据随订单保存，详见 MODEL.md。当前没有跨链、通用插件沙箱、生产 session key 或生产级可靠队列。
+原型单用户最多 300 个任务；整体 JSON aggregate 适合演示和小规模使用。正式版需按 task/account/ledger 拆表，扩展现有 D1 队列的监控和吞吐，加入请求速率、账本体积与存储留存限制。预注资订单支持可选真实 LLM 工具规划，推理在独立服务运行；模型输出经能力检查后调用现有确定性适配器。模型的配置哈希、计划与推理证据随订单保存，详见 MODEL.md。当前没有跨链、通用插件沙箱、生产 session key 或生产级队列运维保障。

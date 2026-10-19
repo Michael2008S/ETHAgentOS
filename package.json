@@ -41,7 +41,10 @@
     "demo:doctor": "node scripts/demo-doctor.mjs",
     "demo:prepare": "node scripts/demo-prepare.mjs",
     "demo:planning": "node scripts/demo-planning.mjs",
-    "demo:showcase": "node scripts/demo-showcase.mjs"
+    "demo:showcase": "node scripts/demo-showcase.mjs",
+    "test:browser": "node scripts/test-browser.mjs",
+    "demo:evidence": "node scripts/demo-evidence.mjs",
+    "demo:full": "node scripts/demo-full.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -76,6 +79,7 @@
     "@cloudflare/workers-types": "4.20260515.1",
     "@openzeppelin/contracts": "5.4.0",
     "@openzeppelin/contracts-upgradeable": "5.4.0",
+    "@playwright/test": "1.56.1",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",

@@ -23,15 +23,20 @@ npm run db:local # 仅全新数据库；旧版本升级见 RUNTIME-QUEUE.md
 npm run model:setup # 首次下载固定版本及校验模型
 ```
 
-依次在独立终端保持运行：
+安装完成后，推荐使用一个前台启动器：
 
 ```sh
-npm run chain:local
-npm run model:local
-npm run supplier:local
-npm run dev -- --host 127.0.0.1 --port 5177
-npm run worker
+npm run demo:start
+# 另一个终端
+npm run demo:doctor
+npm run demo:prepare
+npm run demo:showcase -- --fresh
+npm run demo:evidence
 ```
+
+启动器复用健康服务，拒绝覆盖未知端口，退出仅停止自己启动的子进程；日志在 `.sites-runtime/demo/`。`demo:prepare` 只补不足的测试代币、注册/绑定 Atlas 并授权供应商，不重置历史或重新启用撤销策略。也可继续分别运行 chain:local、model:local、supplier:local、dev、worker。
+
+旧数据库升级还需应用 `drizzle/0002_dazzling_lady_bullseye.sql`，新增消费者联系状态表；不要对已有数据库重复运行全量 db:local。
 
 不要为重试一个失败请求而重启或重置整条链。SQLite/D1、模型与签名日志的持久化目录也应保留。
 
@@ -45,11 +50,15 @@ npm run worker
 
 ## 验证命令
 
+服务准备完成且 CRE 已登录后，`npm run demo:full` 串行执行下列集成 demo（含新 showcase），日志及报告保存到 `outputs/full-demo-*/`；单元、类型、构建和浏览器回归仍单独执行。失败会立即停止；检查原因后用 `npm run demo:full -- --resume outputs/full-demo-<id>/report.json` 从失败项继续，保留原失败记录，不重置服务或重复已通过项。
+
 ```sh
 npm test
 npm run typecheck
 npm run build
 npm run test:api
+PLAYWRIGHT_BROWSERS_PATH=.sites-runtime/playwright-browsers npx playwright install chromium
+npm run test:browser
 npm run demo
 npm run demo:queue
 npm run demo:prefund
@@ -58,6 +67,9 @@ npm run demo:chain
 npm run demo:model
 npm run demo:identity
 npm run demo:supplier
+npm run demo:planning
+npm run demo:showcase -- --fresh
+npm run demo:evidence
 npm run demo:cre # CRE 已登录；官方 CLI dry-run，不广播
 ```
 

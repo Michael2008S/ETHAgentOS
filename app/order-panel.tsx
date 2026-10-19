@@ -23,7 +23,7 @@ export function OrderPanel({scope,session,agents,orders,feedback=[],busy,perform
   const [supplier,setSupplier]=useState<SupplierDescriptor|null>(null);
   useEffect(()=>{const controller=new AbortController();void fetch('/api/suppliers',{signal:controller.signal}).then(async r=>{if(r.ok)setSupplier(((await r.json()) as {descriptor:SupplierDescriptor}).descriptor);}).catch(()=>{});return()=>controller.abort();},[]);
   useEffect(()=>{const controller=new AbortController();void fetch('/api/models',{signal:controller.signal}).then(async r=>{const data=await r.json() as {descriptor?:ModelDescriptor};if(r.ok)setModel(data.descriptor??null);}).catch(()=>{});return()=>controller.abort();},[]);
-  useEffect(()=>{const scroll=()=>{const id=routeFromHash(location.hash).order;if(id)requestAnimationFrame(()=>document.getElementById('order-'+id)?.scrollIntoView({block:'start'}));};scroll();window.addEventListener('hashchange',scroll);return()=>window.removeEventListener('hashchange',scroll);},[orders.length]);
+  useEffect(()=>{const scroll=()=>{const id=routeFromHash(location.hash).order;const index=orders.findIndex(o=>o.id===id);if(index>=0)setLimit(current=>Math.max(current,index+1));if(id)requestAnimationFrame(()=>document.getElementById('order-'+id)?.scrollIntoView({block:'start'}));};scroll();window.addEventListener('hashchange',scroll);return()=>window.removeEventListener('hashchange',scroll);},[orders.length]);
   const client=session?new AgentOrderClient(session):null;
   async function create(event:FormEvent<HTMLFormElement>){
     event.preventDefault();const fields=new FormData(event.currentTarget);

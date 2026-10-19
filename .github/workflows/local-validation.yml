@@ -1,0 +1,30 @@
+name: Local runtime validation
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: .sites-runtime/playwright-browsers
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run db:local
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-diagnostics
+          path: |
+            playwright-report/
+            test-results/

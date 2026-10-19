@@ -1,0 +1,49 @@
+import {test,expect} from '@playwright/test';
+const base='http://127.0.0.1:5177';
+test.beforeEach(async({context,page},info)=>{
+ const sandbox='browser-'+crypto.randomUUID();info.annotations.push({type:'sandbox',description:sandbox});
+ await context.route(base+'/api/**',route=>route.continue({headers:{...route.request().headers(),'x-agentos-sandbox':sandbox}}));
+ const errors=[];page.on('pageerror',error=>errors.push(error.message));info.errorsSeen=errors;
+});
+test.afterEach(async({},info)=>{if(info.errorsSeen)expect(info.errorsSeen).toEqual([]);});
+const headers=info=>({'x-agentos-sandbox':info.annotations.find(a=>a.type==='sandbox').description});
+
+test('lost create response retries the same real backend intent and pays once',async({page,context},info)=>{
+ const ids=[];let lose=true;
+ await context.route(base+'/api/command',async route=>{
+  const body=route.request().postDataJSON();if(body?.type!=='create_task'){await route.fallback();return;}
+  ids.push(body.requestId);const response=await route.fetch({headers:{...route.request().headers(),...headers(info)}});
+  expect(response.status()).toBe(200);
+  if(lose){lose=false;await route.abort('failed');}else await route.fulfill({response});
+ });
+ await page.goto('/#overview');await page.getByRole('button',{name:'新建任务',exact:true}).click();
+ const modal=page.getByRole('dialog',{name:'派发新任务'});await modal.locator('input[name=title]').fill('Browser response-loss intent');
+ await modal.getByRole('button',{name:'派发任务',exact:true}).click();await expect.poll(()=>ids.length).toBe(1);await expect(modal.getByRole('button',{name:'派发任务',exact:true})).toBeEnabled();
+ await page.reload();await page.getByRole('button',{name:'新建任务',exact:true}).click();await expect(modal.locator('input[name=title]')).toHaveValue('Browser response-loss intent');
+ await modal.getByRole('button',{name:'派发任务',exact:true}).click();await expect(modal).not.toBeVisible();expect(ids).toHaveLength(2);expect(ids[0]).toBe(ids[1]);
+ await expect.poll(async()=>{const r=await page.request.get('/api/workspace',{headers:headers(info)});const {state}=await r.json();return state.tasks[0]?.status;}).toBe('completed');
+ const {state}=await(await page.request.get('/api/workspace',{headers:headers(info)})).json();expect(state.tasks).toHaveLength(1);expect(state.ledger.filter(l=>l.kind==='settle')).toHaveLength(1);
+});
+
+test('wallet and custom draft survive navigation, reload and Chinese/English switching',async({page})=>{
+ await page.goto('/#vault');await page.getByRole('button',{name:'连接本地测试钱包',exact:true}).click();await expect(page.getByRole('button',{name:'断开连接',exact:true})).toBeVisible();
+ await page.getByText('创建预注资订单',{exact:true}).click();await page.locator('input[name=title]').fill('Persisted browser draft');await page.locator('select[name=inputMode]').selectOption('custom');
+ const records='[{"block":7,"from":"a","to":"b","cents":777}]';await page.locator('textarea[name=records]').fill(records);
+ await page.getByRole('button',{name:/^智能体\s*3$/}).click();await page.getByRole('button',{name:'钱包与托管',exact:true}).click();await expect(page.getByRole('button',{name:'断开连接',exact:true})).toBeVisible();await expect(page.locator('input[name=title]')).toHaveValue('Persisted browser draft');
+ await page.reload();await expect(page.getByRole('heading',{name:'钱包与托管',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'断开连接',exact:true})).toBeVisible();await page.getByText('创建预注资订单',{exact:true}).click();await expect(page.locator('textarea[name=records]')).toHaveValue(records);await expect(page.locator('input[name=title]')).toHaveValue('Persisted browser draft');
+ await page.getByLabel('Switch to English',{exact:true}).click();await expect(page.getByRole('heading',{name:'Wallet & escrow',exact:true})).toBeVisible();await expect(page.locator('textarea[name=records]')).toHaveValue(records);await page.getByLabel('切换为中文',{exact:true}).click();
+});
+
+test('order deep link and evidence remain owner scoped after refresh',async({page},info)=>{
+ const config=await(await page.request.get('http://127.0.0.1:8545/config')).json();const rpc=await(await page.request.post('http://127.0.0.1:8545/rpc',{data:{jsonrpc:'2.0',id:1,method:'eth_accounts',params:[]}})).json();
+ const response=await page.request.post('/api/orders',{headers:headers(info),data:{action:'create',requestId:crypto.randomUUID(),title:'Linked evidence order',agentId:'atlas',buyer:rpc.result[0],budget:1000}});expect(response.status()).toBe(200);const {order}=await response.json();expect(order.deployment.escrow).toBe(config.escrow);
+ for(let index=0;index<10;index++){const newer=await page.request.post('/api/orders',{headers:headers(info),data:{action:'create',requestId:crypto.randomUUID(),title:'Newer order '+index,agentId:'atlas',buyer:rpc.result[0],budget:1000}});expect(newer.status()).toBe(200);}
+ await page.goto('/#vault?order='+order.id);const card=page.locator('[id="order-'+order.id+'"]');await expect(card.getByRole('heading',{name:order.title})).toBeVisible();await card.getByText('统一订单证据',{exact:true}).click();await expect(card.getByRole('cell',{name:'输入承诺',exact:true})).toBeVisible();await expect(card.getByRole('cell',{name:'已核验',exact:true}).first()).toBeVisible();
+ await page.reload();await expect(page.locator('[id="order-'+order.id+'"]')).toBeVisible();const cross=await page.request.get('/api/orders/evidence?id='+order.id,{headers:{'x-agentos-sandbox':'other-browser-'+crypto.randomUUID()}});expect(cross.status()).toBe(404);
+});
+
+test('degraded model and stale consumer are visible rather than a fixed ready badge',async({page,context})=>{
+ await context.route(base+'/api/runtime/health',route=>route.fulfill({json:{checkedAt:new Date().toISOString(),ready:false,services:{database:'healthy',chain:'healthy',model:'unavailable',supplier:'healthy',consumer:'stale'},queue:{pending:2,leased:0,completed:1,dead:1},lastConsumerAt:null,oldestPendingAt:new Date().toISOString()}}));
+ await page.goto('/#overview');const panel=page.locator('#runtime-status');await expect(panel).toContainText('部分服务不可用');await expect(panel.locator('.chain-summary > div').filter({hasText:'模型服务'})).toContainText('不可用');await expect(panel.getByRole('button',{name:'重试失败任务'})).toBeEnabled();
+ await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+});
