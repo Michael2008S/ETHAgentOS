@@ -36,7 +36,10 @@
     "demo:identity": "node scripts/demo-identity.mjs",
     "supplier:local": "node scripts/supplier-local.mjs",
     "demo:supplier": "node scripts/demo-supplier.mjs",
-    "demo:queue": "node scripts/demo-queue.mjs"
+    "demo:queue": "node scripts/demo-queue.mjs",
+    "demo:start": "node scripts/demo-start.mjs",
+    "demo:doctor": "node scripts/demo-doctor.mjs",
+    "demo:prepare": "node scripts/demo-prepare.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
