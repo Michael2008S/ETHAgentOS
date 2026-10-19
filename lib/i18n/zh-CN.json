@@ -600,5 +600,8 @@
   "pending": "待处理",
   "leased": "已领取",
   "dead": "重试耗尽",
-  "completed": "已完成"
+  "completed": "已完成",
+  "Advanced network configuration": "高级网络配置",
+  "Local deployment changed. Reconnect the wallet.": "本地链部署已改变，请重新连接钱包。",
+  "unchecked": "未探测"
 }
