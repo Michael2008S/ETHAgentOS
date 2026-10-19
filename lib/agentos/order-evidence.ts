@@ -1,0 +1,12 @@
+import { digest,expectedOutput } from './engine.ts';import { canonical } from '../../cre/workflow/verify.ts';
+import { supplierRequest,verifySupplierDelivery } from './supplier.ts';import type { ChainOrder } from './orders.ts';import type { PaidFeedback } from './identity.ts';
+export type EvidenceCheck={id:string;status:'verified'|'recorded'|'failed'|'missing'|'unavailable';reference?:string};
+/** Local recomputation and signature verification; never represent logs as issuer authentication. */
+export async function orderEvidence(order:ChainOrder,feedback?:PaidFeedback){
+ const checks:EvidenceCheck[]=[{id:'Identity snapshot',status:order.agentIdentity?'recorded':'missing',reference:order.agentIdentity?.documentHash},{id:'Input commitment',status:await digest(order.input)===order.inputHash?'verified':'failed',reference:order.inputHash},{id:'Model execution record',status:order.modelPlan?'recorded':'missing',reference:order.modelPlan?.responseHash}];
+ if(order.supplierDelivery){try{await verifySupplierDelivery(order.supplierDelivery,await supplierRequest(order));checks.push({id:'Supplier signature',status:'verified',reference:order.supplierDelivery.payload.outputHash});}catch{checks.push({id:'Supplier signature',status:'failed'});}}else checks.push({id:'Supplier signature',status:'missing'});
+ const correct=order.output&&canonical(expectedOutput(order))===canonical(order.output)&&await digest(order.output)===order.outputHash;
+ checks.push({id:'Independent result recomputation',status:order.output?(correct?'verified':'failed'):order.failure?'failed':'missing',reference:order.outputHash??undefined});
+ checks.push({id:'Funding receipt snapshot',status:order.funding?'recorded':'missing',reference:order.funding?.transactionHash},{id:'Settlement receipt snapshot',status:order.settlement?'recorded':'missing',reference:order.settlement?.transactionHash},{id:'Paid feedback snapshot',status:feedback?'recorded':'missing',reference:feedback?.transactionHash});
+ return {version:'agentos.order-evidence.v1',orderId:order.id,title:order.title,checkedAt:new Date().toISOString(),deployment:order.deployment,checks,quote:order.quote,budget:order.budget,settlement:order.settlement,feedback:feedback?{score:feedback.score,status:feedback.status,transactionHash:feedback.transactionHash}:null,warning:'Recorded snapshots are not fresh chain checks. Model hashes are logs, not provider signatures.'};
+}

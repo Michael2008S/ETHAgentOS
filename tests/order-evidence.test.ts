@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {orderEvidence} from '../lib/agentos/order-evidence.ts';import {digest,expectedOutput} from '../lib/agentos/engine.ts';import type {ChainOrder} from '../lib/agentos/orders.ts';
+test('evidence distinguishes independently checked bytes from unsigned stored records and rejects changed outputs',async()=>{
+ const input={dataset:'custom-transfers-v1' as const,blockFrom:1,blockTo:2,records:[{block:1,from:'a',to:'b',cents:123}]},output=expectedOutput({input,skill:'event-analysis'});
+ const order={id:'x',title:'x',input,skill:'event-analysis',inputHash:await digest(input),output,outputHash:await digest(output),modelPlan:{responseHash:'record-only'},funding:{transactionHash:'record-only'},settlement:null} as unknown as ChainOrder;
+ let evidence=await orderEvidence(order);assert.equal(evidence.checks.find(c=>c.id==='Input commitment')?.status,'verified');assert.equal(evidence.checks.find(c=>c.id==='Model execution record')?.status,'recorded');assert.equal(evidence.checks.find(c=>c.id==='Funding receipt snapshot')?.status,'recorded');assert.equal(evidence.checks.find(c=>c.id==='Independent result recomputation')?.status,'verified');
+ order.output={...output,totalCents:999};order.outputHash=await digest(order.output);evidence=await orderEvidence(order);assert.equal(evidence.checks.find(c=>c.id==='Independent result recomputation')?.status,'failed');
+});

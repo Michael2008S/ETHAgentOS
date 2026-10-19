@@ -11,6 +11,7 @@ import type { ChainOrder,OrderStatus } from '@/lib/agentos/orders';
 import type { proposePurchase } from '@/lib/agentos/purchase-plan';
 import type { ModelDescriptor } from '@/lib/agentos/model';
 import type { SupplierDescriptor } from '@/lib/agentos/supplier';
+import { OrderEvidencePanel } from './order-evidence-panel';
 import { DraftForm,draftKey } from './draft-form';
 import { routeFromHash,routeHash } from '@/lib/agentos/navigation';
 import { submissionIntent } from '@/lib/agentos/client-intent';
@@ -55,7 +56,7 @@ export function OrderPanel({scope,session,agents,orders,feedback=[],busy,perform
     {orders.slice(0,limit).map(order=>{const mine=session&&order.buyer.toLowerCase()===session.account.toLowerCase()&&order.deployment.escrow.toLowerCase()===session.deployment.escrow.toLowerCase(),hash=hashes[order.id]??'',review=feedback.find(f=>f.orderId===order.id),validHash=/^0x[0-9a-fA-F]{64}$/.test(hash),terminal=['completed','refunded','cancelled'].includes(order.status);return <article id={'order-'+order.id} className="order-card" key={order.id}>
       <div className="panel-heading"><div><h3>{order.title}</h3><a className="text-button" href={routeHash('vault',{order:order.id})}><code>{order.id}</code></a></div><span className="pill">{tr(statusLabels[order.status])}</span></div>
       <p className="form-note">{tr('Frozen quote')}: {(order.quote/100).toFixed(2)} {tr('tokens')} · {order.deployment.mode==='local'?tr('Local EVM · 31337'):tr('Sepolia · 11155111')} · {tr('Checkpoint')}: {order.step}/6</p>
-      <p className="form-note">{tr('Input commitment')}: <code>{order.inputHash}</code></p>
+      <OrderEvidencePanel id={order.id}/><p className="form-note">{tr('Input commitment')}: <code>{order.inputHash}</code></p>
       <p className="form-note">{tr('Execution planner')}: {tr(order.planner==='llm'?'LLM tool planner':'Deterministic adapter')}{order.model?' · '+order.model.model:''}</p>
       {order.supplier&&<p className="form-note">{tr('Independent skill supplier')}: {order.supplier.name} · {order.supplier.revision} · <code>{order.supplier.signer}</code></p>}
       {order.supplierDelivery&&<details className="chain-proof"><summary>{tr('Inspect signed supplier delivery')}</summary><p>{tr('Supplier job')}: <code>{order.supplierDelivery.payload.jobId}</code></p><p>{tr('Delivery attempts')}: {order.supplierAttempts??0}</p><p>{tr('Request hash')}: <code>{order.supplierDelivery.payload.requestHash}</code></p><p>{tr('Output hash')}: <code>{order.supplierDelivery.payload.outputHash}</code></p><details><summary>{tr('Full supplier evidence')}</summary><pre className="artifact-json">{JSON.stringify(order.supplierDelivery,null,2)}</pre></details></details>}
