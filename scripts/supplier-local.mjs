@@ -1,3 +1,4 @@
+import {sourceSummary} from '../lib/agentos/transfer-source.ts';
 import { createServer } from 'node:http';
 import { mkdir,open,readFile,readdir,rename,stat } from 'node:fs/promises';
 import { resolve,join } from 'node:path';
@@ -35,7 +36,7 @@ export async function startLocalSupplier({port=7461,runtimeRoot=resolve('.sites-
   const recipients=new Map();let total=0n,count=0;
   for(const row of input.records??DATASET){if(row.block<input.blockFrom||row.block>input.blockTo)continue;total+=BigInt(row.cents);count++;recipients.set(row.to,(recipients.get(row.to)??0n)+BigInt(row.cents));}
   if(total>BigInt(Number.MAX_SAFE_INTEGER))throw Object.assign(new Error('unsafe total'),{status:400});
-  const output={dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo,transferCount:count,totalCents:Number(total),...(request.skill==='event-analysis'?{uniqueRecipients:recipients.size}:{allocations:Object.fromEntries([...recipients].map(([key,value])=>[key,Number(value)]))})};
+  const output={dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo,transferCount:count,totalCents:Number(total),...(input.source?{source:sourceSummary(input.source,request.skill)}:{}),...(request.skill==='event-analysis'?{uniqueRecipients:recipients.size}:{allocations:Object.fromEntries([...recipients].map(([key,value])=>[key,Number(value)]))})};
   if(fault==='wrong-result'||request.scenario==='invalid-delivery')output.totalCents++;
   const payload={version:'agentos.skill-delivery.v1',requestHash:await digest(request),configHash:descriptor.configHash,jobId:supplierJobId(request),outputHash:await digest(output),output,issuedAt:new Date().toISOString()},delivery={payload,signature:await account.signMessage({message:supplierReceiptMessage(payload)})};
   await writeAtomic(pathFor(payload.jobId),{requestHash:payload.requestHash,delivery});return delivery;

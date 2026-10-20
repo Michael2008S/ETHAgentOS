@@ -1,3 +1,5 @@
+import {checkInputSource} from '@/lib/agentos/data-runtime';
+import {transferSourceSchema} from '@/lib/agentos/transfer-source';
 import { z } from 'zod';
 import { owner,checkOrigin,read,updateWorkspace } from '@/lib/agentos/store';
 import { DomainError,normalizeInput } from '@/lib/agentos/engine';
@@ -11,9 +13,9 @@ import { inspectIdentity } from '@/lib/agentos/identity';
 import { canonical } from '@/cre/workflow/verify';
 import { deferInline } from '@/lib/agentos/auth';
 const id=z.string().min(1).max(128),hash=z.string().regex(/^0x[0-9a-fA-F]{64}$/),address=z.string().regex(/^0x[0-9a-fA-F]{40}$/).refine(s=>!/^0x0{40}$/.test(s));
-const input=z.object({dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe(),records:z.array(z.object({block:z.number().int().nonnegative().safe(),from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:z.number().int().nonnegative().safe()}).strict()).min(1).max(100).optional()}).strict();
+const input=z.object({dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe(),source:transferSourceSchema.optional(),records:z.array(z.object({block:z.number().int().nonnegative().safe(),from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:z.number().int().nonnegative().safe()}).strict()).min(1).max(100).optional()}).strict();
 const https=z.string().url().max(4096).refine(s=>{const u=new URL(s);return u.protocol==='https:'&&!u.username&&!u.password&&!u.hash;});
-const verification=z.object({version:z.literal('agentos.delivery.v2'),skill:z.enum(['event-analysis','treasury-report']),skillVersion:z.literal('1.0.0'),dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe()}).strict();
+const verification=z.object({version:z.literal('agentos.delivery.v2'),skill:z.enum(['event-analysis','treasury-report']),skillVersion:z.literal('1.0.0'),dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe(),sourceHash:hash.optional()}).strict();
 const schema=z.discriminatedUnion('action',[
   z.object({action:z.literal('create'),executor:z.enum(['builtin','supplier']).default('builtin'),planner:z.enum(['deterministic','llm']).default('deterministic'),requestId:z.string().uuid(),title:z.string().trim().min(1).max(160),agentId:id,budget:z.number().int().positive().max(1000000),buyer:address,input:input.optional(),scenario:z.enum(['success','injection','interruption','invalid-delivery']).default('success'),timeoutSeconds:z.number().int().min(1).max(86400).default(300),spec:z.object({datasetUrl:https,artifactUrl:https,datasetHash:hash,verification:verification.optional()}).strict().optional()}).strict(),
   z.object({action:z.literal('challenge'),orderId:id,transactionHash:hash}).strict(),
@@ -31,6 +33,7 @@ export async function POST(request:Request){
   const body=schema.parse(JSON.parse(raw)),configured=await configuredOrderChain(request),{chain,deployment,localCall,planner,client,supplier,supplierAuthority}=configured;
   if(body.action==='create'){
    const snapshot=await read(ownerId),prior=snapshot.state.chainOrders?.find(o=>o.requestId===body.requestId),normalized=normalizeInput(body.input),selected=snapshot.state.agents.find(a=>a.id===body.agentId),bytes=inputEvidence({id:'chain-'+body.requestId,input:normalized,skill:selected?.skill},body.buyer as `0x${string}`);
+   if(!prior)await checkInputSource(request,normalized);
    const spec=prior?.spec??(localCall?await localCall<DeliverySpec>('/drafts',bytes):body.spec);
    if(!spec||spec.datasetHash!==bytes.datasetHash||body.spec&&canonical(body.spec)!==canonical(spec))throw new DomainError('Evidence URLs and hash must match the committed order input.');
    if(body.planner==='llm'&&!planner)throw new DomainError('Model service is not configured.','UNAVAILABLE');

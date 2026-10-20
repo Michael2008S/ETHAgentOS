@@ -1,0 +1,15 @@
+# Finalized USDC treasury data
+
+The wallet order form can import Ethereum-mainnet USDC transfers for a selected account, direction and finalized block range. The existing treasury and event skills then analyze those actual events. This is a source adapter for the two skills, not a third hard-coded skill or a claim of a general plugin system.
+
+`POST /api/data` authenticates the owner and accepts only account, direction and optional block bounds. No caller-supplied RPC URL, token, chain or credential is accepted. Production config uses the server-only `AGENTOS_DATA_RPC_URL` HTTPS endpoint. Loopback development defaults to PublicNode. The collector checks chain ID 1, reads the finalized checkpoint and USDC precision, obtains filtered Transfer logs and canonical block headers, and rejects removed/conflicting records. Imports are bounded to 10000 blocks and 25 events, with no silent truncation. Empty results require selecting another range.
+
+Source: [Circle's USDC contract directory](https://developers.circle.com/stablecoins/usdc-contract-addresses) and [Ethereum JSON-RPC API](https://ethereum.org/developers/docs/apis/json-rpc/). The pinned Ethereum contract is `0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48`, with six decimal places checked through the configured RPC.
+
+The input retains raw event topics/data, transaction hash, log index, block hash, selected scope and finality checkpoint. A versioned evidence envelope includes the source and derived records; both its exact bytes and a normalized source commitment are frozen before funding. The service re-reads the source before authorizing a new task/order. Identical accepted request retries reuse their existing task rather than requiring another network check.
+
+Legacy cent views use **floor(raw USDC base units / 10000) for each transfer**. Complete results additionally preserve exact integer `totalBaseUnits`, per-recipient base-unit allocations for treasury reports, and `roundingRemainderBaseUnits`; no floating-point conversion is used. Input changes that disagree with raw source events are rejected. Model/supplier/CRE output validation covers the complete source summary as part of the result. Evidence inspection separately re-reads the currently canonical source.
+
+The origin check trusts the configured RPC. Stored logs and the offline CRE result parser are not Ethereum receipt-inclusion proofs or independent light-client verification. CRE recomputes committed raw-event projections; it does not itself query Ethereum-mainnet finality in this version. Mainnet data does not turn local test-token fees into mainnet settlement.
+
+Run `npm run demo:data` against the loopback web app. It selects a recipient from an actual finalized USDC event, imports/reverifies the source, executes a server/D1 treasury task, and purchases the complete artifact through a separate temporary local EVM. Public source and transaction evidence are saved to `outputs/data-demo-*.json`. The temporary chain is closed; the existing demo chain and workspaces are retained. Full-suite execution is still the final roadmap gate.

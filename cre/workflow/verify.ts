@@ -1,5 +1,6 @@
 import {keccak256,stringToHex,type Hex} from 'viem';
-export type DeliveryVerification={version:'agentos.delivery.v2';skill:'event-analysis'|'treasury-report';skillVersion:'1.0.0';dataset:string;blockFrom:number;blockTo:number};
+import {assertSourceInput,sourceCommitment,sourceSummary,type TransferSource} from '../../lib/agentos/transfer-source.ts';
+export type DeliveryVerification={version:'agentos.delivery.v2';skill:'event-analysis'|'treasury-report';skillVersion:'1.0.0';dataset:string;blockFrom:number;blockTo:number;sourceHash?:Hex};
 // Optional only for historical v1 commitments. New purchases require v2.
 export type DeliverySpec={datasetUrl:string;datasetHash:Hex;artifactUrl:string;verification?:DeliveryVerification};
 export function canonical(value:unknown):string {
@@ -9,12 +10,12 @@ export function canonical(value:unknown):string {
 }
 export const specHash=(spec:DeliverySpec)=>keccak256(stringToHex(canonical(spec)));
 export const resultHash=(output:unknown)=>keccak256(stringToHex(canonical(output)));
-export function deliveryVerification(skill:DeliveryVerification['skill'],input:{dataset:string;blockFrom:number;blockTo:number}):DeliveryVerification{
- return {version:'agentos.delivery.v2',skill,skillVersion:'1.0.0',dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo};
+export function deliveryVerification(skill:DeliveryVerification['skill'],input:{dataset:string;blockFrom:number;blockTo:number;source?:TransferSource}):DeliveryVerification{
+ return {version:'agentos.delivery.v2',skill,skillVersion:'1.0.0',dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo,...(input.source?{sourceHash:sourceCommitment(input.source)}:{})};
 }
 export function validateVerification(value:unknown):asserts value is DeliveryVerification{
  const v=value as DeliveryVerification;
- if(!v||typeof v!=='object'||Array.isArray(v)||Object.keys(v).sort().join(',')!=='blockFrom,blockTo,dataset,skill,skillVersion,version'||v.version!=='agentos.delivery.v2'||!['event-analysis','treasury-report'].includes(v.skill)||v.skillVersion!=='1.0.0'||!['eth-shenzhen-fixture-v1','custom-transfers-v1'].includes(v.dataset)||!Number.isSafeInteger(v.blockFrom)||v.blockFrom<0||!Number.isSafeInteger(v.blockTo)||v.blockTo<v.blockFrom)throw new Error('Invalid versioned delivery verification');
+ if(!v||typeof v!=='object'||Array.isArray(v)||Object.keys(v).sort().join(',')!==(v.sourceHash===undefined?'blockFrom,blockTo,dataset,skill,skillVersion,version':'blockFrom,blockTo,dataset,skill,skillVersion,sourceHash,version')||v.sourceHash!==undefined&&!/^0x[0-9a-f]{64}$/.test(v.sourceHash)||v.version!=='agentos.delivery.v2'||!['event-analysis','treasury-report'].includes(v.skill)||v.skillVersion!=='1.0.0'||!['eth-shenzhen-fixture-v1','custom-transfers-v1'].includes(v.dataset)||!Number.isSafeInteger(v.blockFrom)||v.blockFrom<0||!Number.isSafeInteger(v.blockTo)||v.blockTo<v.blockFrom)throw new Error('Invalid versioned delivery verification');
 }
 export function deliveryArtifact(taskId:Hex,verification:DeliveryVerification,datasetHash:Hex,output:unknown){
  return {version:'agentos.delivery.v2',taskId,verification,datasetHash,output,outputHash:resultHash(output)};
@@ -33,10 +34,16 @@ function recompute(rows:unknown[],v:DeliveryVerification){
 export function verifyDelivery(datasetText:string,artifactText:string,taskId:Hex,expected:DeliverySpec|Hex){
  const expectedDatasetHash=typeof expected==='string'?expected:expected.datasetHash;
  if(keccak256(stringToHex(datasetText))!==expectedDatasetHash)throw new Error('Evidence bytes do not match buyer commitment');
- const rows:unknown=JSON.parse(datasetText);if(!Array.isArray(rows)||rows.length>10000)throw new Error('Invalid evidence');
+ const decoded=JSON.parse(datasetText),v=typeof expected==='string'?undefined:expected.verification;
+ let rows:unknown=decoded,source:TransferSource|undefined;
+ if(v?.sourceHash){
+  if(!decoded||Object.keys(decoded).sort().join(',')!=='records,source,version'||decoded.version!=='agentos.transfer-evidence.v1')throw new Error('Missing source provenance');
+  source=assertSourceInput(decoded.source,{...v,records:decoded.records});if(sourceCommitment(source)!==v.sourceHash)throw new Error('Source provenance differs from commitment');rows=decoded.records;
+ }
+ if(!Array.isArray(rows)||rows.length>10000)throw new Error('Invalid evidence');
  const artifact=JSON.parse(artifactText),outputHash=resultHash(artifact);
  if(typeof expected!=='string'&&expected.verification){
-  const v=expected.verification;validateVerification(v);const output=recompute(rows,v);
+  const v=expected.verification;validateVerification(v);const output={...recompute(rows,v),...(source?{source:sourceSummary(source,v.skill)}:{})};
   const accepted=canonical(artifact)===canonical(deliveryArtifact(taskId,v,expectedDatasetHash,output));
   return {accepted,outputHash};
  }

@@ -47,3 +47,18 @@ test('degraded model and stale consumer are visible rather than a fixed ready ba
  await page.goto('/#overview');const panel=page.locator('#runtime-status');await expect(panel).toContainText('部分服务不可用');await expect(panel.locator('.chain-summary > div').filter({hasText:'模型服务'})).toContainText('不可用');await expect(panel.getByRole('button',{name:'重试失败任务'})).toBeEnabled();
  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });
+
+test('USDC source draft persists after async import, refresh and language switching',async({page,context})=>{
+ // UI persistence only; real RPC source and EVM acceptance are exercised by demo:data.
+ const input={dataset:'custom-transfers-v1',blockFrom:10,blockTo:10,records:[{block:10,from:'a',to:'b',cents:123}],source:{version:'ui-test-only'}};
+ await context.route(base+'/api/data',route=>route.fulfill({json:{input}}));
+ await page.goto('/#vault');await page.getByRole('button',{name:'连接本地测试钱包',exact:true}).click();
+ await page.getByText('创建预注资订单',{exact:true}).click();await page.locator('select[name=inputMode]').selectOption('onchain');
+ await page.locator('input[name=sourceAccount]').fill('0x'+'a'.repeat(40));await page.getByRole('button',{name:'导入 USDC 事件',exact:true}).click();
+ await expect(page.locator('textarea[name=chainInput]')).toHaveValue(JSON.stringify(input,null,2));
+ await expect.poll(()=>page.evaluate(()=>Object.keys(sessionStorage).some(key=>key.startsWith('agentos.draft.v1:')&&sessionStorage.getItem(key).includes('ui-test-only')))).toBe(true);
+ await page.reload();await page.getByText('创建预注资订单',{exact:true}).click();await expect(page.locator('select[name=inputMode]')).toHaveValue('onchain');
+ await expect(page.locator('textarea[name=chainInput]')).toHaveValue(JSON.stringify(input,null,2));
+ await page.getByLabel('Switch to English',{exact:true}).click();await expect(page.getByRole('button',{name:'Import USDC events',exact:true})).toBeVisible();
+ await expect(page.locator('textarea[name=chainInput]')).toHaveValue(JSON.stringify(input,null,2));
+});

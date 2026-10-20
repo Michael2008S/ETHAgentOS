@@ -6,6 +6,7 @@ declare namespace Cloudflare {
     AGENTOS_MODEL_CONFIGURATION?: string;
     AGENTOS_MODEL_API_KEY?: string;
     AGENTOS_SUPPLIER_CONFIGURATION?: string;
+    AGENTOS_DATA_RPC_URL?: string;
     AGENTOS_SUPPLIER_API_KEY?: string;
     AGENTOS_RUNTIME_PRIVATE_ORIGIN?: string;
   }

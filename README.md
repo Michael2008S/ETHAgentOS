@@ -175,3 +175,5 @@ console.log(result.status, result.receipt);
 `npm run test:browser` 使用独立 Chromium 和隔离工作区，验证丢响应重试、钱包/草稿与语言持久化、订单深链接/证据隔离及故障健康状态。首次运行需安装浏览器：`PLAYWRIGHT_BROWSERS_PATH=.sites-runtime/playwright-browsers npx playwright install chromium`。CI 配置为 GitHub Actions 的 local-validation.yml；配置存在不代表远端已运行。测试追踪仅在失败时保存在忽略目录，不能提交包含用户数据的追踪文件。
 
 完整成果验收：新订单以 v2 协议固定技能/版本/输入范围，CRE 与本地验证器独立复算完整输出，链上 outputHash 绑定完整成果信封。篡改资金分配明细或收款方数量，即使重新计算哈希，也会拒付。历史订单保留原承诺。详见 [FULL-DELIVERY](docs/FULL-DELIVERY.md) 与 [后续实施顺序](docs/ROADMAP-IMPLEMENTATION.md)。
+
+真实业务数据：钱包页可选择「以太坊 USDC · 真实来源」，导入指定地址的已最终确认事件。保留原始金额、区块和交易证据，并在创建任务前重新复核。`npm run demo:data` 实跑真实主网读取 → HTTP/D1 资金流报告 → 独立临时链完整成果付款；费用网络与数据来源网络分别标明，见 [REAL-DATA](docs/REAL-DATA.md)。

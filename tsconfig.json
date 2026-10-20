@@ -45,6 +45,11 @@
     "node_modules",
     "examples",
     "cre/workflow/main.ts",
-    "dist"
+    "dist",
+    "**/node_modules",
+    ".sites-runtime",
+    "outputs",
+    ".wrangler",
+    "work"
   ]
 }

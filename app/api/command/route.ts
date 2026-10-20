@@ -1,11 +1,13 @@
+import {checkInputSource} from '@/lib/agentos/data-runtime';
+import {transferSourceSchema} from '@/lib/agentos/transfer-source';
 import { z } from 'zod';
-import { owner, checkOrigin, execute } from '@/lib/agentos/store';
+import { owner, checkOrigin, execute, read } from '@/lib/agentos/store';
 import { DomainError } from '@/lib/agentos/engine';
 import { scheduleTasks } from '@/lib/agentos/background';
 import { isLoopback, deferInline } from '@/lib/agentos/auth';
 const id = z.string().min(1).max(128);
 const skill = z.enum(['event-analysis', 'treasury-report']);
-const taskInput = z.object({dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe(),records:z.array(z.object({block:z.number().int().nonnegative().safe(),from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:z.number().int().nonnegative().safe()}).strict()).min(1).max(100).optional()}).strict();
+const taskInput = z.object({dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe(),source:transferSourceSchema.optional(),records:z.array(z.object({block:z.number().int().nonnegative().safe(),from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:z.number().int().nonnegative().safe()}).strict()).min(1).max(100).optional()}).strict();
 const command = z.discriminatedUnion('type', [
   z.object({ type: z.literal('create_task'), input: taskInput.optional(), timeoutSeconds: z.number().int().min(1).max(86400).optional(), executionMode: z.enum(['automatic','manual']).optional(), requestId: id, taskId: id, agentId: id, title: z.string().min(1).max(160), budget: z.number().int().positive(), scenario: z.enum(['success', 'injection', 'interruption', 'invalid-delivery']) }),
   z.object({ type: z.literal('advance'), taskId: id, expectedStep: z.number().int().min(0).max(6) }),
@@ -27,11 +29,12 @@ export async function POST(request: Request) {
     if (!parsed.success) return Response.json({ error: parsed.error.issues.map(i => i.message).join('; ') }, { status: 400 });
     if (parsed.data.type === 'create_task' && parsed.data.executionMode === 'manual' && (!isLoopback(new URL(request.url)) || !request.headers.has('x-agentos-sandbox'))) throw new DomainError('Manual execution is restricted to isolated local tests.', 'FORBIDDEN');
     const ownerId = owner(request);
+    if(parsed.data.type==='create_task'&&parsed.data.input?.source){const snapshot=await read(ownerId),requestId=parsed.data.requestId;if(!snapshot.state.tasks.some(t=>t.requestId===requestId))await checkInputSource(request,parsed.data.input);}
     const result = await execute(ownerId, parsed.data);
     if (!deferInline(request) && (parsed.data.type === 'create_task' || parsed.data.type === 'resume_task')) scheduleTasks(ownerId, result.state, parsed.data.taskId);
     return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
-    const status = e instanceof DomainError ? ({ UNAUTHORIZED: 401, FORBIDDEN: 403, NOT_FOUND: 404, CONFLICT: 409, IDEMPOTENCY_CONFLICT: 409 }[e.code] ?? 400) : e instanceof SyntaxError ? 400 : 500;
+    const status = e instanceof DomainError ? ({ UNAUTHORIZED: 401, FORBIDDEN: 403, NOT_FOUND: 404, CONFLICT: 409, IDEMPOTENCY_CONFLICT: 409, UNAVAILABLE:503 }[e.code] ?? 400) : e instanceof SyntaxError ? 400 : 500;
     return Response.json({ error: e instanceof Error ? e.message : 'Operation failed.' }, { status });
   }
 }

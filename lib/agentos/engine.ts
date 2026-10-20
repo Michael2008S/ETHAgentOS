@@ -1,6 +1,7 @@
 import type { Command, Event, Receipt, Task, TaskInput, Workspace } from './types.ts';
 import { SKILLS } from './types.ts';
 import { DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS, taskIsOverdue } from './lifecycle.ts';
+import {assertSourceInput,sourceSummary} from './transfer-source.ts';
 
 export class DomainError extends Error { code: string; constructor(message: string, code = 'INVALID_COMMAND') { super(message); this.code = code; } }
 // Public, deterministic fixture. Never represented as live blockchain data.
@@ -85,7 +86,7 @@ export function normalizeInput(input?: TaskInput): TaskInput {
   if (!input || !['eth-shenzhen-fixture-v1','custom-transfers-v1'].includes(input.dataset) || !Number.isSafeInteger(input.blockFrom) || !Number.isSafeInteger(input.blockTo) || input.blockFrom < 0 || input.blockTo < input.blockFrom) throw new DomainError('Invalid input dataset or block range.');
   const normalized: TaskInput = {dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo};
   if (input.dataset === 'eth-shenzhen-fixture-v1') {
-    if (input.records !== undefined) throw new DomainError('Fixture input cannot override records.');
+    if (input.records !== undefined||input.source!==undefined) throw new DomainError('Fixture input cannot override records or source.');
     return normalized;
   }
   if (!Array.isArray(input.records) || input.records.length < 1 || input.records.length > 100) throw new DomainError('Custom input requires 1–100 transfer records.');
@@ -96,12 +97,13 @@ export function normalizeInput(input?: TaskInput): TaskInput {
     if (!Number.isSafeInteger(total)) throw new DomainError('Transfer total exceeds the safe integer range.');
     return {block:row.block,from:row.from.trim(),to:row.to.trim(),cents:row.cents};
   });
+  if(input.source!==undefined){try{normalized.source=assertSourceInput(input.source,normalized);}catch{throw new DomainError('Transfer records do not match their source provenance.');}}
   if (canonical(normalized).length > 32768) throw new DomainError('Custom input is too large.');
   return normalized;
 }
 export function expectedOutput(t: Pick<Task, 'skill' | 'input'>): Record<string, unknown> {
   const rows = (t.input.records ?? DATASET).filter(r => r.block >= t.input.blockFrom && r.block <= t.input.blockTo);
-  const base = { dataset: t.input.dataset, blockFrom: t.input.blockFrom, blockTo: t.input.blockTo, transferCount: rows.length, totalCents: rows.reduce((sum, r) => sum + r.cents, 0) };
+  const base = { dataset: t.input.dataset, blockFrom: t.input.blockFrom, blockTo: t.input.blockTo, transferCount: rows.length, totalCents: rows.reduce((sum, r) => sum + r.cents, 0),...(t.input.source?{source:sourceSummary(assertSourceInput(t.input.source,t.input),t.skill)}:{}) };
   if (t.skill === 'event-analysis') return { ...base, uniqueRecipients: new Set(rows.map(r => r.to)).size };
   const allocations = new Map<string, number>();
   for (const row of rows) allocations.set(row.to, (allocations.get(row.to) ?? 0) + row.cents);
