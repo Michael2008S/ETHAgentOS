@@ -1,7 +1,7 @@
 import type { Address, Hex } from 'viem';
 import type { WalletDeployment } from '../../sdk/wallet.ts';
 import type { ChainEvidence } from '../../sdk/chain.ts';
-import { canonical, type DeliverySpec } from '../../cre/workflow/verify.ts';
+import { canonical,deliveryVerification,deliveryArtifact, type DeliverySpec } from '../../cre/workflow/verify.ts';
 import { authorizeOperation, digest, DomainError, expectedOutput, normalizeInput } from './engine.ts';
 import type { Event, Policy, Scenario, Skill, TaskInput, Workspace } from './types.ts';
 import type { ModelDescriptor,ModelPlan } from './model.ts';
@@ -33,6 +33,7 @@ export async function createOrder(state:Workspace,draft:OrderDraft,deployment:Wa
   if((state.chainOrders?.length??0)>=300)throw new DomainError('This prototype supports up to 300 onchain orders per workspace.');
   const agent=state.agents.find(a=>a.id===draft.agentId);
   if(!agent?.enabled)throw new DomainError('An enabled service is required.');
+  if(canonical(draft.spec.verification)!==canonical(deliveryVerification(agent.skill,input)))throw new DomainError('A complete versioned delivery commitment matching the selected skill and input is required.');
   if(!Number.isSafeInteger(draft.budget)||draft.budget<agent.price||draft.budget>1000000||!Number.isSafeInteger(draft.timeoutSeconds)||draft.timeoutSeconds<1||draft.timeoutSeconds>86400)throw new DomainError('Invalid onchain budget or execution window.');
   if(draft.planner==='llm'&&!draft.model)throw new DomainError('A configured model is required for LLM planning.');
   if(draft.executor==='supplier'&&(!draft.supplier||!draft.agentIdentity||!draft.supplier.skills.includes(agent.skill)))throw new DomainError('An authorized identity and supplier skill are required.');
@@ -114,7 +115,7 @@ export async function advanceOrder(state:Workspace,id:string,expectedStep:number
   }else if(o.step===3){if(canonical(o.output)!==canonical(expectedOutput(o)))o.failure='Delivery differs from independent recomputation.';o.step=4;o.status='awaiting-settlement';orderEvent(o,o.failure?'Delivery rejected':'Delivery verified locally','Waiting for an actual onchain payment or refund receipt.',now,o.failure?'error':'success');}
   return next;
 }
-export function orderArtifact(o:ChainOrder,chainId:Hex){return o.settlementAuthorization?.artifactText??JSON.stringify(o.failure?{taskId:chainId,rejectionReason:o.failure}:{taskId:chainId,totalCents:o.output?.totalCents,transferCount:o.output?.transferCount});}
+export function orderArtifact(o:ChainOrder,chainId:Hex){return o.settlementAuthorization?.artifactText??JSON.stringify(o.failure?{taskId:chainId,rejectionReason:o.failure}:o.spec.verification?deliveryArtifact(chainId,o.spec.verification,o.spec.datasetHash,o.output):{taskId:chainId,totalCents:o.output?.totalCents,transferCount:o.output?.transferCount});}
 export async function authorizeSettlement(state:Workspace,id:string,chainId:Hex,now=new Date().toISOString()):Promise<Workspace>{
   const next=structuredClone(state),o=findOrder(next,id);if(o.settlementAuthorization||o.settlement)return state;
   if(o.status!=='awaiting-settlement'||!o.funding)throw new DomainError('Order is not ready for settlement authorization.');

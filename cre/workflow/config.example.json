@@ -7,6 +7,14 @@
   "spec": {
     "datasetUrl": "https://YOUR_IMMUTABLE_EVIDENCE_HOST/transfers.json",
     "datasetHash": "REPLACE_WITH_KECCAK256_OF_EXACT_DATASET_BYTES",
-    "artifactUrl": "https://YOUR_ARTIFACT_HOST/task-result.json"
+    "artifactUrl": "https://YOUR_ARTIFACT_HOST/task-result.json",
+    "verification": {
+      "version": "agentos.delivery.v2",
+      "skill": "event-analysis",
+      "skillVersion": "1.0.0",
+      "dataset": "custom-transfers-v1",
+      "blockFrom": 0,
+      "blockTo": 10
+    }
   }
 }

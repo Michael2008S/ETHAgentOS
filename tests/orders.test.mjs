@@ -20,7 +20,7 @@ test('pre-funded runtime executes only after escrow, pays once, refunds rejectio
  async function write(address,abi,functionName,args=[],account=buyer){const hash=await signer.writeContract({address,abi,functionName,args,account,gas:6000000n});await client.waitForTransactionReceipt({hash});return hash;}
  async function deploy(name,args=[]){return(await client.waitForTransactionReceipt({hash:await signer.deployContract({...contracts[name],args,account:buyer,gas:6000000n})})).contractAddress;}
  let state=seed(),writes=Promise.resolve(),failSettlementCommit=false;const store={read:async()=>({state:structuredClone(state)}),updateWorkspace:(_,reduce)=>{const result=writes.then(async()=>{const next=await reduce(state);if(failSettlementCommit&&next.chainOrders?.some(o=>o.settlement&&!state.chainOrders?.find(p=>p.id===o.id)?.settlement)){failSettlementCommit=false;throw new Error("Simulated D1 failure after mined payment");}state=next;return {state:structuredClone(state)};});writes=result.catch(()=>{});return result;}};
- const data=new Map(),artifacts=new Map(),transactions=new Map();
+ const specifications=new Map(),data=new Map(),artifacts=new Map(),transactions=new Map();
  try{
   const token=await deploy('MockToken'),metadata=stringToHex('order-test'),escrow=await deploy('AgentEscrow',[token,forwarder,keccak256(metadata)]),deployment={mode:'local',chainId:31337,token,escrow,forwarder,metadataHash:keccak256(metadata),confirmations:1,seller,deployedBlock:'0'};
   await write(token,contracts.MockToken.abi,'mint',[buyer,100000000n]);const wallet=await AgentWalletSession.connect(provider,deployment,false),ledger=structuredClone(state.ledger);
@@ -29,14 +29,14 @@ test('pre-funded runtime executes only after escrow, pays once, refunds rejectio
    if(!transactions.has(body.id))transactions.set(body.id,(async()=>{
     const current=await client.readContract({address:escrow,abi:escrowABI,functionName:'tasks',args:[body.id]});
     if((await client.getBlock()).timestamp>=current[3])return {hash:await write(escrow,escrowABI,'refundExpired',[body.id])};
-    const verdict=verifyDelivery(data.get(body.id),artifacts.get(body.id),body.id,specHashValue(body.id));
+    const verdict=verifyDelivery(data.get(body.id),artifacts.get(body.id),body.id,specifications.get(body.id));
     return {hash:await write(escrow,parseAbi(['function onReport(bytes,bytes)']),'onReport',[metadata,encodeSettlementReport(body.id,current[4],verdict.outputHash,verdict.accepted)],forwarder)};
    })());return transactions.get(body.id);
   });
   function specHashValue(id){return keccak256(stringToHex(data.get(id)));}
   async function draft(scenario='success',model,supplier){
-   const requestId=crypto.randomUUID(),input={dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:[{block:0,from:'x',to:'ignored',cents:999},{block:1,from:'x',to:'a',cents:123},{block:2,from:'x',to:'b',cents:456}]},bytes=inputEvidence({id:'chain-'+requestId,input},buyer),spec={datasetUrl:'https://data.example/'+bytes.id,artifactUrl:'https://artifact.example/'+bytes.id,datasetHash:bytes.datasetHash};
-   data.set(bytes.id,bytes.datasetText);state=await createOrder(state,{requestId,title:'Pre-funded '+scenario,agentId:'atlas',budget:1000,buyer,input,spec,scenario,timeoutSeconds:300,...(model?{planner:'llm',model}:{} ),...(supplier?{executor:'supplier',supplier,agentIdentity:{registry:forwarder,registryAgentId:'0',owner:seller,wallet:seller,documentHash:keccak256(metadata)}}:{})},deployment);return state.chainOrders[0];
+   const requestId=crypto.randomUUID(),input={dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:[{block:0,from:'x',to:'ignored',cents:999},{block:1,from:'x',to:'a',cents:123},{block:2,from:'x',to:'b',cents:456}]},bytes=inputEvidence({id:'chain-'+requestId,input,skill:'event-analysis'},buyer),spec={datasetUrl:'https://data.example/'+bytes.id,artifactUrl:'https://artifact.example/'+bytes.id,datasetHash:bytes.datasetHash,verification:bytes.verification};
+   specifications.set(bytes.id,spec);data.set(bytes.id,bytes.datasetText);state=await createOrder(state,{requestId,title:'Pre-funded '+scenario,agentId:'atlas',budget:1000,buyer,input,spec,scenario,timeoutSeconds:300,...(model?{planner:'llm',model}:{} ),...(supplier?{executor:'supplier',supplier,agentIdentity:{registry:forwarder,registryAgentId:'0',owner:seller,wallet:seller,documentHash:keccak256(metadata)}}:{})},deployment);return state.chainOrders[0];
   }
   async function fund(order){const evidence=await wallet.fundOrder(order,120);state=(await authorizeOrder(state,order.id,'owner',evidence.transactionHash,crypto.randomUUID())).state;const current=await access.funding(findOrder(state,order.id),evidence.transactionHash);state=activateOrder(state,order.id,findOrder(state,order.id).authorization.nonce,current);return evidence;}
   const first=await draft();await runOrder(store,'owner',first.id,access);assert.equal(findOrder(state,first.id).output,null);assert.equal(artifacts.size,0);assert.equal(findOrder(state,first.id).status,'awaiting-funding');

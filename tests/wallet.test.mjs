@@ -22,13 +22,13 @@ test('wallet session funds, reads and verifies real escrow and rejects network/a
   let state=await transition(seed(),{type:'create_task',taskId:'wallet',requestId:'wallet',agentId:'atlas',title:'Wallet',budget:1000,scenario:'success'});
   await assert.rejects(session.fund(state.tasks[0],{}),/completed/);
   for(let expectedStep=0;expectedStep<6;expectedStep++)state=await transition(state,{type:'advance',taskId:'wallet',expectedStep});
-  const task=state.tasks[0],bytes=deliveryBytes(task,buyer),spec={datasetUrl:'https://evidence.example/dataset',artifactUrl:'https://artifact.example/result',datasetHash:bytes.datasetHash};
+  const task=state.tasks[0],bytes=deliveryBytes(task,buyer),spec={datasetUrl:'https://evidence.example/dataset',artifactUrl:'https://artifact.example/result',datasetHash:bytes.datasetHash,verification:bytes.verification};
   chainOverride='0x1';await assert.rejects(session.fund(task,spec),/network changed/);chainOverride=undefined;
   accountOverride=[other];await assert.rejects(session.fund(task,spec),/account changed/);accountOverride=undefined;
   const proof=await session.fund(task,spec);assert.equal(proof.status,'funded');assert.equal((await session.task(task,spec)).status,'funded');assert.equal((await session.balances()).token,'7600000');
   await assert.rejects(session.fund(task,spec),/already exists/);await assert.rejects(session.refund(task),/deadline/);
   await assert.rejects(session.task(task,{...spec,artifactUrl:'https://different.example/result'}),/differs/);
-  const verdict=verifyDelivery(bytes.datasetText,bytes.artifactText,bytes.id,bytes.datasetHash);
+  const verdict=verifyDelivery(bytes.datasetText,bytes.artifactText,bytes.id,spec);
   const tx=await write(escrow,parseAbi(['function onReport(bytes,bytes)']),'onReport',[metadata,encodeSettlementReport(bytes.id,specHash(spec),verdict.outputHash,verdict.accepted)],forwarder);
   assert.equal((await session.evidence(task,tx,'settlement',spec)).status,'paid');assert.equal((await session.task(task,spec)).status,'paid');
   await assert.rejects(session.refund(task),/No funded/);

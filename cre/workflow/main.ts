@@ -11,7 +11,7 @@ function fetchText(runtime:NodeRuntime<Config>,url:string){
 }
 function verify(runtime:NodeRuntime<Config>){
  const {spec,taskId}=runtime.config;
- return verifyDelivery(fetchText(runtime,spec.datasetUrl),fetchText(runtime,spec.artifactUrl),taskId,spec.datasetHash);
+ return verifyDelivery(fetchText(runtime,spec.datasetUrl),fetchText(runtime,spec.artifactUrl),taskId,spec);
 }
 function onCron(runtime:Runtime<Config>):string{
  const c=runtime.config;

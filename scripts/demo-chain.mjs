@@ -5,7 +5,7 @@ import {createPublicClient,createWalletClient,custom,keccak256,stringToHex,parse
 import {AgentChainClient,encodeSettlementReport} from '../sdk/chain.ts';
 import {AgentOSClient} from '../sdk/index.ts';
 import {DATASET} from '../lib/agentos/engine.ts';
-import {verifyDelivery} from '../cre/workflow/verify.ts';
+import {verifyDelivery,deliveryVerification,deliveryArtifact} from '../cre/workflow/verify.ts';
 import {compile} from './compile-contracts.mjs';
 
 const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177';
@@ -31,7 +31,7 @@ try{
     assert.equal(completed.status,scenario==='invalid-delivery'?'refunded':'completed');
     assert.equal(completed.output.totalCents,scenario==='invalid-delivery'?9751:9750);
     const dataset=JSON.stringify((completed.input.records??DATASET).filter(row=>row.block>=completed.input.blockFrom&&row.block<=completed.input.blockTo)),datasetHash=keccak256(stringToHex(dataset));
-    const spec={datasetUrl:'https://evidence.example/committed-transfers.json',datasetHash,artifactUrl:`https://delivery.example/${web.id}.json`};
+    const spec={datasetUrl:'https://evidence.example/committed-transfers.json',datasetHash,artifactUrl:`https://delivery.example/${web.id}.json`,verification:deliveryVerification(completed.skill,completed.input)};
     // URLs are commitments for this local test, not live HTTP endpoints; the real fetched bytes are supplied below.
     const {intent,transactions}=await chain.prepareFunding({workspace,taskId:web.id,buyer,seller,quoteCents:completed.quote,deadline:(await client.getBlock()).timestamp+120n,spec});
     let funding;for(const tx of transactions)funding=await sign(tx);
@@ -41,8 +41,8 @@ try{
       await provider.request({method:'evm_increaseTime',params:[121]});await provider.request({method:'evm_mine',params:[]});
       settlement=await sign(chain.refundTransaction(intent.id));
     }else{
-      const artifact=JSON.stringify({taskId:intent.id,totalCents:completed.output.totalCents,transferCount:completed.output.transferCount});
-      const verdict=verifyDelivery(dataset,artifact,intent.id,datasetHash);assert.equal(verdict.accepted,scenario==='success');expectedHash=verdict.outputHash;
+      const artifact=JSON.stringify(deliveryArtifact(intent.id,spec.verification,datasetHash,completed.output));
+      const verdict=verifyDelivery(dataset,artifact,intent.id,spec);assert.equal(verdict.accepted,scenario==='success');expectedHash=verdict.outputHash;
       const payload=encodeSettlementReport(intent.id,intent.specHash,verdict.outputHash,verdict.accepted);
       settlement=await write(escrow,onReportABI,'onReport',[metadata,payload],forwarder);assert.equal(settlement.status,'success');
       const replay=await write(escrow,onReportABI,'onReport',[metadata,payload],forwarder);assert.equal(replay.status,'reverted');

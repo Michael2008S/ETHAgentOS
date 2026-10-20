@@ -22,7 +22,7 @@ test('server reconciliation verifies EVM evidence, binds wallet/workspace and sa
   const session=await AgentWalletSession.connect(provider,deployment,false);
   let state=seed();
   async function completed(id){state=await transition(state,{type:'create_task',taskId:id,requestId:id,agentId:'atlas',title:id,budget:1000,scenario:'success'});for(let expectedStep=0;expectedStep<6;expectedStep++)state=await transition(state,{type:'advance',taskId:id,expectedStep});return state.tasks.find(t=>t.id===id);}
-  const task=await completed('reconcile'),bytes=deliveryBytes(task,buyer),spec={datasetUrl:'https://public.example/data',artifactUrl:'https://public.example/result',datasetHash:bytes.datasetHash};
+  const task=await completed('reconcile'),bytes=deliveryBytes(task,buyer),spec={datasetUrl:'https://public.example/data',artifactUrl:'https://public.example/result',datasetHash:bytes.datasetHash,verification:bytes.verification};
   const funding=await session.fund(task,spec),claim={taskId:task.id,buyer,chainId:31337,escrow,transactionHash:funding.transactionHash,phase:'funding',spec};
   let issued=await createChainChallenge(state,'owner-a',claim,deployment,crypto.randomUUID());state=issued.state;
   const signature=await account.signMessage({message:issued.challenge.message});
@@ -35,7 +35,7 @@ test('server reconciliation verifies EVM evidence, binds wallet/workspace and sa
   await assert.rejects(verifyChainClaim(state,issued.challenge.nonce,signature,deployment,client, new Date(Date.parse(issued.challenge.expiresAt)+1).toISOString()),/expired/);
   await assert.rejects(verifyChainClaim(state,issued.challenge.nonce,signature,{...deployment,seller:other},client),/deployment changed/);
   await assert.rejects(createChainChallenge(state,'owner-a',{...claim,escrow:other},deployment,crypto.randomUUID()),/not enabled/);
-  const verdict=verifyDelivery(bytes.datasetText,bytes.artifactText,bytes.id,bytes.datasetHash);
+  const verdict=verifyDelivery(bytes.datasetText,bytes.artifactText,bytes.id,spec);
   const tx=await write(escrow,parseAbi(['function onReport(bytes,bytes)']),'onReport',[metadata,encodeSettlementReport(bytes.id,specHash(spec),verdict.outputHash,true)],forwarder);
   issued=await createChainChallenge(state,'owner-a',{...claim,transactionHash:tx,phase:'settlement'},deployment,crypto.randomUUID());state=issued.state;
   const settled=await verifyChainClaim(state,issued.challenge.nonce,await account.signMessage({message:issued.challenge.message}),deployment,client);assert.equal(settled.record.evidence.status,'paid');

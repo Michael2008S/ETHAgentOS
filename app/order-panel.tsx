@@ -32,7 +32,8 @@ export function OrderPanel({scope,session,agents,orders,feedback=[],busy,perform
       const payload={title:String(fields.get('title')),agentId:String(fields.get('agentId')),budget:Math.round(Number(fields.get('budget'))*100),input,executor:String(fields.get('executor')) as 'builtin'|'supplier',planner:String(fields.get('planner')) as 'deterministic'|'llm',scenario:String(fields.get('scenario')) as Scenario,timeoutSeconds:Number(fields.get('timeoutSeconds'))};
       const snapshot={scope};
       const intent=await submissionIntent(snapshot.scope,'order',{...payload,buyer:session!.account,deployment:session!.deployment,datasetUrl:String(fields.get('datasetUrl')??''),artifactUrl:String(fields.get('artifactUrl')??'')},sessionStorage),requestId=intent.id;
-      const spec=session!.deployment.mode==='testnet'?{datasetUrl:String(fields.get('datasetUrl')),artifactUrl:String(fields.get('artifactUrl')),datasetHash:inputEvidence({id:'chain-'+requestId,input:normalizeInput(input)},session!.account).datasetHash}:undefined;
+      const evidence=inputEvidence({id:'chain-'+requestId,input:normalizeInput(input),skill:agents.find(a=>a.id===payload.agentId)?.skill},session!.account);
+      const spec=session!.deployment.mode==='testnet'?{datasetUrl:String(fields.get('datasetUrl')),artifactUrl:String(fields.get('artifactUrl')),datasetHash:evidence.datasetHash,verification:evidence.verification}:undefined;
       await client!.create({requestId,...payload,spec});intent.acknowledge();sessionStorage.removeItem(draftKey(scope+':order:'+session!.account));await onChanged?.();
     });
   }

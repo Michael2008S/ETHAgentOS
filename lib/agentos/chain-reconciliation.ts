@@ -22,7 +22,7 @@ export async function createChainChallenge(state:Workspace,ownerId:string,claim:
   const task=await completedTask(state,claim.taskId);
   if(claim.chainId!==deployment.chainId||!same(claim.escrow,deployment.escrow))throw new DomainError('This deployment is not enabled for server reconciliation.','FORBIDDEN');
   const bytes=deliveryBytes(task,claim.buyer);
-  if(bytes.datasetHash!==claim.spec.datasetHash)throw new DomainError('Evidence does not match this task input.');
+  if(bytes.datasetHash!==claim.spec.datasetHash||claim.spec.verification&&canonical(claim.spec.verification)!==canonical(bytes.verification))throw new DomainError('Evidence does not match this task input.');
   const expiresAt=new Date(Date.parse(now)+300000).toISOString(),scope=await digest({ownerId});
   const message=['AgentOS chain reconciliation v1','This signature records a receipt; it does not transfer tokens.',`Workspace: ${scope}`,`Nonce: ${nonce}`,`Expires: ${expiresAt}`,`Task: ${claim.taskId}`,`Chain task: ${bytes.id}`,`Wallet namespace: ${walletNamespace(claim.buyer)}`,`Buyer: ${claim.buyer}`,`Transaction: ${claim.transactionHash}`,`Phase: ${claim.phase}`,`Specification: ${specHash(claim.spec)}`,`Deployment: ${canonical(deployment)}`].join('\n');
   const challenge:ChainChallenge={nonce,message,claim:structuredClone(claim),deployment:{...deployment},taskDigest:await taskDigest(task),expiresAt};
@@ -40,7 +40,7 @@ export async function verifyChainClaim(state:Workspace,nonce:string,signature:He
   const onchain=await client.readContract({address:deployment.escrow,abi:escrowABI,functionName:'tasks',args:[bytes.id]});
   const intent:ChainIntent={id:bytes.id,buyer:claim.buyer,seller:deployment.seller,amount:centsToToken(task.quote,decimals),deadline:onchain[3],specHash:specHash(claim.spec)};
   const evidence=await chain.verifyEvidence(intent,claim.transactionHash,claim.phase);
-  if(evidence.status==='paid'&&evidence.outputHash!==keccak256(stringToHex(canonical(JSON.parse(bytes.artifactText)))))throw new DomainError('Paid output differs from the completed task delivery.');
+  if(evidence.status==='paid'&&evidence.outputHash!==keccak256(stringToHex(canonical(claim.spec.verification?JSON.parse(bytes.artifactText):{taskId:bytes.id,totalCents:task.output!.totalCents,transferCount:task.output!.transferCount}))))throw new DomainError('Paid output differs from the completed task delivery.');
   return {challenge,record:{id:receiptId(evidence),webTaskId:task.id,agentId:task.agentId,deployment:{...deployment},evidence,verifiedAt:now} satisfies SavedChainReceipt};
 }
 /** Accepts only server-verified evidence; never exposed through /api/command. */

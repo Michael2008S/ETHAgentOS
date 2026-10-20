@@ -7,7 +7,7 @@ import { createChainChallenge,verifyChainClaim,saveChainReceipt, type ChainClaim
 const address=z.string().regex(/^0x[0-9a-fA-F]{40}$/).refine(s=>!/^0x0{40}$/.test(s));
 const hash=z.string().regex(/^0x[0-9a-fA-F]{64}$/);
 const url=z.string().url().max(4096).refine(s=>{const u=new URL(s);return ['http:','https:'].includes(u.protocol)&&!u.username&&!u.password&&!u.hash;});
-const claim=z.object({taskId:z.string().min(1).max(128),buyer:address,chainId:z.number().int().positive().safe(),escrow:address,transactionHash:hash,phase:z.enum(['funding','settlement']),spec:z.object({datasetUrl:url,artifactUrl:url,datasetHash:hash}).strict()}).strict();
+const claim=z.object({taskId:z.string().min(1).max(128),buyer:address,chainId:z.number().int().positive().safe(),escrow:address,transactionHash:hash,phase:z.enum(['funding','settlement']),spec:z.object({datasetUrl:url,artifactUrl:url,datasetHash:hash,verification:z.object({version:z.literal('agentos.delivery.v2'),skill:z.enum(['event-analysis','treasury-report']),skillVersion:z.literal('1.0.0'),dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe()}).strict().optional()}).strict()}).strict();
 const bodySchema=z.discriminatedUnion('action',[
   z.object({action:z.literal('challenge'),claim}).strict(),
   z.object({action:z.literal('reconcile'),nonce:z.string().uuid(),signature:z.string().regex(/^0x[0-9a-fA-F]+$/).min(130).max(8194)}).strict(),

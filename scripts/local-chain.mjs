@@ -6,7 +6,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { compile } from './compile-contracts.mjs';
 import { normalizeInput } from '../lib/agentos/engine.ts';
 import { encodeSettlementReport, escrowABI } from '../sdk/chain.ts';
-import { specHash, verifyDelivery } from '../cre/workflow/verify.ts';
+import { specHash, verifyDelivery, validateVerification } from '../cre/workflow/verify.ts';
 import { deployIdentityRegistries } from './compile-identity.mjs';
 
 const rpcMethods=new Set(['personal_sign','eth_chainId','eth_accounts','eth_blockNumber','eth_call','eth_getBalance','eth_getTransactionReceipt','eth_getTransactionByHash','eth_getBlockByNumber','eth_getBlockByHash','eth_estimateGas','eth_gasPrice','eth_maxPriorityFeePerGas','eth_feeHistory','eth_getTransactionCount','eth_sendTransaction','web3_clientVersion','net_version','eth_getCode','eth_getLogs']);
@@ -53,13 +53,14 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
       if(path==='/drafts'){
         if(!/^0x[0-9a-f]{64}$/.test(body.id)||typeof body.datasetText!=='string')throw new Error('Invalid local input commitment.');
         const records=JSON.parse(body.datasetText);if(!Array.isArray(records))throw new Error('Invalid input.');if(records.length)normalizeInput({dataset:'custom-transfers-v1',blockFrom:0,blockTo:Number.MAX_SAFE_INTEGER,records});
-        const existing=deliveries.get(body.id);if(existing&&existing.datasetText!==body.datasetText)throw new Error('This input commitment already exists.');
-        const spec={datasetUrl:base+'/dataset/'+body.id,datasetHash:keccak256(stringToHex(body.datasetText)),artifactUrl:base+'/artifact/'+body.id};
+        validateVerification(body.verification);
+        const existing=deliveries.get(body.id);if(existing&&(existing.datasetText!==body.datasetText||JSON.stringify(existing.spec.verification)!==JSON.stringify(body.verification)))throw new Error('This input commitment already exists.');
+        const spec={datasetUrl:base+'/dataset/'+body.id,datasetHash:keccak256(stringToHex(body.datasetText)),artifactUrl:base+'/artifact/'+body.id,verification:body.verification};
         if(!existing){deliveries.set(body.id,{datasetText:body.datasetText,artifactText:null,spec,locked:true});await provider.request({method:'evm_mine',params:[]});}return json(200,spec);
       }
       if(path==='/artifacts'){
         const record=deliveries.get(body.id);if(!record?.locked||typeof body.artifactText!=='string')throw new Error('Committed order input is missing.');
-        const artifact=JSON.parse(body.artifactText);if(artifact.taskId!==body.id||!('rejectionReason' in artifact)&&(!Number.isSafeInteger(artifact.totalCents)||!Number.isSafeInteger(artifact.transferCount)))throw new Error('Invalid order artifact.');
+        const artifact=JSON.parse(body.artifactText);if(artifact.taskId!==body.id||!('rejectionReason' in artifact)&&(!artifact.output||typeof artifact.outputHash!=='string'))throw new Error('Invalid order artifact.');
         if(record.artifactText&&record.artifactText!==body.artifactText)throw new Error('Published order artifact is immutable.');record.artifactText=body.artifactText;return json(200,{published:true});
       }
       if(path==='/settle'){
@@ -74,7 +75,7 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
             }
             const record=deliveries.get(body.id);if(task[4]!==specHash(record.spec))throw new Error('Order specification differs from its escrow.');
             const [data,artifact]=await Promise.all([fetch(record.spec.datasetUrl),fetch(record.spec.artifactUrl)]);if(!data.ok||!artifact.ok)throw new Error('Order delivery is not ready.');
-            const verdict=verifyDelivery(await data.text(),await artifact.text(),body.id,record.spec.datasetHash);
+            const verdict=verifyDelivery(await data.text(),await artifact.text(),body.id,record.spec);
             const hash=await wallet.writeContract({address:escrow,abi:parseAbi(['function onReport(bytes metadata,bytes report)']),functionName:'onReport',args:[metadata,encodeSettlementReport(body.id,task[4],verdict.outputHash,verdict.accepted)],account:forwarder,gas:6000000n});const receipt=await client.waitForTransactionReceipt({hash});if(receipt.status!=='success')throw new Error('Order report reverted.');return {hash,accepted:verdict.accepted,mode:'local EOA verifier; not CRE DON'};
           })();settlements.set(body.id,action);action.catch(()=>settlements.delete(body.id));
         }
@@ -83,8 +84,9 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
       if(path==='/deliveries'){
         if(!/^0x[0-9a-f]{64}$/.test(body.id)||typeof body.datasetText!=='string'||typeof body.artifactText!=='string')throw new Error('Invalid local delivery.');
         const records=JSON.parse(body.datasetText);if(!Array.isArray(records))throw new Error('Invalid local dataset.');if(records.length)normalizeInput({dataset:'custom-transfers-v1',blockFrom:0,blockTo:Number.MAX_SAFE_INTEGER,records});
-        const artifact=JSON.parse(body.artifactText);if(artifact.taskId!==body.id||!Number.isSafeInteger(artifact.totalCents)||!Number.isSafeInteger(artifact.transferCount))throw new Error('Invalid local artifact.');
-        const spec={datasetUrl:base+'/dataset/'+body.id,datasetHash:keccak256(stringToHex(body.datasetText)),artifactUrl:base+'/artifact/'+body.id};
+        validateVerification(body.verification);
+        const artifact=JSON.parse(body.artifactText);if(artifact.taskId!==body.id||!artifact.output||typeof artifact.outputHash!=='string')throw new Error('Invalid local artifact.');
+        const spec={datasetUrl:base+'/dataset/'+body.id,datasetHash:keccak256(stringToHex(body.datasetText)),artifactUrl:base+'/artifact/'+body.id,verification:body.verification};
         if(deliveries.get(body.id)?.locked)throw new Error('Pre-funded order evidence cannot be replaced.');deliveries.set(body.id,{datasetText:body.datasetText,artifactText:body.artifactText,spec});return json(200,spec);
       }
       if(path==='/verify'){
@@ -94,14 +96,14 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
         // Actual HTTP retrieval of the published local bytes. This EOA verifier is not a DON.
         const [data,artifact]=await Promise.all([fetch(record.spec.datasetUrl),fetch(record.spec.artifactUrl)]);
         if(!data.ok||!artifact.ok)throw new Error('Local evidence is unavailable.');
-        const verdict=verifyDelivery(await data.text(),await artifact.text(),body.id,record.spec.datasetHash);
+        const verdict=verifyDelivery(await data.text(),await artifact.text(),body.id,record.spec);
         const hash=await wallet.writeContract({address:escrow,abi:parseAbi(['function onReport(bytes metadata,bytes report)']),functionName:'onReport',args:[metadata,encodeSettlementReport(body.id,task[4],verdict.outputHash,verdict.accepted)],account:forwarder,gas:6000000n});
         const receipt=await client.waitForTransactionReceipt({hash});if(receipt.status!=='success')throw new Error('Local report transaction reverted.');
         return json(200,{hash,accepted:verdict.accepted,mode:'local EOA verifier; not CRE DON'});
       }
       if(path==='/tamper'){
         const record=deliveries.get(body.id);if(!record)throw new Error('Local delivery is missing.');
-        const artifact=JSON.parse(record.artifactText);artifact.totalCents+=1;record.artifactText=JSON.stringify(artifact);return json(200,{tampered:true});
+        const artifact=JSON.parse(record.artifactText);artifact.output.totalCents+=1;record.artifactText=JSON.stringify(artifact);return json(200,{tampered:true});
       }
       if(path==='/time'){
         if(!Number.isSafeInteger(body.seconds)||body.seconds<1||body.seconds>604801)throw new Error('Invalid local time increment.');

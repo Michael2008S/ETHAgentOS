@@ -6,7 +6,7 @@ import { resolve,dirname,delimiter } from 'node:path';
 import { startLocalChain } from './local-chain.mjs';
 import { AgentWalletSession,deliveryBytes } from '../sdk/wallet.ts';
 import { seed,transition } from '../lib/agentos/engine.ts';
-import { verifyDelivery } from '../cre/workflow/verify.ts';
+import { verifyDelivery,resultHash } from '../cre/workflow/verify.ts';
 
 const id=crypto.randomUUID(),root=resolve('.sites-runtime/cre-simulation/'+id);
 await mkdir(root+'/workflow',{recursive:true});
@@ -37,20 +37,21 @@ try{
    await new Promise(resolve=>setTimeout(resolve,1000));
   }
  }
- for(const scenario of ['success','invalid-delivery']){
+ for(const scenario of ['success','invalid-delivery','treasury-success','treasury-detail-tamper']){
   const taskId=id+'-'+scenario;
-  let state=await transition(seed(),{type:'create_task',taskId,requestId:taskId,agentId:'atlas',title:'CRE '+scenario,budget:1000,scenario:'success',input:{dataset:'custom-transfers-v1',blockFrom:0,blockTo:10,records:[{block:1,from:'demo.eth',to:'builder.eth',cents:123},{block:2,from:'demo.eth',to:'research.eth',cents:456}]}});
+  let state=await transition(seed(),{type:'create_task',taskId,requestId:taskId,agentId:scenario.startsWith('treasury')?'sage':'atlas',title:'CRE '+scenario,budget:1000,scenario:'success',input:{dataset:'custom-transfers-v1',blockFrom:0,blockTo:10,records:[{block:1,from:'demo.eth',to:'builder.eth',cents:123},{block:2,from:'demo.eth',to:'research.eth',cents:456}]}});
   for(let expectedStep=0;expectedStep<6;expectedStep++)state=await transition(state,{type:'advance',taskId,expectedStep});
   const task=state.tasks[0],bytes=deliveryBytes(task,session.account);
-  const artifact=JSON.parse(bytes.artifactText);if(scenario==='invalid-delivery')artifact.totalCents++;
+  const artifact=JSON.parse(bytes.artifactText);if(scenario==='invalid-delivery')artifact.output.totalCents++;
+  if(scenario==='treasury-detail-tamper'){artifact.output.allocations={'builder.eth':579};artifact.outputHash=resultHash(artifact.output);}
   const artifactText=JSON.stringify(artifact);
   // Only public synthetic test bytes are embedded in these HTTPS endpoint URLs.
   const endpoint=text=>'https://httpbin.org/base64/'+encodeURIComponent(Buffer.from(text).toString('base64'));
-  const spec={datasetUrl:endpoint(bytes.datasetText),datasetHash:bytes.datasetHash,artifactUrl:endpoint(artifactText)};
+  const spec={datasetUrl:endpoint(bytes.datasetText),datasetHash:bytes.datasetHash,artifactUrl:endpoint(artifactText),verification:bytes.verification};
   for(const [url,expected] of [[spec.datasetUrl,bytes.datasetText],[spec.artifactUrl,artifactText]]){const response=await fetch(url,{signal:AbortSignal.timeout(30000)});assert.equal(response.ok,true,'Public synthetic HTTPS evidence unavailable');assert.equal(await response.text(),expected);}
   const funding=await session.fund(task,spec),config={schedule:'*/30 * * * * *',chainName:'ethereum-testnet-sepolia',escrowAddress:local.config.escrow,taskId:bytes.id,gasLimit:'500000',spec};
   console.log('CRE dry-run: '+scenario+' (local RPC, synthetic HTTPS, no broadcast).');
-  const result=await simulate(config),expected=verifyDelivery(bytes.datasetText,artifactText,bytes.id,bytes.datasetHash);
+  const result=await simulate(config),expected=verifyDelivery(bytes.datasetText,artifactText,bytes.id,spec);
   assert.equal(result.code,0,result.output);assert.match(result.output,/Task commitment verified against finalized chain state/);
   assert.ok(result.output.includes('Delivery consensus: accepted='+expected.accepted+' outputHash='+expected.outputHash));
   assert.match(result.output,/CRE report generated/);assert.match(result.output,/Workflow Simulation Result/);
