@@ -1,0 +1,13 @@
+# Workspace reads do not execute work
+
+`GET /api/workspace` returns the authenticated owner's current state. It may initialize an absent workspace through the existing store, but it does not schedule or advance existing tasks/orders, claim jobs, obtain a quote or trigger a payment. Creating an authorized task/order/workflow still schedules its normal background continuation. Explicit owner recovery and the durable consumer remain the recovery mechanisms after a lost continuation.
+
+The old GET handler called `scheduleTasks` and `scheduleOrders`. Ordinary dashboard polling could therefore race an explicit recovery tick for the supplier lease. It could finish a workflow's parent order without advancing the workflow controller. A diagnostic browser run observed HTTP 200 with the order reported as `executing`, the workflow still `running`, and the paid parent later present without a child. That observation and the code path motivated removing the read-side scheduler; the HTTP regression below directly proves the unwanted execution side effect rather than inferring its presence from a UI timeout.
+
+The expanded `demo:queue` checks normal GET requests with the sandbox header but **without** the queue-only fault-injection header. It waits beyond the previous four-second stale threshold, reads the workspace concurrently, then verifies the task's step and durable queue remain unchanged. It also verifies that normal reads leave an already-funded model order queued with no model plan/output. Only subsequent explicit consumer ticks execute it and create one canonical EVM settlement.
+
+- Before-fix report: `outputs/queue-demo-97b0b6a1-eb01-4ffd-84f4-6a42663830a7.json`. The funded order incorrectly became completed during the observation window. Its earlier fresh-task read did not cross the stale threshold, so that subcheck alone is not proof of read-only task behavior.
+- After-fix report: `outputs/queue-demo-ed923a86-6a48-4aab-97ac-d92157050b1a.json`. All six groups passed, including the stale-task read bound, manual/owner isolation, concurrent consumer single settlement, revocation, expiry, invalid delivery, real local model execution and one EVM payment.
+- Website/CRE type checks and production build passed. Raw reports/logs are retained in `outputs/validation-workspace-read-only-2026-10-22/`. The integrated browser follow-up is recorded with the template increment; source/evidence scopes remain separate from public network acceptance and the final full-project demo.
+
+No task or chain history was reset. Polling is observation, not an unattended recovery substitute. A local worker or deployed consumer must run if independent recovery is required; no hosted scheduler was enabled by this change.

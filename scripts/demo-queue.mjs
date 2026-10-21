@@ -16,6 +16,13 @@ const passed=(name,data)=>{report.cases.push({name,...data,passed:true});console
 try {
   await create('success');await create('manual',{executionMode:'manual'});
   let state=await read();assert.equal(state.tasks.find(t=>t.id===id+'-success').step,0);assert.equal((await api('/api/runtime/queue')).queue.pending,1);
+  const observerHeaders={'x-agentos-sandbox':headers['x-agentos-sandbox']};
+  // Exercise the old read scheduler's four-second stale threshold, too.
+  await new Promise(resolve=>setTimeout(resolve,4200));
+  await Promise.all(Array.from({length:3},()=>api('/api/workspace',undefined,observerHeaders)));
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  state=await read();assert.equal(state.tasks.find(t=>t.id===id+'-success').step,0,'Ordinary workspace GET must not advance a queued task.');assert.equal((await api('/api/runtime/queue')).queue.pending,1);
+  passed('ordinary workspace reads do not execute tasks or claim durable jobs',{step:0,queue:(await api('/api/runtime/queue')).queue});
   const other={'x-agentos-sandbox':'other-queue-'+id,'x-agentos-queue-only':'1'};
   assert.equal((await api('/api/runtime/queue',undefined,other)).queue.pending,0);assert.equal((await api('/api/runtime/drain',undefined,other,'POST')).claimed,0);
   assert.equal((await read()).tasks.find(t=>t.id===id+'-success').step,0);
@@ -42,6 +49,8 @@ try {
   const beforeFunding=await api('/api/runtime/queue');await drain();assert.equal((await os.orders()).find(o=>o.id===order.id).status,'awaiting-funding');
   const funding=await session.fundOrder(order,180);await os.activate(order,funding);
   let current=(await os.orders()).find(o=>o.id===order.id);assert.equal(current.status,'queued');assert.equal(current.modelPlan,undefined);assert.equal(current.output,null);
+  await Promise.all(Array.from({length:3},()=>api('/api/workspace',undefined,observerHeaders)));await new Promise(resolve=>setTimeout(resolve,1200));
+  current=(await os.orders()).find(o=>o.id===order.id);assert.equal(current.status,'queued','Ordinary workspace GET must not execute a funded order.');assert.equal(current.modelPlan,undefined);assert.equal(current.output,null);
   const ticks=[];
   for(let i=0;i<12&&!['completed','refunded','paused'].includes(current.status);i++) {
     ticks.push(await drain());current=(await os.orders()).find(o=>o.id===order.id);
