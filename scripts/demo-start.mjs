@@ -8,6 +8,8 @@ function stop(){if(stopping)return;stopping=true;for(const child of children)chi
 for(const signal of ['SIGINT','SIGTERM'])process.on(signal,stop);
 const services=[
  ['chain',8545,'http://127.0.0.1:8545/config','chain:local',d=>d.mode==='local'&&d.chainId===31337],
+ ['mcp',11439,'http://127.0.0.1:11439/health','mcp:local',d=>d.status==='ok'&&d.chainURL==='http://127.0.0.1:8545'],
+ ['plugins',11438,'http://127.0.0.1:11438/health','plugins:local',d=>d.status==='ok'&&d.appOrigin==='http://127.0.0.1:5177'],
  ['model',11435,'http://127.0.0.1:11435/v1/models','model:local',d=>d.data?.some(m=>m.id==='qwen2.5-0.5b-instruct')],
  ['memory',11437,'http://127.0.0.1:11437/v1/models','model:memory',d=>d.data?.some(m=>m.id==='qwen3-embedding-0.6b')],
  ['planning',11436,'http://127.0.0.1:11436/v1/models','model:planning',d=>d.data?.some(m=>m.id==='qwen2.5-3b-instruct')],
@@ -24,8 +26,8 @@ try{
   if(await occupied(port))throw new Error(`Port ${port} is occupied by an unrecognized/unhealthy service. Inspect it; the launcher will not replace it.`);
   if(name==='web'&&!existsSync('dist/server/wrangler.json'))throw new Error('First installation: run npm ci, npm run build and npm run db:local.');
   const log=await open('.sites-runtime/demo/'+name+'.log','a',0o600);
-  const commands={chain:['scripts/local-chain.mjs'],model:['scripts/model-local.mjs'],planning:['scripts/model-planning-local.mjs'],memory:['scripts/model-memory-local.mjs'],supplier:['scripts/supplier-local.mjs'],supplier2:['scripts/supplier-local.mjs'],web:['scripts/run-framework.mjs','dev','--host','127.0.0.1','--port','5177']};
-  const child=spawn(process.execPath,commands[name],{env:{...process.env,...(name==='supplier2'?{AGENTOS_SUPPLIER_PORT:'7462',AGENTOS_SUPPLIER_ID:'local-transfer-supplier-2',AGENTOS_SUPPLIER_NAME:'Second independent transfer supplier',AGENTOS_SUPPLIER_WALLET_ROLE:'seller2',AGENTOS_SUPPLIER_STATE:'.sites-runtime/skill-supplier2'}:name==='supplier'?{AGENTOS_SUPPLIER_PEERS:JSON.stringify(['http://127.0.0.1:7462'])}:{})},stdio:['ignore',log.fd,log.fd]});await log.close();children.push(child);
+  const commands={chain:['scripts/local-chain.mjs'],mcp:['scripts/plugins/mcp-fixture.mjs'],plugins:['scripts/plugins/service.mjs'],model:['scripts/model-local.mjs'],planning:['scripts/model-planning-local.mjs'],memory:['scripts/model-memory-local.mjs'],supplier:['scripts/supplier-local.mjs'],supplier2:['scripts/supplier-local.mjs'],web:['scripts/run-framework.mjs','dev','--host','127.0.0.1','--port','5177']};
+  const child=spawn(process.execPath,commands[name],{env:{...process.env,...(name==='mcp'?{AGENTOS_CHAIN_URL:'http://127.0.0.1:8545'}:name==='plugins'?{AGENTOS_APP_ORIGIN:'http://127.0.0.1:5177',AGENTOS_MCP_SERVERS:JSON.stringify([{id:'local-chain',url:'http://127.0.0.1:11439/mcp',revision:'1.0.0',readTools:['vault_snapshot']}])}:name==='supplier2'?{AGENTOS_SUPPLIER_PORT:'7462',AGENTOS_SUPPLIER_ID:'local-transfer-supplier-2',AGENTOS_SUPPLIER_NAME:'Second independent transfer supplier',AGENTOS_SUPPLIER_WALLET_ROLE:'seller2',AGENTOS_SUPPLIER_STATE:'.sites-runtime/skill-supplier2'}:name==='supplier'?{AGENTOS_SUPPLIER_PEERS:JSON.stringify(['http://127.0.0.1:7462'])}:{})},stdio:['ignore',log.fd,log.fd]});await log.close();children.push(child);
   let exited=false;child.on('exit',()=>{exited=true;});child.on('error',()=>{exited=true;});
   const deadline=Date.now()+180000;
   while(!await probe(url,valid)){if(exited||stopping||Date.now()>deadline)throw new Error(name+' did not become ready. Inspect .sites-runtime/demo/'+name+'.log; no existing service was reset.');await new Promise(resolve=>setTimeout(resolve,750));}

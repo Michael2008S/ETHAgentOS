@@ -7,10 +7,11 @@ import {pendingPurchaseRoutes} from './purchase-route-state.ts';
 import {pendingWorkflows} from './workflows.ts';
 import {workflowDrivesOrder} from './workflow-state.ts';
 
-export type JobKind = 'task' | 'order' | 'workflow' | 'purchase' | 'repair';
+export type JobKind = 'task' | 'order' | 'workflow' | 'purchase' | 'repair' | 'plugin';
 export type Job = { id: string; owner_id: string; kind: JobKind; task_id: string; status: string; lease_token: string; attempts: number; failures: number };
 export function workItems(state: Workspace, now = Date.now()) {
   return [
+    ...(state.pluginJobs??[]).filter(j=>j.status==='queued'||j.status==='running').map(j=>({kind:'plugin' as const,taskId:j.id,deadline:j.deadlineAt,notBefore:j.leaseUntil?Math.min(Date.parse(j.leaseUntil),Date.parse(j.deadlineAt)):0})),
     ...repairWorkItems(state,now),
     ...pendingTasks(state, undefined, new Date(now).toISOString()).map(t => ({kind: 'task' as const, taskId: t.id, deadline: taskDeadline(t), notBefore: 0})),
     ...state.tasks.filter(t => t.executionMode !== 'manual' && t.status === 'paused' && t.paid === 0 && Date.parse(taskDeadline(t)) > now).map(t => ({kind:'task' as const,taskId:t.id,deadline:taskDeadline(t),notBefore:Date.parse(taskDeadline(t))})),
@@ -23,6 +24,10 @@ export const jobId = (owner: string, kind: JobKind, taskId: string) => JSON.stri
 
 /** Workspace CAS and publication are one D1 transaction. Losing reducers publish nothing. */
 export async function commitWithJobs(database: D1Database, owner: string, revision: number, before: Workspace, next: Workspace, now = Date.now()) {
+  const results = await database.batch(workspaceCommitStatements(database,owner,revision,before,next,now));
+  return results[0].meta.changes === 1;
+}
+export function workspaceCommitStatements(database:D1Database,owner:string,revision:number,before:Workspace,next:Workspace,now=Date.now()){
   const data = JSON.stringify(next), prior = new Set(workItems(before, now).map(j => jobId(owner, j.kind, j.taskId)));
   const added = workItems(next, now).filter(j => !prior.has(jobId(owner, j.kind, j.taskId)));
   const statements = [database.prepare('UPDATE agentos_workspaces SET revision = revision + 1, data = ? WHERE owner_id = ? AND revision = ?').bind(data, owner, revision)];
@@ -30,8 +35,7 @@ export async function commitWithJobs(database: D1Database, owner: string, revisi
     SELECT ?, ?, ?, ?, 'pending', ?, ?, ? WHERE EXISTS (SELECT 1 FROM agentos_workspaces WHERE owner_id = ? AND revision = ? AND data = ?)
     ON CONFLICT(id) DO UPDATE SET status = 'pending', available_at = excluded.available_at, failures = 0, last_error = NULL, updated_at = excluded.updated_at
     WHERE agentos_runtime_jobs.status IN ('completed', 'dead')`).bind(jobId(owner,job.kind,job.taskId),owner,job.kind,job.taskId,Math.max(now,job.notBefore),now,now,owner,revision+1,data));
-  const results = await database.batch(statements);
-  return results[0].meta.changes === 1;
+  return statements;
 }
 
 /** Single statement claim: competing requests cannot acquire the same unexpired lease. */

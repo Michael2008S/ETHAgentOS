@@ -1,3 +1,5 @@
+import {runPluginJob} from '@/lib/agentos/plugin-runner';
+import {pluginDatabase,configuredPluginExecutor} from '@/lib/agentos/plugin-runtime';
 import {configuredRepairRuntime} from '@/lib/agentos/workflow-repair-runtime';
 import {runWorkflowRepair} from '@/lib/agentos/workflow-repair-runner';
 import {repairWorkItems} from '@/lib/agentos/workflow-repair-policy';
@@ -32,8 +34,9 @@ export async function POST(request: Request) {
     if(routes.length){const configured=await configuredOrderChain(request);for(const route of routes)routeResults.push(await runPurchaseRoute({read,updateWorkspace},ownerId,route.id,purchaseRouteAccess(configured),configured));}
     const repairs=repairWorkItems((await read(ownerId)).state).filter(p=>p.notBefore<=Date.now()).slice(0,2),repairResults=[];
     if(repairs.length){const runtime=await configuredRepairRuntime(request,before.scope);for(const repair of repairs)repairResults.push(await runWorkflowRepair({read,updateWorkspace},ownerId,repair.taskId,runtime));}
+    const plugins=((await read(ownerId)).state.pluginJobs??[]).filter(j=>j.status==='queued'||j.status==='running').slice(0,2),pluginResults=[];for(const job of plugins)pluginResults.push(await runPluginJob(pluginDatabase(),ownerId,job.id,()=>configuredPluginExecutor(request)));
     const current = await read(ownerId);
-    return Response.json({...current, runtime:{results,orderResults,workflowResults,routeResults,repairResults,pending:repairWorkItems(current.state).length+pendingTasks(current.state).length+pendingOrders(current.state).length+pendingWorkflows(current.state).length+pendingPurchaseRoutes(current.state).length}}, {headers:{'Cache-Control':'no-store'}});
+    return Response.json({...current, runtime:{results,orderResults,workflowResults,routeResults,repairResults,pluginResults,pending:(current.state.pluginJobs??[]).filter(j=>j.status==='queued'||j.status==='running').length+repairWorkItems(current.state).length+pendingTasks(current.state).length+pendingOrders(current.state).length+pendingWorkflows(current.state).length+pendingPurchaseRoutes(current.state).length}}, {headers:{'Cache-Control':'no-store'}});
   } catch (error) {
     return apiFailure(error,'runtime');
   }

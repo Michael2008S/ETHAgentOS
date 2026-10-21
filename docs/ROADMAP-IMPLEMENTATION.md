@@ -10,7 +10,7 @@ User request: complete improvements in the review order, test and commit each it
 | 4 | Two-step workflow and memory references | Persisted dependencies, previous accepted artifact as next input, recovery without duplicate payment | Implemented; item validation below |
 | 5 | Public testnet and CRE settlement | Real wallet, registered workflow execution, actual forwarder payment/refund transactions; account access verified rather than assumed | In progress; receiver/publisher/reconciliation/reusable dispatcher implemented; public acceptance pending |
 | 6 | Third-party onboarding and hosted operation | New skill onboarding with integration acceptance; authenticated deployed consumer, monitoring and failure recovery | In progress; new skill and scoped consumer operations locally accepted; actual hosted operation remains open |
-| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 35-step HTTP/D1/EVM/model/supplier/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical 23-stage pass at aae3f7e remains scoped to that source. |
+| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 36-step HTTP/D1/EVM/model/supplier/plugin/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical passes remain scoped to their tested source. |
 
 The complete demo is a final gate after the individual changes. Public workflow deployment depends on actual account capabilities and configured infrastructure; local simulation does not satisfy item 5. No unattended schedule is enabled merely to represent deployment.
 
@@ -306,3 +306,18 @@ The complete demo is a final gate after the individual changes. Public workflow 
 本项独立协议见 [SEMANTIC-MEMORY](SEMANTIC-MEMORY.md)。语义检索是显式审阅工具，不代表自动将任意历史注入所有规划、模型推理证明或加密记忆。当前完整演示新增 demo:memory，现为 35 步，最终整套验收仍在其余功能完成后执行。通用插件、开放市场/信誉路由、独立钱包/细粒度链上授权与公网/真实 DON/托管运维仍待继续；此前新 HTTPS 证据入口的官方 CLI 网络验收也保持待完成。继续本地交付，不发布站点、启用托管调度或公共链广播，总体目标保持进行中。
 
 本项最终回归：198/198 Node、19/19 Chromium、6/6 CRE SDK 测试（92 assertions）、网站/CRE 类型检查和生产构建通过；六项语义协议/SQLite 测试包含任务摘要不发送明细及 SDK 拒绝畸形/越界响应。首轮完整浏览器 17/19，通过项保留；两项旧测试因新增折叠区导致 summary 选择器不唯一，在采购前停止。收紧为面板自身展开按钮后完整 19 项通过。doctor 新增嵌入模型探测通过，默认工作区暂无身份的提醒保留，不影响隔离测试工作区已验证的身份/订单。原始日志、模型工件描述、真实报告、迁移备份记录、失败/通过截图和逐文件 SHA-256 见 outputs/validation-semantic-memory-2026-10-22/verification.json。
+
+## 后续能力完善：通用隔离插件与只读 MCP（2026-10-22，香港时间）
+
+- [x] 通用有界 JSON/JavaScript manifest、不可变版本、输入/输出 schema、独立审阅 verifier、实际 QuickJS WASM 进程内隔离及可中断 worker。按线程 CPU、墙钟、堆/栈和调用次数限制资源；等待 MCP 不消耗 guest CPU 额度。
+- [x] 官方 MCP SDK HTTP initialize/list/call，运营者配置固定端点、只读工具白名单、完整原始工具声明摘要及调用前重查。密钥不进入 guest、manifest 或凭证；拒绝任意端点、重定向、写工具、模块/主机对象、悬空调用及原始 schema 文档漂移。
+- [x] owner 安装/授权/执行/撤销/取消/API/SDK、中英文 Agents 面板、同编号丢响应恢复及最后一次额度重试。四张 D1 侧表与工作区 CAS、次数预留及持久队列原子提交；运行 lease、权限 epoch、期限和源代码指纹约束迟到结果，服务重启后复用不可变执行日志。
+- [x] 仅当前 5887 数据库备份后追加迁移 0005，迁移前后既有工作区/队列摘要一致。全新 5987/9355/8271/8272/5988/5989 环境实际启动、全迁移、两种插件与实际新链 Vault 读取通过；只停止该临时启动器，恢复原 current.json，目录与历史保留。
+
+最终 206/206 Node、20/20 Chromium、6/6 CRE SDK（92 assertions）、网站/CRE 类型检查和生产构建通过。六组最终真实 HTTP/D1/SDK/QuickJS/官方 MCP/本地 EVM 只读验收：outputs/plugin-demo-cfcd4edf-cc85-4896-842f-af81473a3e87.json。两项完成、两项校验拒绝、两项撤权取消，6 个队列作业完成且 pending/leased/dead 均为零；链订单、链交易与买方签名新增均为零，Vault 余额和区块高度不变。移动端结果截图已查看。doctor 在停模型前核验全部服务 ready=true；默认本地工作区未绑定身份的提醒保留，不影响隔离测试工作区证据。
+
+保留原始失败与修复记录：原始 MCP schema 文档改动曾未改变摘要，改为完整声明 pin；冷启动正常执行曾误用 600ms 墙钟，改为正常 5s 并另保留 600ms 死循环中止测试；新增真实 250ms MCP 等待、25ms CPU 用例。完整八项隔离引擎回归及最终 206 项均通过。原类型/JSX、迁移数据库选择及中间测试失败不计为通过，日志归档于 outputs/validation-plugins-2026-10-22/。
+
+按用户新增的机器资源要求，核验进程归属后停止七套旧隔离 demo，共 45 个进程、约 970 MiB 当时 RSS；保留数据库/部署历史。全部模型相关验收结束后停止本项目三个空闲模型及启动器，模型文件保留。后续只按需启动依赖，每项完成再清理，不停止编辑器、Codex 或其他项目进程。
+
+协议见 PLUGINS.md。此项不授予插件支付权，不声称通用插件已有付费工作流或 DON 验收；下一项须实际打通通用 JSON 插件的预算、托管、独立验收、付款/退款、成果依赖与恢复。当前完整演示为 36 步，仍待后续实现后整套运行。公网验收和托管调度按用户要求暂缓，不发布站点或公共链广播。

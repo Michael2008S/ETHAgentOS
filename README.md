@@ -209,3 +209,5 @@ Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/
 付款前真实报价比较：`npm run demo:quote-planning` 验证双供应商独立签名价格、真实 Qwen 建议、原报价采用、失效拒绝与 Vault 付款。协议及限制见 [PURCHASE-COMPARISON.md](docs/PURCHASE-COMPARISON.md)。退款确认后的自动改购现已提供，见下方说明。
 
 自动改购：`npm run demo:purchase-routes` 验证审核多个签名报价后，确认原订单退款再购买另一家供应商服务；预留全部尝试的总额度，支持崩溃恢复、取消和撤销。SDK、界面与验证边界见 [PURCHASE-ROUTES.md](docs/PURCHASE-ROUTES.md)。
+
+通用插件执行层：智能体页可安装处理通用 JSON 的 JavaScript 清单，审阅独立校验器和只读 MCP 工具后授予次数/期限，再通过持久队列执行。QuickJS WASM 隔离、源码/工具声明绑定、撤权和晚到结果拒绝、工作区隔离及真实 MCP 读取已接通。运行 `npm run mcp:local`、`npm run plugins:local`、`npm run demo:plugins`；协议、迁移和验收边界见 [PLUGINS](docs/PLUGINS.md)。插件作业当前不进入链上付费或原有 DAG 采购工作流。

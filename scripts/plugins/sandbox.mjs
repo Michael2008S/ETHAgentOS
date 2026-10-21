@@ -1,0 +1,19 @@
+import {Worker} from 'node:worker_threads';
+import {boundedJson,validatePluginValue,pluginManifestSchema,pluginManifestHash,pluginExecutionTerms} from '../../lib/agentos/plugin-protocol.ts';
+import {digest} from '../../lib/agentos/engine.ts';
+
+export async function isolatedJavaScript({code,input,limits,verify=false},callTool){
+ boundedJson(input,65536);
+ return new Promise((resolve,reject)=>{
+  const worker=new Worker(new URL('./sandbox-worker.mjs',import.meta.url),{workerData:{code,input,limits,verify},env:{},execArgv:[],resourceLimits:{maxOldGenerationSizeMb:64,maxYoungGenerationSizeMb:16,stackSizeMb:4}});let terminal=false,violated=false,pendingCalls=0,hostError;const active=new Set(),controller=new AbortController();
+  const finish=(error,value)=>{if(terminal)return;terminal=true;clearTimeout(timer);controller.abort();void worker.terminate();error?reject(error):resolve(value);},failure=(reason='worker-failure')=>Object.assign(new Error('Plugin code failed or exceeded its execution limits.'),{code:hostError?.code==='UNAVAILABLE'?'UNAVAILABLE':'PLUGIN_REJECTED',reason}),timer=setTimeout(()=>finish(failure('wall-limit')),limits.wallMs);
+  worker.on('message',message=>{if(terminal)return;if(message.call){const call=message.call;if(verify||!Number.isSafeInteger(call.ordinal)||call.ordinal<0||call.ordinal>=limits.maxToolCalls||active.has(call.ordinal)){violated=true;finish(failure());return;}active.add(call.ordinal);pendingCalls++;void Promise.resolve().then(()=>{if(terminal)throw Error();const args=JSON.parse(call.json);boundedJson(args);return callTool(call.serverId,call.name,args,call.ordinal,controller.signal);}).then(result=>{boundedJson(result,8192);if(!terminal)worker.postMessage({ordinal:call.ordinal,json:JSON.stringify(result)});}).catch(error=>{hostError=error;violated=true;if(!terminal)worker.postMessage({ordinal:call.ordinal,error:true});}).finally(()=>{pendingCalls--;});return;}if(message.error||violated||pendingCalls){finish(failure(message.reason??(violated?'tool-refused':pendingCalls?'orphan-call':'vm-rejected')));return;}try{const value=JSON.parse(message.json);boundedJson(value,16384);finish(null,value);}catch{finish(failure());}});
+  worker.once('error',()=>finish(failure()));worker.once('exit',()=>{if(!terminal)finish(failure());});
+ });
+}
+export async function executePlugin(request,callTool){
+ const manifest=pluginManifestSchema.parse(request.manifest);if(await pluginManifestHash(manifest)!==request.manifestHash||await digest(request.input)!==request.inputHash)throw Error('Plugin request commitment differs.');validatePluginValue(manifest.input,request.input);
+ const transcript=[],output=await isolatedJavaScript({code:manifest.code,input:request.input,limits:manifest.limits},async(serverId,name,args,ordinal,signal)=>{const tool=manifest.tools.find(t=>t.serverId===serverId&&t.name===name);if(!tool)throw Error('Unapproved plugin capability.');const result=await callTool({...tool,arguments:args,ordinal,signal});boundedJson(result,8192);transcript.push({ordinal,serverId,name,toolHash:tool.toolHash,arguments:args,result});if(JSON.stringify(transcript).length>32768)throw Error('Tool transcript exceeds its limit.');return result;});validatePluginValue(manifest.output,output,8192);transcript.sort((a,b)=>a.ordinal-b.ordinal);
+ const accepted=await isolatedJavaScript({code:manifest.verifier,input:{input:request.input,output,transcript},limits:manifest.limits,verify:true});if(accepted!==true)throw Error('The reviewed independent plugin verifier rejected the output.');
+ const terms={version:'agentos.plugin-execution.v1',jobId:request.jobId,scope:request.scope,manifestHash:request.manifestHash,inputHash:request.inputHash,runtimeHash:request.runtimeHash,output,transcript,verification:{accepted:true,verifierHash:await digest(manifest.verifier)}};return {...terms,digest:await digest(terms)};
+}

@@ -50,3 +50,16 @@ export const memoryVectors=sqliteTable('agentos_memory_vectors',{
 export const memoryRequests=sqliteTable('agentos_memory_requests',{
  ownerId:text('owner_id').notNull(),id:text('id').notNull(),action:text('action').notNull(),payloadHash:text('payload_hash').notNull(),status:text('status').notNull(),leaseToken:text('lease_token'),leaseUntil:integer('lease_until'),result:text('result_json'),createdAt:integer('created_at').notNull(),
 },table=>[primaryKey({columns:[table.ownerId,table.id]}),index('memory_requests_owner').on(table.ownerId,table.createdAt)]);
+
+export const plugins=sqliteTable('agentos_plugins',{
+ ownerId:text('owner_id').notNull(),id:text('id').notNull(),manifestHash:text('manifest_hash').notNull(),data:text('data').notNull(),createdAt:integer('created_at').notNull(),
+},table=>[primaryKey({columns:[table.ownerId,table.id]})]);
+export const pluginGrants=sqliteTable('agentos_plugin_grants',{
+ ownerId:text('owner_id').notNull(),pluginId:text('plugin_id').notNull(),data:text('data').notNull(),
+},table=>[primaryKey({columns:[table.ownerId,table.pluginId]})]);
+export const pluginGrantRequests=sqliteTable('agentos_plugin_grant_requests',{
+ ownerId:text('owner_id').notNull(),requestId:text('request_id').notNull(),payloadHash:text('payload_hash').notNull(),data:text('data').notNull(),
+},table=>[primaryKey({columns:[table.ownerId,table.requestId]})]);
+export const pluginExecutions=sqliteTable('agentos_plugin_executions',{
+ ownerId:text('owner_id').notNull(),id:text('id').notNull(),workspaceHash:text('workspace_hash').notNull(),data:text('data').notNull(),createdAt:integer('created_at').notNull(),
+},table=>[primaryKey({columns:[table.ownerId,table.id]}),index('plugin_execution_scope').on(table.workspaceHash,table.id),index('plugin_execution_owner').on(table.ownerId,table.createdAt)]);
