@@ -3,6 +3,8 @@ import { SKILLS } from './types.ts';
 import { DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS, taskIsOverdue } from './lifecycle.ts';
 import {assertSourceInput,sourceSummary} from './transfer-source.ts';
 import {acceptedMemoryRecords} from '../../cre/workflow/verify.ts';
+import {assertSkillDefinition,skillDefinitionHash,type SkillDefinition} from './skill-definition.ts';
+import {executeRankedFlows} from './ranked-flows.ts';
 
 export class DomainError extends Error { code: string; constructor(message: string, code = 'INVALID_COMMAND') { super(message); this.code = code; } }
 // Public, deterministic fixture. Never represented as live blockchain data.
@@ -86,6 +88,7 @@ export function normalizeInput(input?: TaskInput): TaskInput {
   if (input === undefined) return { dataset:'eth-shenzhen-fixture-v1', blockFrom:7210000, blockTo:7210100 };
   if (!input || !['eth-shenzhen-fixture-v1','custom-transfers-v1'].includes(input.dataset) || !Number.isSafeInteger(input.blockFrom) || !Number.isSafeInteger(input.blockTo) || input.blockFrom < 0 || input.blockTo < input.blockFrom) throw new DomainError('Invalid input dataset or block range.');
   const normalized: TaskInput = {dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo};
+  if(input.skillDefinition!==undefined){try{assertSkillDefinition(input.skillDefinition);normalized.skillDefinition=structuredClone(input.skillDefinition);}catch{throw new DomainError('Invalid bounded skill definition.');}}
   if (input.dataset === 'eth-shenzhen-fixture-v1') {
     if (input.records !== undefined||input.source!==undefined||input.memory!==undefined) throw new DomainError('Fixture input cannot override records or source.');
     return normalized;
@@ -104,6 +107,8 @@ export function normalizeInput(input?: TaskInput): TaskInput {
   return normalized;
 }
 export function expectedOutput(t: Pick<Task, 'skill' | 'input'>): Record<string, unknown> {
+  if(t.input.skillDefinition){if(t.input.skillDefinition.id!==t.skill)throw new DomainError('Skill definition differs from the selected service.');return {...executeRankedFlows(t.input.skillDefinition,{dataset:t.input.dataset,blockFrom:t.input.blockFrom,blockTo:t.input.blockTo,records:t.input.records??DATASET}),...(t.input.source?{source:sourceSummary(assertSourceInput(t.input.source,t.input),t.skill)}:{})};}
+  if(!SKILLS.some(s=>s.id===t.skill))throw new DomainError('An extension skill requires its committed definition.');
   const rows = (t.input.records ?? DATASET).filter(r => r.block >= t.input.blockFrom && r.block <= t.input.blockTo);
   const base = { dataset: t.input.dataset, blockFrom: t.input.blockFrom, blockTo: t.input.blockTo, transferCount: rows.length, totalCents: rows.reduce((sum, r) => sum + r.cents, 0),...(t.input.source?{source:sourceSummary(assertSourceInput(t.input.source,t.input),t.skill)}:{}) };
   if (t.skill === 'event-analysis') return { ...base, uniqueRecipients: new Set(rows.map(r => r.to)).size };
@@ -112,8 +117,18 @@ export function expectedOutput(t: Pick<Task, 'skill' | 'input'>): Record<string,
   return { ...base, allocations: Object.fromEntries(allocations) };
 }
 // Every adapter tool call passes through this capability boundary.
-export function authorizeOperation(skill: Task['skill'], operation: string) {
-  if (!SKILLS.find(s => s.id === skill)?.permissions.includes(operation)) throw new DomainError(`${operation} is outside the skill capability grant.`, 'CAPABILITY_DENIED');
+export function authorizeOperation(skill: Task['skill'], operation: string, definition?:SkillDefinition) {
+  let permissions=SKILLS.find(s=>s.id===skill)?.permissions;
+  if(definition){try{assertSkillDefinition(definition);if(definition.id!==skill)throw new Error();permissions=definition.capabilities;}catch{throw new DomainError('Skill capability definition differs.','CAPABILITY_DENIED');}}
+  if (!permissions?.includes(operation)) throw new DomainError(`${operation} is outside the skill capability grant.`, 'CAPABILITY_DENIED');
+}
+export function skillCatalog(state:Workspace){return [...SKILLS,...(state.skillDefinitions??[]).map(d=>({id:d.id as Task['skill'],name:d.name,description:d.description,permissions:d.capabilities,version:d.version}))];}
+/** Registering a definition does not grant permission to run it. Bind exact bytes before funding. */
+export function resolveSkillInput(state:Workspace,skill:Task['skill'],raw?:TaskInput):TaskInput{
+ const input=normalizeInput(raw),definition=state.skillDefinitions?.find(d=>d.id===skill);
+ if(SKILLS.some(s=>s.id===skill)){if(input.skillDefinition)throw new DomainError('Built-in skills cannot replace their acceptance definition.');return input;}
+ if(!definition||input.skillDefinition&&skillDefinitionHash(input.skillDefinition)!==skillDefinitionHash(definition))throw new DomainError('An installed matching skill definition is required.','FORBIDDEN');
+ return {...input,skillDefinition:structuredClone(definition)};
 }
 export function assertInvariants(s: Workspace) {
   const w = wallet(s);
@@ -131,7 +146,9 @@ export function assertInvariants(s: Workspace) {
 export async function transition(input: Workspace, command: Command, now = new Date().toISOString()): Promise<Workspace> {
   const s = structuredClone(input);
   if (command.type === 'create_task') {
-    const taskInput = normalizeInput(command.input);
+    const service=s.agents.find(a=>a.id===command.agentId);
+    if(!service)throw new DomainError('Unknown agent.');
+    const taskInput = resolveSkillInput(s,service.skill,command.input);
     const prior = s.tasks.find(t => t.requestId === command.requestId);
     if (prior) {
       if (prior.id !== command.taskId || prior.agentId !== command.agentId || prior.title !== command.title.trim() || prior.budget !== command.budget || prior.scenario !== command.scenario || (prior.executionMode ?? 'automatic') !== (command.executionMode ?? 'automatic') || (prior.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS) !== (command.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS) || canonical(prior.input) !== canonical(taskInput)) throw new DomainError('Request ID was already used with different task parameters.', 'IDEMPOTENCY_CONFLICT');
@@ -151,7 +168,7 @@ export async function transition(input: Workspace, command: Command, now = new D
     const timeoutSeconds = command.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS;
     if (!Number.isSafeInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > MAX_TIMEOUT_SECONDS) throw new DomainError('Execution window must be 1–86400 whole seconds.');
     const task: Task = { timeoutSeconds, deadlineAt: new Date(Date.parse(now) + timeoutSeconds * 1000).toISOString(), executionMode: command.executionMode ?? 'automatic', id: command.taskId, requestId: command.requestId, title, agentId: agent.id, skill: agent.skill, scenario: command.scenario, budget: command.budget, quote: agent.price, reserved: 0, paid: 0, step: 0, status: 'queued', createdAt: now, updatedAt: now, input: taskInput, inputHash: await digest(taskInput), output: null, outputHash: null, receipt: null, events: [], policySnapshot: null };
-    event(task, now, 'Task accepted', `Assigned to ${agent.name}. ${taskInput.records ? 'Custom input adapter' : 'Local fixture adapter'} ${agent.skill}@1.0.0.`);
+    event(task, now, 'Task accepted', `Assigned to ${agent.name}. ${taskInput.records ? 'Custom input adapter' : 'Local fixture adapter'} ${agent.skill.startsWith('ext:')?agent.skill:agent.skill+'@1.0.0'}.`);
     s.tasks.unshift(task);
   } else if (command.type === 'update_agent') {
     const agent = s.agents.find(a => a.id === command.agentId);
@@ -168,7 +185,7 @@ export async function transition(input: Workspace, command: Command, now = new D
     }
   } else if (command.type === 'update_policy') {
     money(command.policy.maxTaskBudget, 'Per-task limit'); money(command.policy.dailyBudget, 'Daily limit');
-    if (typeof command.policy.active !== 'boolean' || !Array.isArray(command.policy.allowedSkills) || command.policy.allowedSkills.some(k => !SKILLS.some(x => x.id === k))) throw new DomainError('Invalid policy.');
+    if (typeof command.policy.active !== 'boolean' || !Array.isArray(command.policy.allowedSkills) || command.policy.allowedSkills.some(k => !skillCatalog(s).some(x => x.id === k))) throw new DomainError('Invalid policy.');
     s.policy = { ...command.policy, allowedSkills: [...new Set(command.policy.allowedSkills)] };
   } else if (command.type === 'topup') {
     money(command.amount, 'Allocation', 100000);
@@ -176,9 +193,14 @@ export async function transition(input: Workspace, command: Command, now = new D
     const id = 'deposit:' + command.requestId;
     if (s.ledger.some(l => l.id === id && l.amount !== command.amount)) throw new DomainError('Request ID was already used with a different allocation.', 'IDEMPOTENCY_CONFLICT');
     if (!s.ledger.some(l => l.id === id)) s.ledger.push({ id, taskId: null, kind: 'deposit', amount: command.amount, at: now, note: 'Sandbox allocation · no real funds' });
+  } else if (command.type === 'register_skill') {
+    try{assertSkillDefinition(command.definition);}catch{throw new DomainError('Invalid bounded skill definition.');}
+    const prior=s.skillDefinitions?.find(d=>d.id===command.definition.id);
+    if(prior&&skillDefinitionHash(prior)!==skillDefinitionHash(command.definition))throw new DomainError('A skill version is immutable. Publish a new version identifier.','IDEMPOTENCY_CONFLICT');
+    if(!prior){if((s.skillDefinitions?.length??0)>=20)throw new DomainError('Workspace skill definition limit reached.');s.skillDefinitions=[...(s.skillDefinitions??[]),structuredClone(command.definition)];}
   } else if (command.type === 'register_agent') {
     const name = command.agent.name.trim();
-    if (!name || name.length > 40 || command.agent.description.length > 240 || !SKILLS.some(x => x.id === command.agent.skill)) throw new DomainError('Invalid agent profile.');
+    if (!name || name.length > 40 || command.agent.description.length > 240 || !skillCatalog(s).some(x => x.id === command.agent.skill)) throw new DomainError('Invalid agent profile.');
     if (!command.requestId || command.requestId.length > 128) throw new DomainError('Invalid agent identifier.');
     const id = `custom-${command.requestId}`;
     const prior = s.agents.find(a => a.id === id);
@@ -214,12 +236,12 @@ export async function transition(input: Workspace, command: Command, now = new D
         else { t.reserved = t.budget; ledger(s, t, now, 'reserve', t.budget, 'Task budget reserved'); event(t, now, 'Budget reserved', `${(t.budget / 100).toFixed(2)} testUSD locked against concurrent spending.`, 'success'); t.step = 2; }
       } else if (t.step === 2) {
         try {
-          authorizeOperation(t.skill, 'dataset.read');
+          authorizeOperation(t.skill, 'dataset.read',t.input.skillDefinition);
           if (t.scenario === 'injection') {
             event(t, now, 'Untrusted tool instruction detected', 'Fixture requested wallet.transfer to an unapproved recipient. Tool operations are checked against the skill capability grant.', 'warning');
-            authorizeOperation(t.skill, 'wallet.transfer');
+            authorizeOperation(t.skill, 'wallet.transfer',t.input.skillDefinition);
           }
-          authorizeOperation(t.skill, 'artifact.write');
+          authorizeOperation(t.skill, 'artifact.write',t.input.skillDefinition);
           t.output = expectedOutput(t);
           if (t.scenario === 'invalid-delivery') t.output.totalCents = Number(t.output.totalCents) + 1;
           t.outputHash = await digest(t.output);

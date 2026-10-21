@@ -714,5 +714,16 @@
   "Select Vault session": "选择 Vault 会话",
   "Recover workflow": "继续执行工作流",
   "Committed input and delivery artifacts will be published to the configured public HTTPS evidence service. Submit only data you intend to make public. Confirmed settlement receipts are discovered automatically.": "固定的输入与交付成果会发布到已配置的公开 HTTPS 证据服务。请仅提交你愿意公开的数据。运行时会自动发现并核验已确认的结算回执。",
-  "Public testnet requires a bound CRE receiver identity.": "公共测试网需要配置已绑定工作流身份的 CRE 接收合约。"
+  "Public testnet requires a bound CRE receiver identity.": "公共测试网需要配置已绑定工作流身份的 CRE 接收合约。",
+  "Install a versioned skill": "安装版本化技能",
+  "Import a bounded transfer-analysis definition. Installation does not grant execution permission.": "导入受限的转账分析定义。安装后仍需单独授权执行。",
+  "Skill definition JSON": "技能定义 JSON",
+  "Skill installed. Register a service and allow the skill in Permissions.": "技能已安装。请注册服务，并在权限页允许该技能。",
+  "Skill definition is invalid or too large.": "技能定义无效或文件过大。",
+  "Definitions are immutable. Changes require a new version.": "定义不可覆盖，修改时需要发布新版本。",
+  "Install skill": "安装技能",
+  "Installed extension skills": "已安装的扩展技能",
+  "Installed skill adapter": "已安装的技能适配器",
+  "skill adapters": "种技能适配器",
+  " services": " 个服务"
 }

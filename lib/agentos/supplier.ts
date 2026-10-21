@@ -1,3 +1,4 @@
+import {skillIdSchema,skillDefinitionSchema,deliveryVerificationSchema} from './skill-schema.ts';
 import {acceptedArtifactSchema} from './artifact-memory.ts';
 import {transferSourceSchema,sourceSummarySchema} from './transfer-source.ts';
 import { z } from 'zod';
@@ -8,11 +9,11 @@ import { inputEvidence } from '../../sdk/wallet.ts';
 import type { ChainOrder } from './orders.ts';
 import type { Skill } from './types.ts';
 
-const address=z.string().regex(/^0x[0-9a-fA-F]{40}$/).refine(s=>!/^0x0{40}$/.test(s)).transform(s=>s.toLowerCase() as Address),hash=z.string().regex(/^0x[0-9a-f]{64}$/).transform(s=>s as Hex),integer=z.number().int().nonnegative().safe(),skill=z.enum(['event-analysis','treasury-report']);
-const configSchema=z.object({url:z.string().max(4096),id:z.string().regex(/^[a-z0-9-]{1,64}$/),name:z.string().min(1).max(80),revision:z.string().min(1).max(80),signer:address,skills:z.array(skill).min(1).max(2).refine(v=>new Set(v).size===v.length),timeoutMs:z.number().int().min(1000).max(60000).default(30000)}).strict();
+const address=z.string().regex(/^0x[0-9a-fA-F]{40}$/).refine(s=>!/^0x0{40}$/.test(s)).transform(s=>s.toLowerCase() as Address),hash=z.string().regex(/^0x[0-9a-f]{64}$/).transform(s=>s as Hex),integer=z.number().int().nonnegative().safe(),skill=skillIdSchema;
+const configSchema=z.object({url:z.string().max(4096),id:z.string().regex(/^[a-z0-9-]{1,64}$/),name:z.string().min(1).max(80),revision:z.string().min(1).max(80),signer:address,skills:z.array(skill).min(1).max(22).refine(v=>new Set(v).size===v.length),timeoutMs:z.number().int().min(1000).max(60000).default(30000)}).strict();
 export type SupplierConfiguration=z.infer<typeof configSchema>;
 export type SupplierDescriptor={id:string;name:string;revision:string;signer:Address;skills:Skill[];configHash:Hex};
-const descriptorSchema=z.object({id:z.string().max(64),name:z.string().max(80),revision:z.string().max(80),signer:address,skills:z.array(skill).min(1).max(2),configHash:hash}).strict();
+const descriptorSchema=z.object({id:z.string().max(64),name:z.string().max(80),revision:z.string().max(80),signer:address,skills:z.array(skill).min(1).max(22),configHash:hash}).strict();
 export const SUPPLIER_METADATA_KEY='agentos.supplier.v1';
 export const supplierMetadata=(descriptor:SupplierDescriptor)=>encodeAbiParameters(parseAbiParameters('address,bytes32'),[descriptor.signer,descriptor.configHash]);
 export function parseSupplierConfiguration(raw:unknown,allowLocal=false):SupplierConfiguration{
@@ -22,8 +23,8 @@ export function parseSupplierConfiguration(raw:unknown,allowLocal=false):Supplie
  return {...config,url:url.href};
 }
 export async function supplierDescriptor(config:SupplierConfiguration):Promise<SupplierDescriptor>{return {id:config.id,name:config.name,revision:config.revision,signer:config.signer,skills:config.skills,configHash:await digest({version:1,...config}) as Hex};}
-const inputSchema=z.object({dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:integer,blockTo:integer,source:transferSourceSchema.optional(),memory:acceptedArtifactSchema.optional(),records:z.array(z.object({block:integer,from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:integer}).strict()).min(1).max(100).optional()}).strict();
-export const supplierRequestSchema=z.object({version:z.literal('agentos.skill-request.v1'),orderId:z.string().min(1).max(128),taskId:hash,chainId:z.number().int().positive().safe(),escrow:address,buyer:address,paymentBuyer:address.optional(),seller:address,quoteCents:z.number().int().positive().safe(),chainDeadline:z.string().regex(/^\d{1,20}$/),fundingTransactionHash:hash,scenario:z.enum(['success','injection','invalid-delivery','interruption']),skill,input:inputSchema,inputHash:hash,spec:z.object({datasetUrl:z.string().max(4096),artifactUrl:z.string().max(4096),datasetHash:hash,verification:z.object({version:z.literal('agentos.delivery.v2'),skill,skillVersion:z.literal('1.0.0'),dataset:z.string(),blockFrom:integer,blockTo:integer,sourceHash:hash.optional(),memoryHash:hash.optional()}).strict().optional()}).strict(),identity:z.object({registry:address,registryAgentId:z.string().regex(/^(0|[1-9][0-9]{0,77})$/),owner:address,wallet:address,documentHash:hash}).strict(),operations:z.tuple([z.literal('dataset.read'),z.literal('artifact.write')]),supplier:descriptorSchema}).strict();
+const inputSchema=z.object({skillDefinition:skillDefinitionSchema.optional(),dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:integer,blockTo:integer,source:transferSourceSchema.optional(),memory:acceptedArtifactSchema.optional(),records:z.array(z.object({block:integer,from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:integer}).strict()).min(1).max(100).optional()}).strict();
+export const supplierRequestSchema=z.object({version:z.literal('agentos.skill-request.v1'),orderId:z.string().min(1).max(128),taskId:hash,chainId:z.number().int().positive().safe(),escrow:address,buyer:address,paymentBuyer:address.optional(),seller:address,quoteCents:z.number().int().positive().safe(),chainDeadline:z.string().regex(/^\d{1,20}$/),fundingTransactionHash:hash,scenario:z.enum(['success','injection','invalid-delivery','interruption']),skill,input:inputSchema,inputHash:hash,spec:z.object({datasetUrl:z.string().max(4096),artifactUrl:z.string().max(4096),datasetHash:hash,verification:deliveryVerificationSchema.optional()}).strict(),identity:z.object({registry:address,registryAgentId:z.string().regex(/^(0|[1-9][0-9]{0,77})$/),owner:address,wallet:address,documentHash:hash}).strict(),operations:z.tuple([z.literal('dataset.read'),z.literal('artifact.write')]),supplier:descriptorSchema}).strict();
 export type SupplierRequest=z.infer<typeof supplierRequestSchema>;
 export const supplierJobId=(request:SupplierRequest)=>keccak256(stringToHex(canonical({version:1,chainId:request.chainId,escrow:request.escrow,taskId:request.taskId,supplier:request.supplier.configHash})));
 export async function supplierRequest(order:ChainOrder):Promise<SupplierRequest>{
@@ -32,7 +33,7 @@ export async function supplierRequest(order:ChainOrder):Promise<SupplierRequest>
  if(await digest(normalizeInput(request.input))!==request.inputHash)throw new DomainError('Supplier input commitment differs.','SUPPLIER_REJECTED');return request;
 }
 const outputBase={source:sourceSummarySchema.optional(),dataset:z.string().max(64),blockFrom:integer,blockTo:integer,transferCount:integer,totalCents:integer};
-export const supplierDeliverySchema=z.object({payload:z.object({version:z.literal('agentos.skill-delivery.v1'),requestHash:hash,configHash:hash,jobId:hash,outputHash:hash,output:z.union([z.object({...outputBase,uniqueRecipients:integer}).strict(),z.object({...outputBase,allocations:z.record(integer)}).strict()]),issuedAt:z.string().datetime()}).strict(),signature:z.string().regex(/^0x[0-9a-fA-F]{130}$/).transform(v=>v as Hex)}).strict();
+export const supplierDeliverySchema=z.object({payload:z.object({version:z.literal('agentos.skill-delivery.v1'),requestHash:hash,configHash:hash,jobId:hash,outputHash:hash,output:z.union([z.object({...outputBase,uniqueRecipients:integer}).strict(),z.object({...outputBase,allocations:z.record(integer)}).strict(),z.object({...outputBase,groupBy:z.enum(['from','to']),accountCount:integer,topAccounts:z.array(z.object({account:z.string().min(1).max(128),amountCents:integer,shareBps:integer.max(10000)}).strict()).max(10),thresholdBps:integer.max(10000),concentrated:z.boolean()}).strict()]),issuedAt:z.string().datetime()}).strict(),signature:z.string().regex(/^0x[0-9a-fA-F]{130}$/).transform(v=>v as Hex)}).strict();
 export type SupplierDelivery=z.infer<typeof supplierDeliverySchema>;
 export const supplierReceiptMessage=(payload:SupplierDelivery['payload'])=>'AgentOS skill delivery v1\n'+canonical(payload);
 export async function verifySupplierDelivery(raw:unknown,request:SupplierRequest):Promise<SupplierDelivery>{

@@ -15,7 +15,7 @@ if(resume>=0&&(!resumeFile||!resumeFile.startsWith(resolve('outputs')+'/full-dem
 const directory=resumeFile?dirname(resumeFile):resolve('outputs/full-demo-'+crypto.randomUUID());
 await mkdir(directory,{recursive:true});
 const report=resumeFile?JSON.parse(await readFile(resumeFile,'utf8')):{startedAt:new Date().toISOString(),scope:'local HTTP/D1/EVM and authenticated CRE dry-run; no broadcast',runtime,steps:[]};
-const steps=['demo:doctor','test:api','demo','demo:deadline','demo:wallet','demo:reconcile','demo:prefund','demo:vault','demo:workflow','demo:queue','demo:chain','demo:data','demo:model','demo:identity','demo:supplier','demo:planning','demo:showcase','demo:evidence','demo:cre','demo:cre-dispatcher','demo:doctor'];
+const steps=['demo:doctor','test:api','demo','demo:deadline','demo:wallet','demo:reconcile','demo:prefund','demo:vault','demo:workflow','demo:queue','demo:chain','demo:data','demo:model','demo:identity','demo:supplier','demo:skill','demo:planning','demo:showcase','demo:evidence','demo:cre','demo:cre-dispatcher','demo:doctor'];
 if(!Array.isArray(report.steps)||report.steps.some((step,index)=>step.command!==steps[index]))throw new Error('Report does not match this demo sequence.');
 const failed=report.steps.findIndex(step=>step.code!==0),startIndex=failed>=0?failed:report.steps.length;
 if(failed>=0){report.failedAttempts=[...(report.failedAttempts??[]),...report.steps.slice(failed)];report.steps=report.steps.slice(0,failed);}

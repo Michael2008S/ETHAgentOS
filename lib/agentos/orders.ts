@@ -2,7 +2,7 @@ import type { Address, Hex } from 'viem';
 import type { WalletDeployment } from '../../sdk/wallet.ts';
 import type { ChainEvidence } from '../../sdk/chain.ts';
 import { canonical,deliveryVerification,deliveryArtifact, type DeliverySpec } from '../../cre/workflow/verify.ts';
-import { authorizeOperation, digest, DomainError, expectedOutput, normalizeInput } from './engine.ts';
+import { authorizeOperation, digest, DomainError, expectedOutput, normalizeInput, resolveSkillInput } from './engine.ts';
 import type { Event, Policy, Scenario, Skill, TaskInput, Workspace } from './types.ts';
 import type { ModelDescriptor,ModelPlan } from './model.ts';
 import type { AgentIdentity } from './identity.ts';
@@ -31,7 +31,8 @@ export function orderPolicy(state:Workspace,order:ChainOrder,now:string){
   return null;
 }
 export async function createOrder(state:Workspace,draft:OrderDraft,deployment:WalletDeployment,now=new Date().toISOString()):Promise<Workspace>{
-  const input=normalizeInput(draft.input),prior=state.chainOrders?.find(o=>o.requestId===draft.requestId);
+  const selected=state.agents.find(a=>a.id===draft.agentId);if(!selected)throw new DomainError('Unknown service.');
+  const input=resolveSkillInput(state,selected.skill,draft.input),prior=state.chainOrders?.find(o=>o.requestId===draft.requestId);
   const parameters={...draft,input,planner:draft.planner??'deterministic',model:draft.model??null,agentIdentity:draft.agentIdentity??null,executor:draft.executor??'builtin',supplier:draft.supplier??null};
   if(prior){
     const previous={...(prior.workflowId?{workflowId:prior.workflowId}:{}),planner:prior.planner??'deterministic',model:prior.model??null,agentIdentity:prior.agentIdentity??null,executor:prior.executor??'builtin',supplier:prior.supplier??null,...(prior.vaultSessionId?{vaultSessionId:prior.vaultSessionId}:{}),requestId:prior.requestId,title:prior.title,agentId:prior.agentId,budget:prior.budget,buyer:prior.buyer,spec:prior.spec,input:prior.input,scenario:prior.scenario,timeoutSeconds:prior.timeoutSeconds};
@@ -83,8 +84,8 @@ export function commitModelPlan(state:Workspace,id:string,token:string,result:{p
   o.modelPlan=result.plan;orderEvent(o,'Model plan received','Model output remains untrusted until every requested operation passes the capability gate.',now,'success');return next;
 }
 export function authorizeOrderOperations(o:ChainOrder){
-  if(o.planner==='llm'){if(!o.modelPlan)throw new DomainError('A model plan is required before execution.','MODEL_REJECTED');for(const operation of o.modelPlan.operations)authorizeOperation(o.skill,operation);if(canonical(o.modelPlan.operations)!==canonical(['dataset.read','artifact.write']))throw new DomainError('Model plan must read the dataset before writing one artifact.','MODEL_REJECTED');}
-  authorizeOperation(o.skill,'dataset.read');if(o.scenario==='injection')authorizeOperation(o.skill,'wallet.transfer');authorizeOperation(o.skill,'artifact.write');
+  if(o.planner==='llm'){if(!o.modelPlan)throw new DomainError('A model plan is required before execution.','MODEL_REJECTED');for(const operation of o.modelPlan.operations)authorizeOperation(o.skill,operation,o.input.skillDefinition);if(canonical(o.modelPlan.operations)!==canonical(['dataset.read','artifact.write']))throw new DomainError('Model plan must read the dataset before writing one artifact.','MODEL_REJECTED');}
+  authorizeOperation(o.skill,'dataset.read',o.input.skillDefinition);if(o.scenario==='injection')authorizeOperation(o.skill,'wallet.transfer',o.input.skillDefinition);authorizeOperation(o.skill,'artifact.write',o.input.skillDefinition);
 }
 export async function claimSupplierLease(state:Workspace,id:string,token:string,now=new Date().toISOString()):Promise<Workspace>{
   const next=structuredClone(state),o=findOrder(next,id);

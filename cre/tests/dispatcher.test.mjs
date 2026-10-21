@@ -6,6 +6,7 @@ import {onCron} from '../workflow/handler.ts';
 import {evidenceRoot,selectReadyIds,SLOT_MILLISECONDS} from '../workflow/dispatcher.ts';
 import {deliveryVerification,deliveryArtifact,resultHash,specHash} from '../workflow/verify.ts';
 import {expectedOutput} from '../../lib/agentos/engine.ts';
+import {executeRankedFlows} from '../../lib/agentos/ranked-flows.ts';
 
 function fixture(){
  const config={mode:'dispatcher',schedule:'*/30 * * * * *',chainName:'ethereum-testnet-sepolia',escrowAddress:'0x'+'11'.repeat(20),gasLimit:'500000',evidenceOrigin:'https://evidence.example'},clock={now:1800000000000},runtime=newTestRuntime(null,{timeProvider:()=>clock.now},config),network=getNetwork({chainFamily:'evm',chainSelectorName:config.chainName}),evm=EvmMock.testInstance(network.chainSelector.selector),http=HttpActionsMock.testInstance(),tasks=new Map(),reports=[],reads=[],requests=[];
@@ -42,4 +43,13 @@ test('bad commitments, unavailable artifacts, expired and unfinalized tasks neve
 test('failed receiver callback is deferred and a malicious feed cannot send HTTP outside the configured service',()=>{
  const f=fixture();f.add('receiver-failure');f.evm.writeReport=()=>({txStatus:'TX_STATUS_SUCCESS',receiverContractExecutionStatus:'RECEIVER_CONTRACT_EXECUTION_STATUS_REVERTED'});expect(f.run().outcomes[0].status).toBe('deferred');
  const task=[...f.tasks.values()][0];task.spec.datasetUrl='https://attacker.example/private';expect(()=>f.run()).toThrow();expect(f.requests.some(url=>url.includes('attacker.example'))).toBe(false);
+});
+test('one unchanged dispatcher configuration independently accepts a new bounded skill and rejects changed ranking details',()=>{
+ const definition={protocol:'agentos.skill-definition.v1',id:'ext:community.flow-ranking@1.0.0',version:'1.0.0',name:'Flow ranking',description:'Rank recipient concentration.',capabilities:['dataset.read','artifact.write'],input:'transfers.v1',output:'ranked-flows.v1',recipe:{kind:'ranked-flows.v1',groupBy:'to',topN:2,thresholdBps:5000}},f=fixture(),before=JSON.stringify(f.config),good=f.add('new-skill-good'),bad=f.add('new-skill-bad');
+ for(const task of [good,bad]){
+  const input={dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:JSON.parse(task.datasetText)},verification=deliveryVerification(definition.id,{...input,skillDefinition:definition}),output=executeRankedFlows(definition,input);
+  if(task===bad)output.topAccounts[0].shareBps++;
+  task.spec.verification=verification;task.artifactText=JSON.stringify(deliveryArtifact(task.taskId,verification,task.spec.datasetHash,output));
+ }
+ expect(f.run().outcomes.every(o=>o.status==='reported')).toBe(true);expect(f.reports).toHaveLength(2);expect(f.reports.find(r=>r[0]===good.taskId)[3]).toBe(true);expect(f.reports.find(r=>r[0]===bad.taskId)[3]).toBe(false);expect(JSON.stringify(f.config)).toBe(before);
 });

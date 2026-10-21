@@ -1,3 +1,4 @@
+import {execute as executeExtension} from '../examples/skills/ranked-flows-provider.mjs';
 import {vaultABI} from '../lib/agentos/vault.ts';
 import {sourceSummary} from '../lib/agentos/transfer-source.ts';
 import { createServer } from 'node:http';
@@ -6,19 +7,20 @@ import { resolve,join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPublicClient,http,keccak256,stringToHex } from 'viem';
 import { generatePrivateKey,privateKeyToAccount } from 'viem/accounts';
-import { canonical,specHash } from '../cre/workflow/verify.ts';
+import { canonical,specHash,deliveryVerification } from '../cre/workflow/verify.ts';
 import { AgentChainClient,centsToToken,escrowABI } from '../sdk/chain.ts';
 import { inputEvidence } from '../sdk/wallet.ts';
 import { identityABI } from '../sdk/identity.ts';
 import { DATASET,digest,normalizeInput } from '../lib/agentos/engine.ts';
 import { parseSupplierConfiguration,supplierDescriptor,supplierRequestSchema,supplierJobId,supplierReceiptMessage,supplierMetadata,SUPPLIER_METADATA_KEY,verifySupplierDelivery } from '../lib/agentos/supplier.ts';
 
+const bundledSkill=JSON.parse(await readFile(new URL('../examples/skills/treasury-concentration.json',import.meta.url),'utf8'));
 async function writeAtomic(path,value){const temporary=path+'.'+crypto.randomUUID()+'.tmp',file=await open(temporary,'wx',0o600);try{await file.writeFile(JSON.stringify(value));await file.sync();}finally{await file.close();}await rename(temporary,path);}
-export async function startLocalSupplier({port=7461,runtimeRoot=resolve('.sites-runtime/skill-supplier'),chainBase='http://127.0.0.1:8545'}={}){
+export async function startLocalSupplier({port=7461,runtimeRoot=resolve('.sites-runtime/skill-supplier'),chainBase='http://127.0.0.1:8545',skills=['event-analysis','treasury-report',bundledSkill.id]}={}){
  const chainURL=new URL(chainBase);if(!Number.isInteger(port)||port<1||port>65535||chainURL.protocol!=='http:'||chainURL.hostname!=='127.0.0.1'||chainURL.pathname!=='/'||chainURL.username||chainURL.password||chainURL.search||chainURL.hash)throw new Error('Local supplier requires configured loopback endpoints.');
  await mkdir(runtimeRoot,{recursive:true,mode:0o700});const keyPath=join(runtimeRoot,'signer.json');let privateKey;
  try{privateKey=JSON.parse(await readFile(keyPath,'utf8')).privateKey;if((await stat(keyPath)).mode&0o077)throw new Error('Supplier signing file must have mode 0600.');}catch(e){if(e.code!=='ENOENT')throw e;privateKey=generatePrivateKey();const file=await open(keyPath,'wx',0o600);try{await file.writeFile(JSON.stringify({privateKey}));await file.sync();}finally{await file.close();}}
- const account=privateKeyToAccount(privateKey),base='http://127.0.0.1:'+port,config=parseSupplierConfiguration({url:base+'/v1/execute',id:'local-transfer-supplier',name:'Independent transfer supplier',revision:'1.0.0',signer:account.address,skills:['event-analysis','treasury-report']},true),descriptor=await supplierDescriptor(config);
+ const account=privateKeyToAccount(privateKey),base='http://127.0.0.1:'+port,config=parseSupplierConfiguration({url:base+'/v1/execute',id:'local-transfer-supplier',name:'Independent transfer supplier',revision:'1.0.0',signer:account.address,skills},true),descriptor=await supplierDescriptor(config);
  const locks=new Map(),attempts=new Map();let mode='healthy',delayMs=2500;
  const pathFor=id=>join(runtimeRoot,id.slice(2)+'.json');
  async function cached(id,request){try{const record=JSON.parse(await readFile(pathFor(id),'utf8'));if(record.requestHash!==await digest(request))throw Object.assign(new Error('conflicting request'),{status:409});return await verifySupplierDelivery(record.delivery,request);}catch(e){if(e.code==='ENOENT')return null;throw e;}}
@@ -33,12 +35,13 @@ export async function startLocalSupplier({port=7461,runtimeRoot=resolve('.sites-
   const identityArgs=[BigInt(request.identity.registryAgentId)],identity={address:request.identity.registry,abi:identityABI,args:identityArgs};
   const [owner,wallet,uri,metadata]=await Promise.all([client.readContract({...identity,functionName:'ownerOf'}),client.readContract({...identity,functionName:'getAgentWallet'}),client.readContract({...identity,functionName:'tokenURI'}),client.readContract({address:request.identity.registry,abi:identityABI,functionName:'getMetadata',args:[identityArgs[0],SUPPLIER_METADATA_KEY]})]);
   if(owner.toLowerCase()!==request.identity.owner||wallet.toLowerCase()!==request.seller||keccak256(stringToHex(uri))!==request.identity.documentHash||metadata.toLowerCase()!==supplierMetadata(descriptor).toLowerCase())throw Object.assign(new Error('supplier authorization required'),{status:409});
+  if(input.skillDefinition&&(input.skillDefinition.id!==request.skill||canonical(deliveryVerification(request.skill,input))!==canonical(request.spec.verification)))throw Object.assign(new Error('skill definition commitment'),{status:409});
   if(fault==='slow')await new Promise(resolve=>setTimeout(resolve,delayMs));
   // Separate computation: BigInt accumulation, independent of AgentOS expectedOutput().
   const recipients=new Map();let total=0n,count=0;
   for(const row of input.records??DATASET){if(row.block<input.blockFrom||row.block>input.blockTo)continue;total+=BigInt(row.cents);count++;recipients.set(row.to,(recipients.get(row.to)??0n)+BigInt(row.cents));}
   if(total>BigInt(Number.MAX_SAFE_INTEGER))throw Object.assign(new Error('unsafe total'),{status:400});
-  const output={dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo,transferCount:count,totalCents:Number(total),...(input.source?{source:sourceSummary(input.source,request.skill)}:{}),...(request.skill==='event-analysis'?{uniqueRecipients:recipients.size}:{allocations:Object.fromEntries([...recipients].map(([key,value])=>[key,Number(value)]))})};
+  const output=input.skillDefinition?{...executeExtension(input.skillDefinition,{dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo,records:input.records??DATASET}),...(input.source?{source:sourceSummary(input.source,request.skill)}:{})}:{dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo,transferCount:count,totalCents:Number(total),...(input.source?{source:sourceSummary(input.source,request.skill)}:{}),...(request.skill==='event-analysis'?{uniqueRecipients:recipients.size}:{allocations:Object.fromEntries([...recipients].map(([key,value])=>[key,Number(value)]))})};
   if(fault==='wrong-result'||request.scenario==='invalid-delivery')output.totalCents++;
   const payload={version:'agentos.skill-delivery.v1',requestHash:await digest(request),configHash:descriptor.configHash,jobId:supplierJobId(request),outputHash:await digest(output),output,issuedAt:new Date().toISOString()},delivery={payload,signature:await account.signMessage({message:supplierReceiptMessage(payload)})};
   await writeAtomic(pathFor(payload.jobId),{requestHash:payload.requestHash,delivery});return delivery;
@@ -70,5 +73,5 @@ export async function startLocalSupplier({port=7461,runtimeRoot=resolve('.sites-
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});return {base,descriptor,close:()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();})};
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
- const service=await startLocalSupplier({port:Number(process.env.AGENTOS_SUPPLIER_PORT||7461),chainBase:process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545',runtimeRoot:process.env.AGENTOS_SUPPLIER_STATE||resolve('.sites-runtime/skill-supplier')});console.log('AgentOS independent skill supplier: '+service.base);console.log('Public supplier descriptor: '+JSON.stringify(service.descriptor));let closing=false;for(const signal of ['SIGINT','SIGTERM'])process.on(signal,async()=>{if(closing)return;closing=true;await service.close();process.exitCode=0;});
+ const service=await startLocalSupplier({port:Number(process.env.AGENTOS_SUPPLIER_PORT||7461),skills:process.env.AGENTOS_SUPPLIER_SKILLS?JSON.parse(process.env.AGENTOS_SUPPLIER_SKILLS):undefined,chainBase:process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545',runtimeRoot:process.env.AGENTOS_SUPPLIER_STATE||resolve('.sites-runtime/skill-supplier')});console.log('AgentOS independent skill supplier: '+service.base);console.log('Public supplier descriptor: '+JSON.stringify(service.descriptor));let closing=false;for(const signal of ['SIGINT','SIGTERM'])process.on(signal,async()=>{if(closing)return;closing=true;await service.close();process.exitCode=0;});
 }

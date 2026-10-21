@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {encodeFunctionData,formatUnits,parseAbi} from 'viem';
 import {AgentWalletSession,localWalletProvider} from '../../sdk/wallet.ts';
+import {readFile} from 'node:fs/promises';
 const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',chain=process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545';
 test.beforeAll(async()=>{
  const deployment=await(await fetch(chain+'/config')).json();if(deployment.mode!=='local'||deployment.chainId!==31337)throw new Error('Browser regression requires the local test chain.');
@@ -14,6 +15,22 @@ test.beforeEach(async({context,page},info)=>{
 });
 test.afterEach(async({},info)=>{if(info.errorsSeen)expect(info.errorsSeen).toEqual([]);});
 const headers=info=>({'x-agentos-sandbox':info.annotations.find(a=>a.type==='sandbox').description});
+test('a new skill installs without a grant, persists across reload and executes only after explicit permission',async({page},info)=>{
+ const definition=JSON.parse(await readFile(new URL('../../examples/skills/treasury-concentration.json',import.meta.url),'utf8'));
+ await page.goto('/#agents');const panel=page.getByRole('region',{name:'安装版本化技能'});
+ await panel.getByRole('textbox',{name:'技能定义 JSON',exact:true}).fill(JSON.stringify({...definition,capabilities:['wallet.transfer']}));await expect(panel.getByRole('button',{name:'安装技能',exact:true})).toBeDisabled();
+ await panel.getByRole('textbox',{name:'技能定义 JSON',exact:true}).fill(JSON.stringify(definition));await panel.getByRole('button',{name:'安装技能',exact:true}).click();await expect(panel.getByRole('status')).toContainText('技能已安装');
+ const installed=(await(await page.request.get('/api/workspace',{headers:headers(info)})).json()).state;expect(installed.policy.allowedSkills).not.toContain(definition.id);
+ await page.reload();await expect(panel.getByText(definition.id,{exact:true})).toBeVisible();await page.getByRole('button',{name:'注册智能体',exact:true}).click();
+ const modal=page.getByRole('dialog',{name:'注册智能体'});await modal.getByLabel('名称',{exact:true}).fill('Browser concentration');await modal.getByLabel('描述',{exact:true}).fill('Imported concentration skill');await modal.locator('select[name=skill]').selectOption(definition.id);await modal.getByRole('button',{name:'注册智能体',exact:true}).click();await expect(modal).not.toBeVisible();
+ await page.getByRole('button',{name:'权限管理',exact:true}).click();await page.getByRole('checkbox',{name:/Treasury concentration/}).check();await page.getByRole('button',{name:'保存策略',exact:true}).click();
+ await expect.poll(async()=>{const state=(await(await page.request.get('/api/workspace',{headers:headers(info)})).json()).state;return state.policy.allowedSkills.includes(definition.id);}).toBe(true);
+ const state=(await(await page.request.get('/api/workspace',{headers:headers(info)})).json()).state,agent=state.agents.find(a=>a.skill===definition.id);
+ await page.getByRole('button',{name:'新建任务',exact:true}).click();const task=page.getByRole('dialog',{name:'派发新任务'});await task.locator('select[name=agentId]').selectOption(agent.id);await task.locator('input[name=title]').fill('Browser new skill');await task.getByRole('button',{name:'派发任务',exact:true}).click();await expect(task).not.toBeVisible();
+ await expect.poll(async()=>{const state=(await(await page.request.get('/api/workspace',{headers:headers(info)})).json()).state;return state.tasks[0]?.status;}).toBe('completed');
+ await page.keyboard.press('Escape');await page.getByLabel('Switch to English',{exact:true}).click();await page.goto('/#agents');await expect(page.getByRole('heading',{name:'Install a versioned skill',exact:true})).toBeVisible();
+ await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);await page.screenshot({path:'outputs/skill-browser-proof.png',fullPage:true});
+});
 const browserDailyCap=async(page,info)=>{const r=await page.request.get('/api/vault',{headers:headers(info)});expect(r.status()).toBe(200);const {view}=await r.json();return formatUnits(BigInt(view.spent)+100n*10n**BigInt(view.decimals),view.decimals);};
 
 test('lost create response retries the same real backend intent and pays once',async({page,context},info)=>{

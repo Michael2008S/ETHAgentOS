@@ -1,6 +1,6 @@
 # 独立技能供应商
 
-预注资订单支持独立 HTTP 技能执行进程。当前协议提供 `event-analysis` 与 `treasury-report` 两个版本化技能，可由服务器配置 HTTPS 供应商；本轮实际验收的是单独运行在本机的供应商进程，尚未验收远程 HTTPS 服务。
+预注资订单支持独立 HTTP 技能执行进程。协议提供 `event-analysis`、`treasury-report` 和通过受限定义安装的版本化扩展技能，可由服务器配置 HTTPS 供应商；当前实际验收的是单独运行在本机的参考供应商，尚未验收远程 HTTPS 服务。新技能安装、权限及独立验收见 [SKILL-ONBOARDING](SKILL-ONBOARDING.md)。
 
 ## 本地演示
 

@@ -22,5 +22,8 @@ export class AgentOSClient {
   async recover(){return this.request('/api/runtime',undefined,true);}
   async resume(taskId:string){await this.request('/api/command',{type:'resume_task',taskId});return this.run(taskId);}
   async cancel(taskId:string){return this.request('/api/command',{type:'cancel_task',taskId});}
+  async installSkill(definition:import('../lib/agentos/skill-definition.ts').SkillDefinition){return this.request('/api/command',{type:'register_skill',definition});}
+  async registerAgent(agent:Pick<import('../lib/agentos/types.ts').Agent,'name'|'description'|'skill'>,requestId=crypto.randomUUID()){return this.request('/api/command',{type:'register_agent',agent,requestId});}
+  async updatePolicy(policy:import('../lib/agentos/types.ts').Policy){return this.request('/api/command',{type:'update_policy',policy});}
   async updateAgent(agentId:string,settings:{enabled:boolean;price:number}){return this.request('/api/command',{type:'update_agent',agentId,...settings});}
 }

@@ -1,3 +1,4 @@
+import {skillIdSchema,skillDefinitionSchema} from '@/lib/agentos/skill-schema';
 import {checkInputSource} from '@/lib/agentos/data-runtime';
 import {transferSourceSchema} from '@/lib/agentos/transfer-source';
 import { z } from 'zod';
@@ -6,15 +7,16 @@ import { DomainError } from '@/lib/agentos/engine';
 import { scheduleTasks } from '@/lib/agentos/background';
 import { isLoopback, deferInline } from '@/lib/agentos/auth';
 const id = z.string().min(1).max(128);
-const skill = z.enum(['event-analysis', 'treasury-report']);
-const taskInput = z.object({dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe(),source:transferSourceSchema.optional(),records:z.array(z.object({block:z.number().int().nonnegative().safe(),from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:z.number().int().nonnegative().safe()}).strict()).min(1).max(100).optional()}).strict();
+const skill = skillIdSchema;
+const taskInput = z.object({skillDefinition:skillDefinitionSchema.optional(),dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe(),source:transferSourceSchema.optional(),records:z.array(z.object({block:z.number().int().nonnegative().safe(),from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:z.number().int().nonnegative().safe()}).strict()).min(1).max(100).optional()}).strict();
 const command = z.discriminatedUnion('type', [
+  z.object({type:z.literal('register_skill'),definition:skillDefinitionSchema}).strict(),
   z.object({ type: z.literal('create_task'), input: taskInput.optional(), timeoutSeconds: z.number().int().min(1).max(86400).optional(), executionMode: z.enum(['automatic','manual']).optional(), requestId: id, taskId: id, agentId: id, title: z.string().min(1).max(160), budget: z.number().int().positive(), scenario: z.enum(['success', 'injection', 'interruption', 'invalid-delivery']) }),
   z.object({ type: z.literal('advance'), taskId: id, expectedStep: z.number().int().min(0).max(6) }),
   z.object({ type: z.literal('resume_task'), taskId: id }),
   z.object({ type: z.literal('cancel_task'), taskId: id }),
   z.object({ type: z.literal('expire_task'), taskId: id }),
-  z.object({ type: z.literal('update_policy'), policy: z.object({ active: z.boolean(), maxTaskBudget: z.number().int().positive(), dailyBudget: z.number().int().positive(), allowedSkills: z.array(skill).max(2) }) }),
+  z.object({ type: z.literal('update_policy'), policy: z.object({ active: z.boolean(), maxTaskBudget: z.number().int().positive(), dailyBudget: z.number().int().positive(), allowedSkills: z.array(skill).max(22) }) }),
   z.object({ type: z.literal('update_agent'), agentId: id, enabled: z.boolean(), price: z.number().int().positive().max(1000000) }),
   z.object({ type: z.literal('topup'), amount: z.number().int().positive(), requestId: id }),
   z.object({ type: z.literal('register_agent'), agent: z.object({ name: z.string().min(1).max(40), description: z.string().max(240), skill }), requestId: id }),

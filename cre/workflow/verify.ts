@@ -1,6 +1,8 @@
 import {keccak256,stringToHex,type Hex} from 'viem';
 import {assertSourceInput,sourceCommitment,sourceSummary,type TransferSource} from '../../lib/agentos/transfer-source.ts';
-export type DeliveryVerification={version:'agentos.delivery.v2';skill:'event-analysis'|'treasury-report';skillVersion:'1.0.0';dataset:string;blockFrom:number;blockTo:number;sourceHash?:Hex;memoryHash?:Hex};
+import {assertSkillDefinition,type SkillDefinition,type RankedFlowInput} from '../../lib/agentos/skill-definition.ts';
+import {recomputeRankedFlows} from './ranked-flows.ts';
+export type DeliveryVerification={version:'agentos.delivery.v2';skill:string;skillVersion:string;dataset:string;blockFrom:number;blockTo:number;sourceHash?:Hex;memoryHash?:Hex;skillDefinition?:SkillDefinition};
 // Optional only for historical v1 commitments. New purchases require v2.
 export type DeliverySpec={datasetUrl:string;datasetHash:Hex;artifactUrl:string;verification?:DeliveryVerification};
 export type AcceptedArtifact={version:'agentos.accepted-artifact.v1';orderId:string;chainId:number;escrow:Hex;taskId:Hex;settlementTransactionHash:Hex;artifactHash:Hex;datasetText:string;artifactText:string;spec:DeliverySpec};
@@ -11,13 +13,16 @@ export function canonical(value:unknown):string {
 }
 export const specHash=(spec:DeliverySpec)=>keccak256(stringToHex(canonical(spec)));
 export const resultHash=(output:unknown)=>keccak256(stringToHex(canonical(output)));
-export function deliveryVerification(skill:DeliveryVerification['skill'],input:{dataset:string;blockFrom:number;blockTo:number;source?:TransferSource;memory?:AcceptedArtifact}):DeliveryVerification{
- return {version:'agentos.delivery.v2',skill,skillVersion:'1.0.0',dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo,...(input.source?{sourceHash:sourceCommitment(input.source)}:{}),...(input.memory?{memoryHash:resultHash(input.memory)}:{})};
+export function deliveryVerification(skill:DeliveryVerification['skill'],input:{dataset:string;blockFrom:number;blockTo:number;source?:TransferSource;memory?:AcceptedArtifact;skillDefinition?:SkillDefinition}):DeliveryVerification{
+ const verification:DeliveryVerification={version:'agentos.delivery.v2',skill,skillVersion:input.skillDefinition?.version??'1.0.0',dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo,...(input.source?{sourceHash:sourceCommitment(input.source)}:{}),...(input.memory?{memoryHash:resultHash(input.memory)}:{}),...(input.skillDefinition?{skillDefinition:structuredClone(input.skillDefinition)}:{})};
+ validateVerification(verification);return verification;
 }
 export function validateVerification(value:unknown):asserts value is DeliveryVerification{
  const v=value as DeliveryVerification;
- const keys=['blockFrom','blockTo','dataset','skill','skillVersion','version',...(v?.sourceHash===undefined?[]:['sourceHash']),...(v?.memoryHash===undefined?[]:['memoryHash'])].sort().join(',');
- if(!v||typeof v!=='object'||Array.isArray(v)||Object.keys(v).sort().join(',')!==keys||[v.sourceHash,v.memoryHash].some(h=>h!==undefined&&!/^0x[0-9a-f]{64}$/.test(h))||v.sourceHash&&v.memoryHash||v.version!=='agentos.delivery.v2'||!['event-analysis','treasury-report'].includes(v.skill)||v.skillVersion!=='1.0.0'||!['eth-shenzhen-fixture-v1','custom-transfers-v1'].includes(v.dataset)||!Number.isSafeInteger(v.blockFrom)||v.blockFrom<0||!Number.isSafeInteger(v.blockTo)||v.blockTo<v.blockFrom)throw new Error('Invalid versioned delivery verification');
+ const keys=['blockFrom','blockTo','dataset','skill','skillVersion','version',...(v?.sourceHash===undefined?[]:['sourceHash']),...(v?.memoryHash===undefined?[]:['memoryHash']),...(v?.skillDefinition===undefined?[]:['skillDefinition'])].sort().join(',');
+ if(!v||typeof v!=='object'||Array.isArray(v)||Object.keys(v).sort().join(',')!==keys||[v.sourceHash,v.memoryHash].some(h=>h!==undefined&&!/^0x[0-9a-f]{64}$/.test(h))||v.sourceHash&&v.memoryHash||v.version!=='agentos.delivery.v2'||!['eth-shenzhen-fixture-v1','custom-transfers-v1'].includes(v.dataset)||!Number.isSafeInteger(v.blockFrom)||v.blockFrom<0||!Number.isSafeInteger(v.blockTo)||v.blockTo<v.blockFrom)throw new Error('Invalid versioned delivery verification');
+ if(v.skillDefinition!==undefined){assertSkillDefinition(v.skillDefinition);if(v.skillDefinition.id!==v.skill||v.skillDefinition.version!==v.skillVersion)throw new Error('Skill definition differs from the committed skill and version');}
+ else if(!['event-analysis','treasury-report'].includes(v.skill)||v.skillVersion!=='1.0.0')throw new Error('Unrecognized skill requires a bounded definition');
 }
 /** One bounded level: independently verify the complete parent report before deriving its allocation input.
  * Payment authenticity is separately rechecked by the runtime against its owner-scoped order and chain.
@@ -38,6 +43,7 @@ export function deliveryArtifact(taskId:Hex,verification:DeliveryVerification,da
 }
 /** Independently computes the full skill result; does not import runtime adapters. */
 function recompute(rows:unknown[],v:DeliveryVerification){
+ if(v.skillDefinition)return recomputeRankedFlows(v.skillDefinition,{dataset:v.dataset,blockFrom:v.blockFrom,blockTo:v.blockTo,records:rows} as RankedFlowInput);
  let total=0n;const recipients=new Map<string,bigint>();
  for(const raw of rows){
   const row=raw as {block:number;from:string;to:string;cents:number};

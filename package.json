@@ -50,7 +50,9 @@
     "demo:vault": "node scripts/demo-vault.mjs",
     "demo:workflow": "node scripts/demo-workflow.mjs",
     "test:cre": "node scripts/test-cre.mjs",
-    "demo:cre-dispatcher": "node scripts/cre-cli.mjs build && node scripts/test-cre.mjs && node scripts/demo-cre-dispatcher.mjs"
+    "demo:cre-dispatcher": "node scripts/cre-cli.mjs build && node scripts/test-cre.mjs && node scripts/demo-cre-dispatcher.mjs",
+    "skill:conformance": "node scripts/skill-conformance.mjs",
+    "demo:skill": "node scripts/demo-skill.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

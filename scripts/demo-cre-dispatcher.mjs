@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mkdir,writeFile} from 'node:fs/promises';
+import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import {resolve,dirname,delimiter} from 'node:path';
@@ -15,7 +15,7 @@ import {createEvidenceService} from '../lib/agentos/evidence-publisher.ts';
 import {orderChain} from '../lib/agentos/order-chain.ts';
 import {createOrder,findOrder,authorizeOrder,activateOrder,orderArtifact} from '../lib/agentos/orders.ts';
 import {runOrder} from '../lib/agentos/order-runner.ts';
-import {seed} from '../lib/agentos/engine.ts';
+import {seed,transition,resolveSkillInput} from '../lib/agentos/engine.ts';
 import {canonical,resultHash,specHash,verifyDelivery} from '../cre/workflow/verify.ts';
 import {evidenceRoot} from '../cre/workflow/dispatcher.ts';
 
@@ -42,7 +42,7 @@ try{
   await writeFile(root+'/'+name+'.log',result.output);assert.equal(result.code,0,result.output);assert.equal(resultHash(config),configHash);return result;
  }
  async function prepare(name,agentId,scenario='success'){
-  const requestId=crypto.randomUUID(),input={dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:[{block:1,from:'synthetic-treasury',to:'synthetic-research',cents:123},{block:2,from:'synthetic-treasury',to:'synthetic-operations',cents:456}]},bytes=inputEvidence({id:'chain-'+requestId,input,skill:state.agents.find(a=>a.id===agentId).skill},buyer),spec=await service.prepare(bytes);
+  const requestId=crypto.randomUUID(),input=resolveSkillInput(state,state.agents.find(a=>a.id===agentId).skill,{dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:[{block:1,from:'synthetic-treasury',to:'synthetic-research',cents:123},{block:2,from:'synthetic-treasury',to:'synthetic-operations',cents:456}]}),bytes=inputEvidence({id:'chain-'+requestId,input,skill:state.agents.find(a=>a.id===agentId).skill},buyer),spec=await service.prepare(bytes);
   state=await createOrder(state,{requestId,title:name,agentId,buyer,budget:1000,input,spec,scenario,timeoutSeconds:300},deployment);const order=state.chainOrders[0],funding=await wallet.fundOrder(order,3600);state=(await authorizeOrder(state,order.id,'temporary-dispatcher-demo',funding.transactionHash,crypto.randomUUID())).state;const authorized=findOrder(state,order.id);assert.equal(await access.verifySignature(authorized,authorized.authorization.message,await account.signMessage({message:authorized.authorization.message})),true);state=activateOrder(state,order.id,authorized.authorization.nonce,await access.funding(authorized,funding.transactionHash));return order.id;
  }
  const first=await prepare('Correct dispatcher delivery','atlas'),wrong=await prepare('Rejected dispatcher delivery','sage','invalid-delivery');
@@ -56,6 +56,13 @@ try{
  const terminal=await simulate('terminal-not-yet-archived');assert.ok(!terminal.output.includes('CRE report generated'),terminal.output);report.cases.push({name:'terminal-not-yet-archived',configHash,cli:terminal,passed:true});
  for(const orderId of [first,wrong])await access.completeEvidence(findOrder(state,orderId));assert.equal((await ready()).total,0);
  const later=await prepare('New order with unchanged dispatcher','sage');await runOrder(store,'temporary-dispatcher-demo',later,access);const next=await simulate('new-order-same-config'),laterOrder=findOrder(state,later),laterBytes=inputEvidence(laterOrder,buyer),verdict=verifyDelivery(laterBytes.datasetText,orderArtifact(laterOrder,laterBytes.id),laterBytes.id,laterOrder.spec);assert.ok(next.output.includes('Delivery consensus: accepted=true outputHash='+verdict.outputHash),next.output);assert.equal((await wallet.task(laterOrder,laterOrder.spec)).status,'funded');report.cases.push({name:'new-order-same-config',configHash,cli:next,passed:true});
- const {order}=await localCallback(later);await access.completeEvidence(order);assert.equal((await ready()).total,0);assert.equal(resultHash(config),configHash);report.config=config;report.syntheticWorkflowId=workflowId;report.status='passed';console.log('PASS same dispatcher configuration, correct/rejected/new orders, terminal skip and retained immutable evidence.');
+ const {order}=await localCallback(later);await access.completeEvidence(order);assert.equal((await ready()).total,0);
+ const definition=JSON.parse(await readFile(new URL('../examples/skills/treasury-concentration.json',import.meta.url),'utf8'));
+ state=await transition(state,{type:'register_skill',definition});state=await transition(state,{type:'register_agent',requestId:'dispatcher-extension',agent:{name:'Dispatcher concentration',description:'Data-only extension skill',skill:definition.id}});state=await transition(state,{type:'update_policy',policy:{...state.policy,allowedSkills:[...state.policy.allowedSkills,definition.id]}});
+ const extensionGood=await prepare('New skill accepted by unchanged dispatcher','custom-dispatcher-extension'),extensionBad=await prepare('New skill rejected by unchanged dispatcher','custom-dispatcher-extension','invalid-delivery');
+ for(const orderId of [extensionGood,extensionBad])await runOrder(store,'temporary-dispatcher-demo',orderId,access);
+ const extended=await simulate('new-skill-same-config');
+ for(const orderId of [extensionGood,extensionBad]){const o=findOrder(state,orderId),bytes=inputEvidence(o,buyer),verdict=verifyDelivery(bytes.datasetText,orderArtifact(o,bytes.id),bytes.id,o.spec);assert.ok(extended.output.includes('Delivery consensus: accepted='+verdict.accepted+' outputHash='+verdict.outputHash),extended.output);assert.equal((await wallet.task(o,o.spec)).status,'funded');const {order}=await localCallback(orderId);await access.completeEvidence(order);report.cases.push({name:'extension local test callback only',orderId,skill:definition.id,settlement:order.settlement,passed:true});}
+ report.cases.push({name:'new-skill-same-config',configHash,definition,cli:extended,passed:true});assert.equal((await ready()).total,0);assert.equal(resultHash(config),configHash);report.config=config;report.syntheticWorkflowId=workflowId;report.status='passed';console.log('PASS same dispatcher configuration, correct/rejected/new orders and extension skills, terminal skip and retained immutable evidence.');
 }catch(error){report.status='failed';report.error=error.message;console.error(error.message);process.exitCode=1;}
 finally{if(evidence)await evidence.close();if(local)await local.close();report.finishedAt=new Date().toISOString();await mkdir('outputs',{recursive:true});const path='outputs/cre-dispatcher-'+id+'.json';await writeFile(path,JSON.stringify(report,null,2));console.log('CRE dispatcher evidence: '+path);}

@@ -1,0 +1,11 @@
+{
+  "protocol": "agentos.skill-definition.v1",
+  "id": "ext:community.treasury-concentration@1.0.0",
+  "version": "1.0.0",
+  "name": "Treasury concentration",
+  "description": "Rank recipient allocations and flag when one recipient receives at least half of the committed amount.",
+  "capabilities": ["dataset.read", "artifact.write"],
+  "input": "transfers.v1",
+  "output": "ranked-flows.v1",
+  "recipe": {"kind": "ranked-flows.v1", "groupBy": "to", "topN": 3, "thresholdBps": 5000}
+}
