@@ -70,3 +70,11 @@ test('dispatcher independently validates nested accepted extension memory and re
  expect(f.reports.find(r=>r[0]===child.taskId)[3]).toBe(true);
  expect(f.reports.some(r=>r[0]===bad.taskId&&r[3])).toBe(false);
 });
+
+test('dispatcher validates every merged paid projection and rejects a changed parent or changed derived records',()=>{
+ for(const change of ['records','parent']){
+  const f=fixture(),left=f.add('merge-left'),right=f.add('merge-right'),good=f.add('merge-accepted'),bad=f.add('merge-'+change),envelope=task=>({version:'agentos.accepted-artifact.v2',projection:'summary-total.v1',orderId:'chain-'+task.taskId.slice(2),chainId:11155111,escrow:f.config.escrowAddress,taskId:task.taskId,settlementTransactionHash:keccak256(stringToHex('payment '+task.taskId)),artifactHash:resultHash(JSON.parse(task.artifactText)),datasetText:task.datasetText,artifactText:task.artifactText,spec:task.spec}),memory={version:'agentos.accepted-merge.v1',strategy:'concat-projections.v1',parents:[envelope(left),envelope(right)]};
+  function set(task,memory,records=acceptedMemoryRecords(memory)){const input={dataset:'custom-transfers-v1',blockFrom:0,blockTo:0,memory,records},verification=deliveryVerification('event-analysis',input);task.datasetText=JSON.stringify({version:'agentos.memory-evidence.v1',memory,records});const datasetHash=keccak256(stringToHex(task.datasetText));task.spec={...task.spec,verification,datasetHash,datasetUrl:evidenceRoot(f.config.evidenceOrigin,f.config.escrowAddress)+'/dataset/'+datasetHash};task.artifactText=JSON.stringify(deliveryArtifact(task.taskId,verification,datasetHash,expectedOutput({skill:'event-analysis',input})));}
+  set(good,memory);const changed=structuredClone(memory),records=acceptedMemoryRecords(memory);if(change==='records')records[0].cents++;else{const artifact=JSON.parse(changed.parents[1].artifactText);artifact.output.totalCents++;changed.parents[1].artifactText=JSON.stringify(artifact);changed.parents[1].artifactHash=resultHash(artifact);}set(bad,changed,records);f.tasks.delete(left.taskId);f.tasks.delete(right.taskId);f.run();expect(f.reports.find(r=>r[0]===good.taskId)[3]).toBe(true);expect(f.reports.some(r=>r[0]===bad.taskId&&r[3])).toBe(false);
+ }
+});

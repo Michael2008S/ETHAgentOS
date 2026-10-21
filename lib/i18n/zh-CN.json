@@ -1123,5 +1123,19 @@
   "Automatic proposal has no matching repair attempt.": "自动提案没有匹配的修复尝试记录。",
   "Invalid automatic repair provenance.": "自动修复提案来源无效。",
   "Automatic repair policy differs from this wallet or workspace.": "自动修复策略与当前钱包或工作区不一致。",
-  "Automatic repair policy changed the requested limits.": "自动修复策略改变了请求的额度。"
+  "Automatic repair policy changed the requested limits.": "自动修复策略改变了请求的额度。",
+  "Workflow execution mode": "工作流执行方式",
+  "Planning execution mode": "规划执行方式",
+  "Sequential execution": "顺序执行",
+  "Parallel execution": "并行执行",
+  "Maximum in-flight purchases": "最多在途采购数",
+  "Merge accepted results": "汇合已验收成果",
+  "Select at least two paid parent steps": "至少选择两个已付款的前序步骤",
+  "The limit bounds in-flight purchases. Funding is serialized; independent execution may overlap. Merges concatenate paid projections in step order and may count overlapping source data again.": "该上限限制在途采购数。注资按顺序进行，独立步骤可并行执行。汇合按步骤顺序拼接已付款成果的派生记录，重叠源数据可能被重复计入。",
+  "Merged input requires distinct, bounded paid artifact projections.": "汇合输入需要互不重复且在限制内的已付款成果派生记录。",
+  "Merged input requires parallel mode and distinct earlier steps.": "汇合输入需要并行模式和互不重复的前序步骤。",
+  "Parallel template mode requires its versioned concurrency limit.": "并行模板需要对应版本及明确的并发上限。",
+  "Template merge must reference distinct earlier steps in parallel mode.": "模板汇合必须在并行模式下引用互不重复的前序步骤。",
+  "Workflow concurrency differs from the approved graph.": "工作流并发数与批准的依赖图不一致。",
+  "Parallel workflow execution is unavailable. Checkpoint retained.": "并行工作流暂不可用，执行检查点已保留。"
 }

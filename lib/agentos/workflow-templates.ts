@@ -4,19 +4,19 @@ import {digest,DomainError,skillCatalog} from './engine.ts';
 import type {Workspace} from './types.ts';
 import {skillIdSchema} from './skill-schema.ts';
 import {skillDefinitionHash} from './skill-definition.ts';
-import {portableWorkflowInputSchema,workflowStepDraftSchema,workflowConditionSchema} from './workflow-schema.ts';
+import {portableWorkflowInputSchema,workflowStepDraftSchema,workflowConditionSchema,parallelismSchema} from './workflow-schema.ts';
 import {validateWorkflowCondition} from './workflow-constraints.ts';
 import type {WorkflowStepDraft} from './workflow-state.ts';
 
 const hash=z.string().regex(/^0x[0-9a-f]{64}$/),name=z.string().trim().min(1).max(120),revision=z.string().regex(/^(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})$/),timeout=z.number().int().min(30).max(86400),id=z.string().regex(/^template-[0-9a-fA-F-]{36}$/);
 const slot=z.object({skill:skillIdSchema,skillVersion:revision,skillHash:hash.optional(),budget:z.number().int().positive().max(1000000),input:portableWorkflowInputSchema,when:workflowConditionSchema.optional(),executor:z.enum(['builtin','supplier'])}).strict();
-export const workflowTemplateDefinitionSchema=z.object({protocol:z.literal('agentos.workflow-template.v1'),name,description:z.string().trim().max(500),revision,timeoutSeconds:timeout,steps:z.array(slot).min(2).max(8)}).strict();
+export const workflowTemplateDefinitionSchema=z.object({protocol:z.enum(['agentos.workflow-template.v1','agentos.workflow-template.v2']),parallelism:parallelismSchema.optional(),name,description:z.string().trim().max(500),revision,timeoutSeconds:timeout,steps:z.array(slot).min(2).max(8)}).strict();
 export type WorkflowTemplateDefinition=z.infer<typeof workflowTemplateDefinitionSchema>;
 export type WorkflowTemplate={id:string;requestId:string;workspaceHash:string;definition:WorkflowTemplateDefinition;digest:string;createdAt:string;archivedAt?:string};
 export const templateBindingSchema=z.object({agentId:z.string().min(1).max(128),supplierId:z.string().regex(/^[a-z0-9-]{1,64}$/).optional()}).strict();
 export type TemplateBinding=z.infer<typeof templateBindingSchema>;
 export const workflowTemplateRequestSchema=z.union([
- z.object({action:z.literal('save'),requestId:z.string().uuid(),name,description:z.string().trim().max(500).default(''),revision,timeoutSeconds:timeout,steps:z.array(workflowStepDraftSchema).min(2).max(8)}).strict(),
+ z.object({action:z.literal('save'),requestId:z.string().uuid(),name,description:z.string().trim().max(500).default(''),revision,parallelism:parallelismSchema.optional(),timeoutSeconds:timeout,steps:z.array(workflowStepDraftSchema).min(2).max(8)}).strict(),
  z.object({action:z.literal('import'),requestId:z.string().uuid(),definition:workflowTemplateDefinitionSchema,digest:hash}).strict(),
  z.object({action:z.literal('archive'),templateId:id,digest:hash}).strict(),
  z.object({action:z.literal('restore'),templateId:id,digest:hash}).strict(),
@@ -24,17 +24,19 @@ export const workflowTemplateRequestSchema=z.union([
 ]);
 export function validateTemplateDefinition(raw:unknown){
  const parsed=workflowTemplateDefinitionSchema.safeParse(raw);if(!parsed.success)throw new DomainError('Invalid workflow template definition.');const definition=parsed.data;
+ if(Boolean(definition.parallelism)!==(definition.protocol==='agentos.workflow-template.v2'))throw new DomainError('Parallel template mode requires its versioned concurrency limit.');
  for(const [index,step] of definition.steps.entries()){
   if(step.skill.startsWith('ext:')!==Boolean(step.skillHash))throw new DomainError('Template extension slots require their exact installed definition hash.');
   if(step.skill.startsWith('ext:')&&!step.skill.endsWith('@'+step.skillVersion))throw new DomainError('Template skill version differs from its identifier.');
   if(step.input.from==='step'&&step.input.step>=index)throw new DomainError('Template input must reference an earlier step.');
+  if(step.input.from==='merge'&&(!definition.parallelism||step.input.steps.some(i=>i>=index)))throw new DomainError('Template merge must reference distinct earlier steps in parallel mode.');
   if(step.when)validateWorkflowCondition(step.when,definition.steps.map(s=>s.skill),index);
  }
  return definition;
 }
 /** Portable definitions contain only skill requirements and program structure, never input or authority. */
-export function definitionFromWorkflow(state:Workspace,metadata:Pick<WorkflowTemplateDefinition,'name'|'description'|'revision'|'timeoutSeconds'>,steps:WorkflowStepDraft[]){
- return validateTemplateDefinition({protocol:'agentos.workflow-template.v1',name:metadata.name,description:metadata.description,revision:metadata.revision,timeoutSeconds:metadata.timeoutSeconds,steps:steps.map(step=>{
+export function definitionFromWorkflow(state:Workspace,metadata:Pick<WorkflowTemplateDefinition,'name'|'description'|'revision'|'timeoutSeconds'|'parallelism'>,steps:WorkflowStepDraft[]){
+ return validateTemplateDefinition({protocol:metadata.parallelism?'agentos.workflow-template.v2':'agentos.workflow-template.v1',...(metadata.parallelism?{parallelism:metadata.parallelism}:{}),name:metadata.name,description:metadata.description,revision:metadata.revision,timeoutSeconds:metadata.timeoutSeconds,steps:steps.map(step=>{
   const service=state.agents.find(a=>a.id===step.agentId),skill=skillCatalog(state).find(s=>s.id===service?.skill);if(!service||!skill)throw new DomainError('Template service or installed skill is unavailable.');
   const installed=state.skillDefinitions?.find(s=>s.id===service.skill);
   return {skill:service.skill,skillVersion:skill.version,...(installed?{skillHash:skillDefinitionHash(installed)}:{}),budget:step.budget,input:step.input,...(step.when?{when:step.when}:{}),executor:step.supplierId?'supplier':'builtin'};
@@ -68,5 +70,5 @@ export async function instantiateWorkflowTemplate(state:Workspace,id:string,revi
   return {agentId:agent.id,budget:slot.budget,input:slot.input,...(slot.when?{when:slot.when}:{}),...(binding.supplierId?{supplierId:binding.supplierId}:{})};
  });
  // This is an editable draft, not a quote, a session grant or an execution checkpoint.
- return structuredClone({title:record.definition.name,timeoutSeconds:record.definition.timeoutSeconds,steps,...(steps.some(s=>s.supplierId)?{supplierPricing:'signed-at-execution-under-cap' as const}:{}),templateDigest:record.digest});
+ return structuredClone({title:record.definition.name,timeoutSeconds:record.definition.timeoutSeconds,...(record.definition.parallelism?{parallelism:record.definition.parallelism}:{}),steps,...(steps.some(s=>s.supplierId)?{supplierPricing:'signed-at-execution-under-cap' as const}:{}),templateDigest:record.digest});
 }

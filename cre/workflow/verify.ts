@@ -6,6 +6,8 @@ export type DeliveryVerification={version:'agentos.delivery.v2';skill:string;ski
 // Optional only for historical v1 commitments. New purchases require v2.
 export type DeliverySpec={datasetUrl:string;datasetHash:Hex;artifactUrl:string;verification?:DeliveryVerification};
 export type AcceptedArtifact={version:'agentos.accepted-artifact.v1'|'agentos.accepted-artifact.v2';projection?:'allocations.v1'|'ranked-accounts.v1'|'summary-total.v1';orderId:string;chainId:number;escrow:Hex;taskId:Hex;settlementTransactionHash:Hex;artifactHash:Hex;datasetText:string;artifactText:string;spec:DeliverySpec};
+export type AcceptedMerge={version:'agentos.accepted-merge.v1';strategy:'concat-projections.v1';parents:AcceptedArtifact[];orderId?:never};
+export type AcceptedMemory=AcceptedArtifact|AcceptedMerge;
 export function canonical(value:unknown):string {
  if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
  if(value!==null&&typeof value==='object')return '{'+Object.entries(value).sort(([a],[b])=>a<b?-1:a>b?1:0).map(([k,v])=>JSON.stringify(k)+':'+canonical(v)).join(',')+'}';
@@ -13,7 +15,7 @@ export function canonical(value:unknown):string {
 }
 export const specHash=(spec:DeliverySpec)=>keccak256(stringToHex(canonical(spec)));
 export const resultHash=(output:unknown)=>keccak256(stringToHex(canonical(output)));
-export function deliveryVerification(skill:DeliveryVerification['skill'],input:{dataset:string;blockFrom:number;blockTo:number;source?:TransferSource;memory?:AcceptedArtifact;skillDefinition?:SkillDefinition}):DeliveryVerification{
+export function deliveryVerification(skill:DeliveryVerification['skill'],input:{dataset:string;blockFrom:number;blockTo:number;source?:TransferSource;memory?:AcceptedMemory;skillDefinition?:SkillDefinition}):DeliveryVerification{
  const verification:DeliveryVerification={version:'agentos.delivery.v2',skill,skillVersion:input.skillDefinition?.version??'1.0.0',dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo,...(input.source?{sourceHash:sourceCommitment(input.source)}:{}),...(input.memory?{memoryHash:resultHash(input.memory)}:{}),...(input.skillDefinition?{skillDefinition:structuredClone(input.skillDefinition)}:{})};
  validateVerification(verification);return verification;
 }
@@ -28,13 +30,20 @@ export function validateVerification(value:unknown):asserts value is DeliveryVer
  * Payment authenticity is separately checked by the runtime for the entire lineage.
  */
 export const MAX_MEMORY_DEPTH=8;
-export function acceptedMemoryRecords(value:unknown){return memoryRecords(value,0);}
-function memoryRecords(value:unknown,depth:number):{block:number;from:string;to:string;cents:number}[]{
+export const MAX_MEMORY_NODES=64;
+export function acceptedMemoryRecords(value:unknown){return memoryRecords(value,0,{nodes:0});}
+function memoryRecords(value:unknown,depth:number,bound:{nodes:number}):{block:number;from:string;to:string;cents:number}[]{
+ if(depth>=MAX_MEMORY_DEPTH||++bound.nodes>MAX_MEMORY_NODES)throw new Error('Accepted memory proof exceeds its bounded depth or size');
+ if(value&&typeof value==='object'&&(value as AcceptedMerge).version==='agentos.accepted-merge.v1'){
+  const merge=value as AcceptedMerge;if(Object.keys(merge).sort().join(',')!=='parents,strategy,version'||merge.strategy!=='concat-projections.v1'||!Array.isArray(merge.parents)||merge.parents.length<2||merge.parents.length>8||merge.parents.some(p=>!p||!['agentos.accepted-artifact.v1','agentos.accepted-artifact.v2'].includes(p.version)))throw new Error('Invalid accepted artifact merge');
+  const ids=merge.parents.map(p=>`${p.chainId}:${p.escrow.toLowerCase()}:${p.taskId}`);if(new Set(ids).size!==ids.length||new Set(merge.parents.map(p=>p.orderId)).size!==ids.length||merge.parents.some(p=>p.chainId!==merge.parents[0].chainId||p.escrow.toLowerCase()!==merge.parents[0].escrow.toLowerCase()))throw new Error('Merged parents must be distinct payments on the same deployment');
+  const rows=merge.parents.flatMap(p=>memoryRecords(p,depth,bound));if(rows.length>100||!Number.isSafeInteger(rows.reduce((sum,row)=>sum+row.cents,0)))throw new Error('Merged records exceed their bounds');return rows;
+ }
  const m=value as AcceptedArtifact,legacy=m?.version==='agentos.accepted-artifact.v1';
  const keys='artifactHash,artifactText,chainId,datasetText,escrow,orderId,'+(legacy?'':'projection,')+'settlementTransactionHash,spec,taskId,version';
  if(depth>=MAX_MEMORY_DEPTH||!m||typeof m!=='object'||Array.isArray(m)||Object.keys(m).sort().join(',')!==keys||!['agentos.accepted-artifact.v1','agentos.accepted-artifact.v2'].includes(m.version)||typeof m.orderId!=='string'||!/^chain-[a-zA-Z0-9-]{1,100}$/.test(m.orderId)||!Number.isSafeInteger(m.chainId)||m.chainId<=0||!/^0x[0-9a-fA-F]{40}$/.test(m.escrow)||[m.taskId,m.settlementTransactionHash,m.artifactHash].some(h=>!/^0x[0-9a-f]{64}$/.test(h))||typeof m.datasetText!=='string'||m.datasetText.length>32768||typeof m.artifactText!=='string'||m.artifactText.length>32768||!m.spec||Object.keys(m.spec).sort().join(',')!=='artifactUrl,datasetHash,datasetUrl,verification'||legacy&&(m.spec.verification?.memoryHash||m.spec.verification?.skill!=='treasury-report'))throw new Error('Invalid accepted artifact memory or lineage depth');
  validateVerification(m.spec.verification);
- const verdict=verifyAtDepth(m.datasetText,m.artifactText,m.taskId,m.spec,depth+1);
+ const verdict=verifyAtDepth(m.datasetText,m.artifactText,m.taskId,m.spec,depth+1,bound);
  if(!verdict.accepted||verdict.outputHash!==m.artifactHash)throw new Error('Parent artifact does not pass complete acceptance');
  const output=JSON.parse(m.artifactText).output,skill=m.spec.verification.skill;
  let entries:[string,number][];
@@ -61,8 +70,8 @@ function recompute(rows:unknown[],v:DeliveryVerification){
  }
  return {dataset:v.dataset,blockFrom:v.blockFrom,blockTo:v.blockTo,transferCount:rows.length,totalCents:Number(total),...(v.skill==='event-analysis'?{uniqueRecipients:recipients.size}:{allocations:Object.fromEntries([...recipients].map(([key,value])=>[key,Number(value)]))})};
 }
-export function verifyDelivery(datasetText:string,artifactText:string,taskId:Hex,expected:DeliverySpec|Hex){return verifyAtDepth(datasetText,artifactText,taskId,expected,0);}
-function verifyAtDepth(datasetText:string,artifactText:string,taskId:Hex,expected:DeliverySpec|Hex,depth:number){
+export function verifyDelivery(datasetText:string,artifactText:string,taskId:Hex,expected:DeliverySpec|Hex){return verifyAtDepth(datasetText,artifactText,taskId,expected,0,{nodes:0});}
+function verifyAtDepth(datasetText:string,artifactText:string,taskId:Hex,expected:DeliverySpec|Hex,depth:number,bound:{nodes:number}){
  const expectedDatasetHash=typeof expected==='string'?expected:expected.datasetHash;
  if(keccak256(stringToHex(datasetText))!==expectedDatasetHash)throw new Error('Evidence bytes do not match buyer commitment');
  const decoded=JSON.parse(datasetText),v=typeof expected==='string'?undefined:expected.verification;
@@ -72,7 +81,7 @@ function verifyAtDepth(datasetText:string,artifactText:string,taskId:Hex,expecte
   source=assertSourceInput(decoded.source,{...v,records:decoded.records});if(sourceCommitment(source)!==v.sourceHash)throw new Error('Source provenance differs from commitment');rows=decoded.records;
  }
  if(v?.memoryHash){
-  if(!decoded||Object.keys(decoded).sort().join(',')!=='memory,records,version'||decoded.version!=='agentos.memory-evidence.v1'||v.dataset!=='custom-transfers-v1'||v.blockFrom!==0||v.blockTo!==0||resultHash(decoded.memory)!==v.memoryHash||canonical(memoryRecords(decoded.memory,depth))!==canonical(decoded.records))throw new Error('Accepted memory differs from its commitment or derived records');
+  if(!decoded||Object.keys(decoded).sort().join(',')!=='memory,records,version'||decoded.version!=='agentos.memory-evidence.v1'||v.dataset!=='custom-transfers-v1'||v.blockFrom!==0||v.blockTo!==0||resultHash(decoded.memory)!==v.memoryHash||canonical(memoryRecords(decoded.memory,depth,bound))!==canonical(decoded.records))throw new Error('Accepted memory differs from its commitment or derived records');
   rows=decoded.records;
  }
  if(!Array.isArray(rows)||rows.length>10000)throw new Error('Invalid evidence');

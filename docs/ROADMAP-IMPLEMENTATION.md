@@ -10,7 +10,7 @@ User request: complete improvements in the review order, test and commit each it
 | 4 | Two-step workflow and memory references | Persisted dependencies, previous accepted artifact as next input, recovery without duplicate payment | Implemented; item validation below |
 | 5 | Public testnet and CRE settlement | Real wallet, registered workflow execution, actual forwarder payment/refund transactions; account access verified rather than assumed | In progress; receiver/publisher/reconciliation/reusable dispatcher implemented; public acceptance pending |
 | 6 | Third-party onboarding and hosted operation | New skill onboarding with integration acceptance; authenticated deployed consumer, monitoring and failure recovery | In progress; new skill and scoped consumer operations locally accepted; actual hosted operation remains open |
-| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 33-step HTTP/D1/EVM/model/supplier/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical 23-stage pass at aae3f7e remains scoped to that source. |
+| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 34-step HTTP/D1/EVM/model/supplier/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical 23-stage pass at aae3f7e remains scoped to that source. |
 
 The complete demo is a final gate after the individual changes. Public workflow deployment depends on actual account capabilities and configured infrastructure; local simulation does not satisfy item 5. No unattended schedule is enabled merely to represent deployment.
 
@@ -274,3 +274,17 @@ The complete demo is a final gate after the individual changes. Public workflow 
 - 失败报告 `outputs/cre-demo-2f574779-0000-4567-b30a-4cd0addaa8ec.json` 为 failed、cases=0，不计为模拟场景通过。本次没有完成这条新证据路径上的真实官方 CLI 验收；后续须在隧道网络可用时继续，不能用本地回归代替。CLI 日志、失败报告、隧道诊断、WASM、Node 和专项日志及 SHA-256 清单保存在 `outputs/validation-cre-evidence-2026-10-22/`。
 
 此提交完成移除 httpbin 依赖和可验证的发布重试改造，保留实际 HTTPS/CLI 和最终 33 步完整演示为开放验收关卡。临时隧道和 CRE 账户 API 仍是外部网络依赖，未声称离线运行、公共链、DON 或托管 SLA。其余 AgentOS 能力继续按上节范围推进，总体目标未完成。
+
+## 后续能力完善：受限并行工作流与多父成果汇合（2026-10-22，香港时间）
+
+- [x] 显式选择 2–4 个在途采购上限，v4 图按依赖启动就绪步骤；一个持久工作流作业及带 fencing token 的六分钟租约协调消费者/owner 恢复。单次 drive 内先顺序注资，再并行执行独立步骤；旧顺序协议与已存记录保持原语义。阻断/取消后已注资子订单交给原订单恢复/退款路径，旧独立作业不会绕过运行中的图调度。
+- [x] 合并输入绑定有序、互不重复的全部父成果及规范付款；允许共享祖先的菱形图，拒绝循环/前向依赖。条件跳过传播到汇合下游，退款/失败父步骤阻断新采购。Website、供应商和 CRE 均独立核算完整成果与拼接派生记录；运行时额外核验所有原订单的工作区、买方、部署及规范付款。拼接不去重，重叠输入会重复计入，界面明确说明；深度/节点数/字节/记录上限均保留。
+- [x] 真实模型可在明确启用并行模式后生成独立根及多输入汇合，服务端及 SDK 独立检查并发数和完整程序。模板 v2 保存并发数及输入边，套用仍清空会话授权。编辑器、规划器、模板、刷新恢复、同编号重试、中英文和移动端接通。
+
+最终四组真实 HTTP/D1/SDK/两个独立签名供应商进程/官方 ERC-8004/Vault/本地 EVM/固定 Qwen 3B 验收通过：`outputs/parallel-workflow-demo-16e6ce6c-fb96-42dc-84d9-131e5914bde0.json`。两家供应商实际执行窗口重叠后，由第三个签名采购消费汇合的已付款输入；丢创建响应只保留同一图及两个根。另验证两笔执行中取消后的退款、错误父结果阻断汇合，以及真实模型生成并人工批准的三步并行图。10 笔唯一注资、7 笔付款、3 笔退款；实际付款 1820 分、累计注资 2460 分，两家收款方分别收到 1620/200 分，仅一次买方会话签名。供应商每个作业请求一次、余额增量与派生成果核验吻合；6 个持久作业完成，pending/leased/dead 为零。首次四组通过报告同样保留，但不合并为一次运行。
+
+191/191 Node 回归、18/18 Chromium 回归、6/6 CRE SDK 测试（92 assertions）、网站/CRE 类型检查及生产构建通过。12 项实际进程内 EVM 工作流专项另外覆盖三根分支在途上限、租约过期后的旧 driver 被拒绝、共享祖先、条件跳过、篡改记录、外部买方和规范付款改变等。新增浏览器专项验证仅选一个父步骤不能启动、v2 模板、刷新及丢响应重试、两根和汇合实际三笔付款、一次签名、模板套用清空授权、中英文及无横向溢出，实际移动截图已查看。官方 CLI 对新验证器编译成功，binary hash 为 `9b8e03977e2e176eeee72afc6ff619d17cb1228bd8d1d12b1f473a73e980b4ce`；不将编译及 SDK mocks 说成实际 DON 或新的 CLI HTTPS 场景通过。
+
+旧链进程加载的验证器不因网页源代码同步而升级，故新建 5887/9255/8171/8172 的隔离环境；旧 5787/9155/8071/8072 服务、部署、D1 和签名历史均保留。当前环境见 `.sites-runtime/isolated-demo/current.json`。原始报告、类型检查修正前/后的日志、最终回归、CRE/WASM、启动记录与移动截图及逐文件 SHA-256 清单保存在 `outputs/validation-parallel-workflows-2026-10-22/`。
+
+协议见 [PARALLEL-WORKFLOWS.md](PARALLEL-WORKFLOWS.md)。本项已加入完整演示，现为 34 步，最终整套验收仍待其余功能完成后执行；增量回归不替代该关卡。语义记忆选择、通用插件、开放市场/信誉路由、独立钱包/细粒度链上授权与公网/实际 DON/托管运维验收仍在剩余范围；新 HTTPS 证据路径的官方 CLI 实测也保留为待网络恢复后的验收。继续按用户选择本地交付，不发布站点、启用托管调度或公共链广播，总体目标保持进行中。

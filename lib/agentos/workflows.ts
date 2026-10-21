@@ -3,12 +3,12 @@ import type {Address} from 'viem';
 import type {WalletDeployment} from '../../sdk/wallet.ts';
 import {inputEvidence} from '../../sdk/wallet.ts';
 import {canonical,type DeliverySpec} from '../../cre/workflow/verify.ts';
-import {acceptedArtifact,acceptedArtifactInput,memoryParent,verifyAcceptedOrder} from './artifact-memory.ts';
+import {acceptedArtifact,acceptedArtifactInput,mergedArtifactInput,memoryParent,verifyAcceptedOrder} from './artifact-memory.ts';
 import {digest,DomainError,normalizeInput,resolveSkillInput} from './engine.ts';
 import {createOrder,findOrder} from './orders.ts';
 import type {OrderChain} from './order-chain.ts';
 import type {TaskInput,Workspace} from './types.ts';
-import {workflowInput,type AgentWorkflow,type WorkflowStep,type WorkflowStepDraft,type WorkflowCondition} from './workflow-state.ts';
+import {workflowInput,workflowDependencies,type AgentWorkflow,type WorkflowStep,type WorkflowStepDraft,type WorkflowCondition} from './workflow-state.ts';
 import type {WorkflowReplan} from './workflow-replan.ts';
 import {workflowDraftSchema} from './workflow-schema.ts';
 import {vaultAllowance,assertVaultSeller} from './vault.ts';
@@ -17,18 +17,19 @@ import {validateWorkflowCondition} from './workflow-constraints.ts';
 import type {WorkflowSupplierAccess} from './workflow-suppliers.ts';
 
 type WorkflowBase={requestId:string;title:string;buyer:Address;vaultSessionId:string;input?:TaskInput;timeoutSeconds:number};
-export type WorkflowDraft=WorkflowBase&({agentIds:[string,string];budgets:[number,number];steps?:never;supplierPricing?:never}|{steps:WorkflowStepDraft[];supplierPricing?:'signed-at-execution-under-cap';agentIds?:never;budgets?:never});
+export type WorkflowDraft=WorkflowBase&({agentIds:[string,string];budgets:[number,number];steps?:never;supplierPricing?:never;parallelism?:never}|{steps:WorkflowStepDraft[];parallelism?:number;supplierPricing?:'signed-at-execution-under-cap';agentIds?:never;budgets?:never});
 export type EvidencePublisher=(bytes:ReturnType<typeof inputEvidence>)=>Promise<DeliverySpec>;
 export function findWorkflow(state:Workspace,id:string){const workflow=state.workflows?.find(w=>w.id===id);if(!workflow)throw new DomainError('Workflow not found.','NOT_FOUND');return workflow;}
 export const pendingWorkflows=(state:Workspace)=>(state.workflows??[]).filter(w=>w.status==='running');
 function selectedWorkflowInput(state:Workspace,w:AgentWorkflow,index:number){
  const source=workflowInput(w.steps[index],index);if(source.from==='original')return w.input;
  if(source.from==='step')return acceptedArtifactInput(findOrder(state,w.steps[source.step].orderId!));
+ if(source.from==='merge')return mergedArtifactInput(source.steps.map(i=>findOrder(state,w.steps[i].orderId!)));
  const root=w.replan?.roots.find(r=>r.orderId===source.orderId),order=findOrder(state,source.orderId),memory=acceptedArtifact(order);
  if(!root||memory.artifactHash!==root.artifactHash||memory.settlementTransactionHash!==root.settlementTransactionHash)throw new DomainError('Accepted replanning root differs from its reviewed payment.','FORBIDDEN');
  const input=acceptedArtifactInput(order);memoryParent(state,{input,buyer:w.buyer,deployment:w.deployment});return input;
 }
-const requestFields=(w:AgentWorkflow)=>({requestId:w.requestId,title:w.title,buyer:w.buyer,vaultSessionId:w.vaultSessionId,...(w.version==='agentos.workflow.v1'?{agentIds:w.steps.map(s=>s.agentId),budgets:w.steps.map(s=>s.budget)}:{steps:w.steps.map(s=>({agentId:s.agentId,budget:s.budget,input:s.input,...(s.supplierId?{supplierId:s.supplierId}:{}),...(s.when?{when:s.when}:{})}))}),...(w.version==='agentos.workflow.v3'?{supplierPricing:'signed-at-execution-under-cap'}:{}),input:w.input,timeoutSeconds:w.timeoutSeconds});
+const requestFields=(w:AgentWorkflow)=>({requestId:w.requestId,title:w.title,buyer:w.buyer,vaultSessionId:w.vaultSessionId,...(w.version==='agentos.workflow.v1'?{agentIds:w.steps.map(s=>s.agentId),budgets:w.steps.map(s=>s.budget)}:{steps:w.steps.map(s=>({agentId:s.agentId,budget:s.budget,input:s.input,...(s.supplierId?{supplierId:s.supplierId}:{}),...(s.when?{when:s.when}:{})}))}),...(w.steps.some(s=>s.supplierId)?{supplierPricing:'signed-at-execution-under-cap'}:{}),...(w.parallelism?{parallelism:w.parallelism}:{}),input:w.input,timeoutSeconds:w.timeoutSeconds});
 async function stepRequestId(requestId:string,index:number){const hex=(await digest({requestId,index})).slice(2);return `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-8${hex.slice(17,20)}-${hex.slice(20,32)}`;}
 async function addStepOrder(state:Workspace,w:AgentWorkflow,index:number,input:TaskInput,publish:EvidencePublisher,now:string,supplierAccess?:WorkflowSupplierAccess){
  const step=w.steps[index],agent=state.agents.find(a=>a.id===step.agentId);
@@ -36,7 +37,7 @@ async function addStepOrder(state:Workspace,w:AgentWorkflow,index:number,input:T
  let signedQuote;
  if(step.supplierId){
   const binding=step.supplierBinding;
-  if(w.version!=='agentos.workflow.v3'||!binding||!supplierAccess||supplierAccess.scope!==w.workspaceHash||binding.supplier.id!==step.supplierId||binding.identity.agentId!==step.agentId)throw new DomainError('Frozen workflow supplier is unavailable.','SUPPLIER_REJECTED');
+  if(!['agentos.workflow.v3','agentos.workflow.v4'].includes(w.version)||!binding||!supplierAccess||supplierAccess.scope!==w.workspaceHash||binding.supplier.id!==step.supplierId||binding.identity.agentId!==step.agentId)throw new DomainError('Frozen workflow supplier is unavailable.','SUPPLIER_REJECTED');
   const session=state.vaultSessions?.find(s=>s.sessionId===w.vaultSessionId);if(!session)throw new DomainError('Workflow Vault session is unavailable.','FORBIDDEN');
   assertVaultSeller(session,binding.identity.wallet);await supplierAccess.authorize(binding);
   await supplierAccess.checkSession(session,step.quote+w.steps.filter((s,i)=>i!==index&&!s.orderId&&!s.skippedAt).reduce((sum,s)=>sum+s.quote,0));
@@ -67,13 +68,15 @@ export async function createWorkflow(state:Workspace,raw:WorkflowDraft,deploymen
   resolveSkillInput(state,agent.skill,input);
   const source=definition.input;if(source.from==='accepted'&&!replan?.roots.some(r=>r.orderId===source.orderId))throw new DomainError('An accepted input requires an approved replanning root.','FORBIDDEN');
   if(definition.input.from==='step'&&definition.input.step>=index)throw new DomainError('Workflow input must reference an earlier step.');
+  if(source.from==='merge'&&(!draft.parallelism||source.steps.some(i=>i>=index)))throw new DomainError('Merged input requires parallel mode and distinct earlier steps.');
   if(definition.when)validateWorkflowCondition(definition.when,definitions.map(s=>state.agents.find(a=>a.id===s.agentId)?.skill),index);
   let supplierBinding;
   if(definition.supplierId){supplierBinding=await supplierAccess!.bind(state,agentId,definition.supplierId);if(supplierBinding.supplier.id!==definition.supplierId||supplierBinding.identity.agentId!==agentId||!supplierBinding.supplier.skills.includes(agent.skill))throw new DomainError('Workflow supplier does not support the selected registered service.','SUPPLIER_REJECTED');assertVaultSeller(session,supplierBinding.identity.wallet);await supplierAccess!.authorize(supplierBinding);}
   return {requestId:await stepRequestId(draft.requestId,index),agentId,skill:agent.skill,quote:definition.supplierId?budget:agent.price,budget,...(definition.supplierId?{supplierId:definition.supplierId,supplierBinding}:{}),...(!legacy?{input:definition.input,...(definition.when?{when:definition.when}:{})}:{})} as WorkflowStep;
  }));
  if(supplierMode){const gross=steps.reduce((sum,s)=>sum+s.quote,0);vaultAllowance(state,draft.vaultSessionId,draft.buyer,steps[0].skill,steps[0].budget,gross,now);await supplierAccess!.checkSession(session,gross);}
- const workflow:AgentWorkflow={...(replan?{replan:structuredClone(replan)}:{}),...(supplierMode?{workspaceHash:supplierAccess!.scope}:{}),version:supplierMode?'agentos.workflow.v3':legacy?'agentos.workflow.v1':'agentos.workflow.v2',id:'workflow-'+draft.requestId,requestId:draft.requestId,title:draft.title,buyer:draft.buyer,deployment:{...deployment},vaultSessionId:draft.vaultSessionId,input,timeoutSeconds:draft.timeoutSeconds,totalBudget:steps.reduce((sum,s)=>sum+s.budget,0),status:'running',steps,createdAt:now,updatedAt:now};
+ const workflow:AgentWorkflow={...(draft.parallelism?{parallelism:draft.parallelism}:{}),...(replan?{replan:structuredClone(replan)}:{}),...(supplierMode?{workspaceHash:supplierAccess!.scope}:{}),version:draft.parallelism?'agentos.workflow.v4':supplierMode?'agentos.workflow.v3':legacy?'agentos.workflow.v1':'agentos.workflow.v2',id:'workflow-'+draft.requestId,requestId:draft.requestId,title:draft.title,buyer:draft.buyer,deployment:{...deployment},vaultSessionId:draft.vaultSessionId,input,timeoutSeconds:draft.timeoutSeconds,totalBudget:steps.reduce((sum,s)=>sum+s.budget,0),status:'running',steps,createdAt:now,updatedAt:now};
+ if(draft.parallelism)return advanceParallelWorkflow({...state,workflows:[workflow,...state.workflows??[]]},workflow.id,undefined,publish,now,supplierAccess);
  steps[0].orderId='chain-'+steps[0].requestId;
  const next={...state,workflows:[workflow,...state.workflows??[]]};return addStepOrder(next,workflow,0,selectedWorkflowInput(next,workflow,0),publish,now,supplierAccess);
 }
@@ -86,6 +89,7 @@ export async function advanceWorkflow(state:Workspace,id:string,chain:OrderChain
  const original=findWorkflow(state,id);if(original.status!=='running')return state;
  const next=structuredClone(state),w=findWorkflow(next,id);
  try{
+  if(original.version==='agentos.workflow.v4')return await advanceParallelWorkflow(next,id,chain,publish,now,supplierAccess);
   for(let index=0;index<w.steps.length;index++){
    const step=w.steps[index];if(step.skippedAt)continue;
    if(step.orderId){
@@ -113,6 +117,25 @@ export async function advanceWorkflow(state:Workspace,id:string,chain:OrderChain
   if(!(error instanceof DomainError)||!['FORBIDDEN','INVALID_COMMAND','CONFLICT','SUPPLIER_REJECTED'].includes(error.code))throw error;
   const blocked=structuredClone(state),workflow=findWorkflow(blocked,id);workflow.status='blocked';workflow.lastError=error.message;workflow.updatedAt=now;return blocked;
  }
+}
+async function advanceParallelWorkflow(state:Workspace,id:string,chain:OrderChain|undefined,publish:EvidencePublisher,now:string,supplierAccess?:WorkflowSupplierAccess):Promise<Workspace>{
+ let next=state;const w=findWorkflow(next,id);if(w.status!=='running')return state;
+ const verified=new Set<number>();
+ async function paid(index:number){if(verified.has(index))return;const step=w.steps[index],order=step.orderId?findOrder(next,step.orderId):undefined;if(!order||order.status!=='completed'||order.settlement?.status!=='paid'||!chain)throw new DomainError('Wait for every paid accepted parent.','UNAVAILABLE');await verifyAcceptedOrder(next,order,chain);verified.add(index);}
+ for(const step of w.steps)if(step.orderId&&['refunded','cancelled'].includes(findOrder(next,step.orderId).status))throw new DomainError('A workflow step did not produce a paid accepted artifact.','FORBIDDEN');
+ let active=w.steps.filter(s=>s.orderId&&!['completed','refunded','cancelled'].includes(findOrder(next,s.orderId).status)).length;
+ for(const [index,step] of w.steps.entries()){
+  if(step.orderId||step.skippedAt)continue;const dependencies=workflowDependencies(step,index);
+  if(dependencies.some(i=>w.steps[i].skippedAt)){step.skippedAt=now;step.skipReason='An input or condition dependency was skipped.';w.updatedAt=now;continue;}
+  if(dependencies.some(i=>!w.steps[i].orderId||findOrder(next,w.steps[i].orderId!).status!=='completed'))continue;
+  for(const dependency of dependencies)await paid(dependency);
+  if(step.when&&!matches(findOrder(next,w.steps[step.when.step].orderId!).output!,step.when)){step.skippedAt=now;step.skipReason='The accepted output did not match the condition.';w.updatedAt=now;continue;}
+  if(active>=w.parallelism!)continue;
+  const source=workflowInput(step,index);if(source.from==='accepted'){if(!chain)continue;await verifyAcceptedOrder(next,findOrder(next,source.orderId),chain);}
+  const input=selectedWorkflowInput(next,w,index);step.orderId='chain-'+step.requestId;w.updatedAt=now;next=await addStepOrder(next,w,index,input,publish,now,supplierAccess);active++;
+ }
+ if(w.steps.every(s=>s.skippedAt||s.orderId&&findOrder(next,s.orderId).status==='completed')){for(const [index,step] of w.steps.entries())if(!step.skippedAt)await paid(index);w.status='completed';w.updatedAt=now;delete w.lastError;}
+ return next;
 }
 export function controlWorkflow(state:Workspace,id:string,action:'resume'|'cancel',now=new Date().toISOString()){
  const next=structuredClone(state),w=findWorkflow(next,id);if(w.status==='completed'||w.status==='cancelled')return state;

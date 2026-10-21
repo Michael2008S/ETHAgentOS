@@ -14,6 +14,7 @@ import {purchaseRouteAccess} from '@/lib/agentos/purchase-route-runtime';
 import {pendingWorkflows} from '@/lib/agentos/workflows';
 import {workflowPublisher} from '@/lib/agentos/workflow-runtime';
 import {runWorkflow} from '@/lib/agentos/workflow-runner';
+import {workflowDrivesOrder} from '@/lib/agentos/workflow-state';
 
 /** Owner-scoped recovery tick; also usable by the local unattended worker. */
 export async function POST(request: Request) {
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     const pending = pendingTasks(before.state).slice(0,16);
     const results = [];
     for (let i=0; i<pending.length; i+=4) results.push(...await Promise.all(pending.slice(i,i+4).map(t => runTask({read,execute},ownerId,t.id,{delayMs:0}))));
-    const orders=pendingOrders((await read(ownerId)).state).slice(0,8),orderResults=[];
+    const orderSnapshot=(await read(ownerId)).state,orders=pendingOrders(orderSnapshot).filter(o=>!workflowDrivesOrder(orderSnapshot,o)).slice(0,8),orderResults=[];
     if(orders.length){const {chain,planner,supplier,supplierAuthority,vaultFunder}=await configuredOrderChain(request);for(const order of orders)orderResults.push(await runOrder({read,updateWorkspace},ownerId,order.id,chain,{planner,supplier,supplierAuthority,vaultFunder}));}
     const workflows=pendingWorkflows((await read(ownerId)).state).slice(0,4),workflowResults=[];
     if(workflows.length){const configured=await configuredOrderChain(request);for(const workflow of workflows)workflowResults.push(await runWorkflow({read,updateWorkspace},ownerId,workflow.id,configured.chain,workflowPublisher(configured),{...configured,workflowSuppliers:workflowSupplierAccess(configured,before.scope)}));}

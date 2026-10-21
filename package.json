@@ -66,7 +66,8 @@
     "model:planning": "node scripts/model-planning-local.mjs",
     "demo:workflow-templates": "node scripts/demo-workflow-templates.mjs",
     "demo:workflow-replanning": "node scripts/demo-workflow-replanning.mjs",
-    "demo:auto-repair": "node scripts/demo-auto-repair.mjs"
+    "demo:auto-repair": "node scripts/demo-auto-repair.mjs",
+    "demo:workflow-parallel": "node scripts/demo-parallel-workflow.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

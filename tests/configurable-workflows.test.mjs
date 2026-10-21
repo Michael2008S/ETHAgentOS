@@ -12,7 +12,7 @@ import {workflowRequestSchema} from '../lib/agentos/workflow-schema.ts';
 import {futureWorkflowSteps} from '../lib/agentos/workflow-state.ts';
 import {runWorkflow} from '../lib/agentos/workflow-runner.ts';
 import {orderChain} from '../lib/agentos/order-chain.ts';
-import {acceptedArtifact,acceptedArtifactInput,verifyMemoryAuthority,verifyAcceptedOrder} from '../lib/agentos/artifact-memory.ts';
+import {acceptedArtifact,acceptedArtifactInput,mergedArtifactInput,verifyMemoryAuthority,verifyAcceptedOrder} from '../lib/agentos/artifact-memory.ts';
 import {inputEvidence} from '../sdk/wallet.ts';
 import {escrowABI,encodeSettlementReport} from '../sdk/chain.ts';
 import {specHash,verifyDelivery,resultHash,acceptedMemoryRecords} from '../cre/workflow/verify.ts';
@@ -42,6 +42,30 @@ async function fixture(){
  return {provider,client,wallet,seller,write,buyer,deployment,session,store,publish,chain,fund,draft,run,get state(){return state;},get counts(){return {fundCalls,publishes};}};
 }
 const step=(agentId,source='original',when)=>({agentId,budget:400,input:source==='original'?{from:'original'}:{from:'step',step:source},...(when?{when}:{})});
+
+test('parallel roots reserve all fees, share one durable scheduler and merge every canonical paid artifact exactly once',async()=>{
+ const f=await fixture();try{
+  const draft={...f.draft([step('sage'),step('atlas'),{...step('sage'),input:{from:'merge',steps:[0,1]}}]),parallelism:2};await f.store.updateWorkspace('owner',s=>createWorkflow(s,draft,f.deployment,f.publish));const w=f.state.workflows[0];assert.equal(w.version,'agentos.workflow.v4');assert.equal(f.state.chainOrders.length,2);assert.equal(futureWorkflowSteps(f.state).length,1);assert.deepEqual(workItems(f.state).map(j=>j.kind),['workflow']);await f.store.updateWorkspace('owner',s=>createWorkflow(s,draft,f.deployment,f.publish));assert.equal(f.state.chainOrders.length,2);
+  await f.run(w.id);const final=findWorkflow(f.state,w.id),orders=final.steps.map(s=>findOrder(f.state,s.orderId));assert.equal(final.status,'completed',final.lastError);assert.equal(final.runLease,undefined);assert.equal(f.counts.fundCalls,3);assert.equal(orders[2].input.memory.version,'agentos.accepted-merge.v1');assert.deepEqual(orders[2].input.memory.parents.map(p=>p.orderId),orders.slice(0,2).map(o=>o.id));assert.equal(orders[2].output.totalCents,1358);assert.equal(orders[2].input.records.length,3);assert.equal(orders[2].spec.verification.memoryHash,resultHash(orders[2].input.memory));await verifyMemoryAuthority(f.state,orders[2],f.chain);
+  for(const o of orders)assert.equal((await f.client.getContractEvents({address:f.deployment.escrow,abi:escrowABI,eventName:'Opened',args:{id:inputEvidence(o,f.buyer).id},fromBlock:0n})).length,1);
+  const original=f.chain.settlement;f.chain.settlement=async(o,h)=>o.id===orders[1].id?{...o.settlement,status:'refunded'}:original(o,h);await assert.rejects(verifyMemoryAuthority(f.state,orders[2],f.chain),/canonical/);f.chain.settlement=original;
+  assert.throws(()=>mergedArtifactInput([orders[0],orders[0]]),/distinct/);const foreign=structuredClone(f.state);findOrder(foreign,orders[1].id).buyer=f.seller;await assert.rejects(verifyMemoryAuthority(foreign,orders[2],f.chain),/workspace/);
+  const bytes=inputEvidence(orders[2],f.buyer),decoded=JSON.parse(bytes.datasetText);decoded.records[0].cents++;const changed=JSON.stringify(decoded);assert.throws(()=>verifyDelivery(changed,JSON.stringify({}),bytes.id,{...orders[2].spec,datasetHash:keccak256(stringToHex(changed))}),/derived records/);
+ }finally{await f.provider.disconnect();}
+});
+test('parallel diamonds permit a shared ancestor, propagate skipped joins and refuse malformed merge graphs before publication',async()=>{
+ const f=await fixture();try{
+  const draft={...f.draft([step('sage'),step('atlas',0),step('relay',0),{...step('sage'),input:{from:'merge',steps:[1,2]}}]),parallelism:2};await f.store.updateWorkspace('owner',s=>createWorkflow(s,draft,f.deployment,f.publish));await f.run(f.state.workflows[0].id);const w=f.state.workflows[0],last=findOrder(f.state,w.steps[3].orderId);assert.equal(w.status,'completed',w.lastError);assert.equal(last.output.totalCents,1358);await verifyMemoryAuthority(f.state,last,f.chain);
+  const skip={...f.draft([step('atlas'),step('relay','original',{step:0,field:'totalCents',operator:'gte',value:680}),{...step('sage'),input:{from:'merge',steps:[0,1]}},step('atlas',2)]),parallelism:2};await f.store.updateWorkspace('owner',s=>createWorkflow(s,skip,f.deployment,f.publish));await f.run('workflow-'+skip.requestId);const skipped=findWorkflow(f.state,'workflow-'+skip.requestId);assert.equal(skipped.status,'completed');assert.ok(skipped.steps.slice(1).every(s=>s.skippedAt&&!s.orderId));
+  const count=f.counts.publishes;for(const [parallelism,steps] of [[undefined,[step('atlas'),step('relay'),{...step('sage'),input:{from:'merge',steps:[0,1]}}]],[2,[step('atlas'),{...step('sage'),input:{from:'merge',steps:[0,2]}}]],[2,[step('atlas'),step('relay'),{...step('sage'),input:{from:'merge',steps:[1,0]}}]],[2,[step('atlas'),step('relay'),{...step('sage'),input:{from:'merge',steps:[0,0]}}]],[5,[step('atlas'),step('relay')]]])await assert.rejects(createWorkflow(f.state,{...f.draft(steps),...(parallelism?{parallelism}:{})},f.deployment,f.publish));assert.equal(f.counts.publishes,count);
+ }finally{await f.provider.disconnect();}
+});
+test('a graph lease fences a late driver after expiry, keeps the in-flight cap and recovers without duplicate principal',async()=>{
+ const f=await fixture();try{
+  const draft={...f.draft([step('atlas'),step('relay'),step('atlas'),{...step('sage'),input:{from:'merge',steps:[0,1,2]}}]),parallelism:2};await f.store.updateWorkspace('owner',s=>createWorkflow(s,draft,f.deployment,f.publish));const id=f.state.workflows[0].id;assert.equal(f.state.chainOrders.length,2);assert.equal(f.state.workflows[0].steps[2].orderId,undefined);
+  const old=runWorkflow(f.store,'owner',id,f.chain,f.publish,{vaultFunder:f.fund,delayMs:100});for(let n=0;n<200;n++){if(f.state.chainOrders.filter(o=>o.funding).length===2)break;await new Promise(done=>setTimeout(done,5));}assert.equal(f.state.chainOrders.filter(o=>o.funding).length,2);const oldToken=findWorkflow(f.state,id).runLease.token;await f.store.updateWorkspace('owner',s=>{findWorkflow(s,id).runLease.expiresAt='2000-01-01T00:00:00.000Z';return s;});await runWorkflow(f.store,'owner',id,f.chain,f.publish,{vaultFunder:f.fund});await old;await f.run(id);const w=findWorkflow(f.state,id);assert.equal(w.status,'completed',w.lastError);assert.notEqual(w.runLease?.token,oldToken);assert.equal(f.counts.fundCalls,4);assert.equal(f.state.chainOrders.length,4);for(const o of f.state.chainOrders)assert.equal((await f.client.getContractEvents({address:f.deployment.escrow,abi:escrowABI,eventName:'Opened',args:{id:inputEvidence(o,f.buyer).id},fromBlock:0n})).length,1);
+ }finally{await f.provider.disconnect();}
+});
 
 test('seven configured steps accept extension outputs, project nested memory, skip false branches, and pay each executed step exactly once',async()=>{
  const f=await fixture();try{

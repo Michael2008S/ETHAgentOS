@@ -46,6 +46,8 @@ npm run demo:evidence
 
 工作流可先保存为版本化模板，再导出/导入并显式绑定服务。套用只更新编辑器，保留当前输入并清空 Vault 会话选择；重新审阅并选择会话后启动。`npm run demo:workflow-templates` 实跑同一模板在两份输入上的独立采购，详见 [WORKFLOW-TEMPLATES](WORKFLOW-TEMPLATES.md)。
 
+并行模式可在编辑器或模型规划器中明确选择 2–4 个在途采购上限，并选择两个以上的前序已付款成果汇合。`npm run demo:workflow-parallel` 验证双独立供应商实际重叠执行、汇合后的签名交付、取消退款、失败阻断及真实模型生成并行方案。新验证协议的完整本地环境独立运行于 5887/9255/8171/8172，准确入口以 `.sites-runtime/isolated-demo/current.json` 为准；旧环境和数据保留，不通过重启旧链替换其部署。详见 [PARALLEL-WORKFLOWS](PARALLEL-WORKFLOWS.md)。
+
 未完成工作流可在规划来源中选择并生成替代方案。先处理完待定注资/退款，再审阅剩余步骤、已付款成果与含此前尝试的累计上限；批准前旧工作流不变。`npm run demo:workflow-replanning` 实跑错误供应商退款 → 真实模型一步/两步方案 → 批准丢响应恢复 → 复用已付款成果采购，详见 [WORKFLOW-REPLANNING](WORKFLOW-REPLANNING.md)。
 
 1. 任务总览运行成功、越权、错误交付、中断恢复四场景。观察授权、预算预留、成果、独立验证、付款/退款与收据。关闭页面后由服务端和队列继续推进。

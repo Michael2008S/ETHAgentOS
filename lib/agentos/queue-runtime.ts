@@ -1,5 +1,6 @@
 import {configuredRepairRuntime} from './workflow-repair-runtime';
 import {runWorkflowRepair} from './workflow-repair-runner';
+import {workflowDrivesOrder} from './workflow-state';
 import {workflowSupplierAccess} from './workflow-supplier-runtime';
 import {digest} from './engine';
 import { env } from 'cloudflare:workers';
@@ -33,9 +34,12 @@ export async function drainQueue(request: Request, ownerId?: string, intervalMs=
         const task=snapshot.state.tasks.find(t=>t.id===job.task_id);
         if(task?.executionMode!=='manual') failed=(await runTask(store,job.owner_id,job.task_id,{delayMs:0})).status==='retryable';
       } else if(job.kind==='order') {
+        const current=await store.read(job.owner_id),order=current.state.chainOrders?.find(o=>o.id===job.task_id);
+        if(!order||!workflowDrivesOrder(current.state,order)){
         const {chain,planner,supplier,supplierAuthority,vaultFunder}=await configuredOrderChain(request);
         const result=await runOrder(store,job.owner_id,job.task_id,chain,{maxSteps:3,planner,supplier,supplierAuthority,vaultFunder});
         failed=result.status==='retryable' && !!result.error;
+        }
       } else if(job.kind==='workflow'){
         const configured=await configuredOrderChain(request);
         const result=await runWorkflow(store,job.owner_id,job.task_id,configured.chain,workflowPublisher(configured),{...configured,maxSteps:3,workflowSuppliers:workflowSupplierAccess(configured,await digest({workspace:job.owner_id}))});
