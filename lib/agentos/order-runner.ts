@@ -1,3 +1,4 @@
+import {verifyOrderQuote} from './supplier-quote.ts';
 import {supplierForOrder} from './supplier-pool.ts';
 import type { Workspace } from './types.ts';
 import { advanceOrder,authorizeSettlement,claimModelLease,commitModelPlan,claimSupplierLease,commitSupplierDelivery,orderPolicy,findOrder,finishOrder,orderEvent,pendingOrders } from './orders.ts';
@@ -38,7 +39,7 @@ export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:O
         if(view.status===0&&order.vaultFunding&&BigInt(order.vaultFunding.deadline)<=view.timestamp){await store.updateWorkspace(ownerId,current=>{const next=structuredClone(current),o=findOrder(next,id);if(o.status==='funding'&&!o.funding){o.status='cancelled';o.failure='Vault funding deadline passed without an escrow.';orderEvent(o,'Vault purchase denied',o.failure,now,'warning');}return next;});return {orderId:id,status:'cancelled'};}
         const token=crypto.randomUUID();
         try{
-          if(view.status===0)await verifyMemoryAuthority(state,order,chain);
+          if(view.status===0){await verifyOrderQuote(order,Number(view.timestamp));await verifyMemoryAuthority(state,order,chain);}
           const claimed=await store.updateWorkspace(ownerId,current=>claimVaultFunding(current,id,token,view.timestamp+BigInt(vaultEscrowWindow(order)),now,view.status!==0)),leased=findOrder(claimed.state,id);
           if(leased.vaultFunding?.token!==token)return {orderId:id,status:'funding'};
           if(!options.vaultFunder)throw new DomainError('Vault executor is unavailable.','UNAVAILABLE');

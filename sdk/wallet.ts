@@ -1,3 +1,4 @@
+import {verifyOrderQuote} from '../lib/agentos/supplier-quote.ts';
 import {orderSeller} from '../lib/agentos/order-parties.ts';
 import { createPublicClient, createWalletClient, custom, defineChain, keccak256, stringToHex, type Address, type EIP1193Provider, type Hex,type PublicClient } from 'viem';
 import { AgentChainClient, centsToToken, chainTaskId, tokenABI, escrowABI, validateChainDeployment, type ChainDeployment, type ChainEvidence, type ChainIntent, type TransactionIntent } from './chain.ts';
@@ -97,6 +98,7 @@ export class AgentWalletSession {
     if(order.status!=='awaiting-funding'||order.funding||order.output||order.buyer.toLowerCase()!==this.account.toLowerCase()||canonical(order.deployment).toLowerCase()!==canonical(this.deployment).toLowerCase())throw new Error('Only the configured buyer may fund this unexecuted order.');
     if(!Number.isSafeInteger(windowSeconds)||windowSeconds<30||windowSeconds>604800)throw new Error('Order escrow window must be 30–604800 seconds.');
     const bytes=inputEvidence(order,this.account);if(bytes.datasetHash!==order.spec.datasetHash||canonical(order.spec.verification)!==canonical(bytes.verification))throw new Error('Order input commitment or verification differs.');
+    await verifyOrderQuote(order,Number((await this.client.getBlock()).timestamp));
     if(order.executor==='supplier'&&orderSeller(order).toLowerCase()!==this.deployment.seller.toLowerCase()){if(!order.agentIdentity||!order.supplier)throw new Error('A verified supplier identity is required.');await(await import('../lib/agentos/supplier-chain.ts')).authorizeSupplier(this.client,this.deployment,order.agentIdentity,order.supplier);}
     const {intent,transactions}=await this.chain.prepareFunding({workspace:walletNamespace(this.account),taskId:order.id,buyer:this.account,seller:orderSeller(order),quoteCents:order.quote,deadline:(await this.client.getBlock()).timestamp+BigInt(windowSeconds),spec:order.spec});
     let hash:Hex|undefined;for(const transaction of transactions)hash=await this.send(transaction,onSubmitted);

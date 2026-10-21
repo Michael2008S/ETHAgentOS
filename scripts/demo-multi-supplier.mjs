@@ -42,7 +42,7 @@ try{
  report.cases.push({name:'bounded multi-seller Vault, isolated supplier outage and original provider recovery without duplicate funding',singleSellerSession:single.sessionId,multiSellerSession:session,healthyOrder:healthy,recoveredOrder:recovered,status:'passed'});
  await assert.rejects(orders.create({...draft(1,'Changed supplier on replay'),requestId:recovered.requestId,supplierId:descriptors[0].id,vaultSessionId:session.sessionId}),/different supplier/);
  await buyer.send({to:deployment.vault,data:encodeFunctionData({abi:vaultABI,functionName:'allowSeller',args:[sellerB.account,false]})});await assert.rejects(orders.create({...draft(1,'Revoked payee denied'),vaultSessionId:session.sessionId}),/revoked/);
- const after=await balances();assert.equal(after[0]-before[0],6000000n);assert.equal(after[1]-before[1],4000000n);assert.deepEqual((await os.workspace()).ledger,initial.ledger);assert.equal((await orders.orders()).length,4);
+ const after=await balances();assert.equal(after[0]-before[0],4800000n);assert.equal(after[1]-before[1],4000000n);assert.deepEqual((await os.workspace()).ledger,initial.ledger);assert.equal((await orders.orders()).length,4);
  const cross=new AgentOrderClient(buyer,base,{'x-agentos-sandbox':'foreign-'+id});assert.equal((await cross.orders()).length,0);
  report.cases.push({name:'registry payee balances, signed seller-set denial, revocation, immutable supplier replay and owner isolation',before:before.map(String),after:after.map(String),status:'passed'});report.status='passed';for(const c of report.cases)console.log('PASS '+c.name);
 }catch(error){report.status='failed';report.error=error.stack;console.error(error.stack);process.exitCode=1;}

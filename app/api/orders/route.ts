@@ -1,3 +1,5 @@
+import {chainOrderInputSchema} from '@/lib/agentos/order-input-schema';
+import {makeSupplierQuoteRequest,verifySupplierQuote,supplierQuoteSchema} from '@/lib/agentos/supplier-quote';
 import {deliveryVerificationSchema,skillDefinitionSchema} from '@/lib/agentos/skill-schema';
 import {checkInputSource} from '@/lib/agentos/data-runtime';
 import {transferSourceSchema} from '@/lib/agentos/transfer-source';
@@ -15,11 +17,11 @@ import { canonical } from '@/cre/workflow/verify';
 import { deferInline } from '@/lib/agentos/auth';
 import {checkVaultBinding} from '@/lib/agentos/vault';
 const id=z.string().min(1).max(128),hash=z.string().regex(/^0x[0-9a-fA-F]{64}$/),address=z.string().regex(/^0x[0-9a-fA-F]{40}$/).refine(s=>!/^0x0{40}$/.test(s));
-const input=z.object({skillDefinition:skillDefinitionSchema.optional(),dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe(),source:transferSourceSchema.optional(),records:z.array(z.object({block:z.number().int().nonnegative().safe(),from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:z.number().int().nonnegative().safe()}).strict()).min(1).max(100).optional()}).strict();
+const input=chainOrderInputSchema;
 const https=z.string().url().max(4096).refine(s=>{const u=new URL(s);return u.protocol==='https:'&&!u.username&&!u.password&&!u.hash;});
 const verification=deliveryVerificationSchema;
 const schema=z.discriminatedUnion('action',[
-  z.object({action:z.literal('create'),vaultSessionId:z.string().uuid().optional(),executor:z.enum(['builtin','supplier']).default('builtin'),supplierId:z.string().regex(/^[a-z0-9-]{1,64}$/).optional(),planner:z.enum(['deterministic','llm']).default('deterministic'),requestId:z.string().uuid(),title:z.string().trim().min(1).max(160),agentId:id,budget:z.number().int().positive().max(1000000),buyer:address,input:input.optional(),scenario:z.enum(['success','injection','interruption','invalid-delivery']).default('success'),timeoutSeconds:z.number().int().min(1).max(86400).default(300),spec:z.object({datasetUrl:https,artifactUrl:https,datasetHash:hash,verification:verification.optional()}).strict().optional()}).strict(),
+  z.object({action:z.literal('create'),vaultSessionId:z.string().uuid().optional(),executor:z.enum(['builtin','supplier']).default('builtin'),supplierId:z.string().regex(/^[a-z0-9-]{1,64}$/).optional(),supplierQuote:supplierQuoteSchema.optional(),planner:z.enum(['deterministic','llm']).default('deterministic'),requestId:z.string().uuid(),title:z.string().trim().min(1).max(160),agentId:id,budget:z.number().int().positive().max(1000000),buyer:address,input:input.optional(),scenario:z.enum(['success','injection','interruption','invalid-delivery']).default('success'),timeoutSeconds:z.number().int().min(1).max(86400).default(300),spec:z.object({datasetUrl:https,artifactUrl:https,datasetHash:hash,verification:verification.optional()}).strict().optional()}).strict(),
   z.object({action:z.literal('challenge'),orderId:id,transactionHash:hash}).strict(),
   z.object({action:z.literal('activate'),orderId:id,nonce:z.string().uuid(),signature:z.string().regex(/^0x[0-9a-fA-F]+$/).min(130).max(8194)}).strict(),
   z.object({action:z.literal('sync'),orderId:id,transactionHash:hash.optional()}).strict(),
@@ -37,8 +39,6 @@ export async function POST(request:Request){
    const snapshot=await read(ownerId),prior=snapshot.state.chainOrders?.find(o=>o.requestId===body.requestId),selected=snapshot.state.agents.find(a=>a.id===body.agentId),normalized=selected?resolveSkillInput(snapshot.state,selected.skill,body.input):normalizeInput(body.input),bytes=inputEvidence({id:'chain-'+body.requestId,input:normalized,skill:selected?.skill},body.buyer as `0x${string}`);
    if(!prior)await checkInputSource(request,normalized);
    if(body.vaultSessionId&&!prior){const session=snapshot.state.vaultSessions?.find(s=>s.sessionId===body.vaultSessionId);if(!session?.signature||session.revokedAt)throw new DomainError('No active Vault session authorizes this purchase.','FORBIDDEN');await checkVaultBinding(client,deployment,session);}
-   const spec=prior?.spec??(localCall?await localCall<DeliverySpec>('/drafts',bytes):configured.evidence?await configured.evidence.prepare(bytes):body.spec);
-   if(!spec||spec.datasetHash!==bytes.datasetHash||body.spec&&canonical(body.spec)!==canonical(spec))throw new DomainError('Evidence URLs and hash must match the committed order input.');
    if(body.planner==='llm'&&!planner)throw new DomainError('Model service is not configured.','UNAVAILABLE');
    const bound=prior?prior.agentIdentity:snapshot.state.agentIdentities?.find(i=>i.agentId===body.agentId);
    const identity=bound?(prior?bound:await inspectIdentity(client,deployment,bound)):undefined;
@@ -46,8 +46,21 @@ export async function POST(request:Request){
    const chosenSupplier=body.executor==='supplier'?prior?.supplier??supplier?.selectById(body.supplierId).descriptor:undefined;
    if(prior&&body.supplierId!==undefined&&body.supplierId!==prior.supplier?.id)throw new DomainError('Request ID was already used with a different supplier.','IDEMPOTENCY_CONFLICT');
    if(body.executor==='supplier'){if(!chosenSupplier)throw new DomainError('Skill supplier is not configured.','UNAVAILABLE');if(!identity)throw new DomainError('Supplier execution requires an identity-bound order.');await authorizeSupplier(client,deployment,identity,chosenSupplier);}
-   const {action:_,supplierId:__,...fields}=body,draft={...fields,spec,input:normalized,...(body.planner==='llm'?{model:planner!.descriptor}:{}),...(identity?{agentIdentity:identity}:{}),...(body.executor==='supplier'?{supplier:chosenSupplier!}:{})} as OrderDraft;
-   const result=await updateWorkspace(ownerId,state=>createOrder(state,draft,deployment));if(draft.vaultSessionId&&!deferInline(request))scheduleOrders(ownerId,result.state,request);return Response.json({...result,order:findOrder(result.state,'chain-'+body.requestId)},{headers:{'Cache-Control':'no-store'}});
+   if(body.supplierQuote&&body.executor!=='supplier')throw new DomainError('Signed quotes require supplier execution.');
+   let quoteNow=Number((await client.getBlock()).timestamp);
+   let signedQuote=prior?.supplierQuote;
+   if(body.executor==='supplier'&&!prior){
+    if(!selected||!identity||!chosenSupplier)throw new DomainError('An identity-bound supplier service is required.');
+    const active=supplier?.selectById(chosenSupplier.id);if(!active?.quote)throw new DomainError('Supplier quote service is unavailable.','UNAVAILABLE');
+    const session=body.vaultSessionId?snapshot.state.vaultSessions?.find(s=>s.sessionId===body.vaultSessionId):undefined;
+    const expected=await makeSupplierQuoteRequest({requestId:body.requestId,workspaceHash:snapshot.scope,buyer:body.buyer as `0x${string}`,payer:session?.vault??body.buyer as `0x${string}`,agentId:body.agentId,skill:selected.skill,input:normalized,identity,deployment,supplier:chosenSupplier});
+    const offer=body.supplierQuote??await active.quote(expected);quoteNow=Number((await client.getBlock()).timestamp);
+    signedQuote=await verifySupplierQuote(offer,expected,chosenSupplier,quoteNow);
+   }
+   const spec=prior?.spec??(localCall?await localCall<DeliverySpec>('/drafts',bytes):configured.evidence?await configured.evidence.prepare(bytes):body.spec);
+   if(!spec||spec.datasetHash!==bytes.datasetHash||body.spec&&canonical(body.spec)!==canonical(spec))throw new DomainError('Evidence URLs and hash must match the committed order input.');
+   const {action:_,supplierId:__,...fields}=body,draft={...fields,...(signedQuote?{supplierQuote:body.supplierQuote??signedQuote}:{}),spec,input:normalized,...(body.planner==='llm'?{model:planner!.descriptor}:{}),...(identity?{agentIdentity:identity}:{}),...(body.executor==='supplier'?{supplier:chosenSupplier!}:{})} as OrderDraft;
+   const result=await updateWorkspace(ownerId,state=>createOrder(state,draft,deployment,undefined,{now:quoteNow,workspaceHash:snapshot.scope}));if(draft.vaultSessionId&&!deferInline(request))scheduleOrders(ownerId,result.state,request);return Response.json({...result,order:findOrder(result.state,'chain-'+body.requestId)},{headers:{'Cache-Control':'no-store'}});
   }
   const {state}=await read(ownerId),order=findOrder(state,body.orderId);
   if(body.action==='challenge'){

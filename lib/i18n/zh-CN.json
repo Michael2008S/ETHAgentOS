@@ -810,5 +810,17 @@
   "Optional wallet addresses separated by commas or spaces. The default seller remains included; every selected address is approved onchain and committed in the signed session.": "可选填钱包地址，以逗号或空格分隔。默认收款方始终包含在内；每个所选地址均须链上批准，并写入签名会话。",
   "The grant is limited to this workspace, current allowed skills and the selected sellers. Onchain daily limits also apply.": "授权仅限当前工作区、已允许的技能和所选收款方，同时受链上每日限额约束。",
   "The signed Vault session does not permit this seller.": "已签名的 Vault 会话不允许向此收款方付款。",
-  "The selected supplier is not configured.": "所选供应商尚未配置。"
+  "The selected supplier is not configured.": "所选供应商尚未配置。",
+  "Signed supplier quote": "供应商签名报价",
+  "Request signed quote": "获取签名报价",
+  "Supplier price": "供应商报价",
+  "Expires at chain time": "到期时间（链上时间）",
+  "Quote hash": "报价摘要",
+  "Inspect signed quote": "查看签名报价",
+  "Request a provider-signed price before committing this purchase. Changes to the draft require a new quote.": "提交采购前获取供应商签名的价格。修改草稿后需重新获取报价。",
+  "Form changed. Request a new quote.": "表单已修改，请重新获取报价。",
+  "Supplier quote is not currently valid. Request a new quote.": "供应商报价尚未生效或已过期，请重新获取报价。",
+  "Supplier quote signature or purchase commitment differs.": "供应商报价签名或采购承诺不匹配。",
+  "Order price differs from the signed supplier quote.": "订单价格与供应商签名报价不一致。",
+  "Supplier quote service is unavailable.": "供应商报价服务暂不可用。"
 }

@@ -1,3 +1,4 @@
+import {verifyOrderQuote} from './supplier-quote.ts';
 import {orderSeller} from './order-parties.ts';
 import {createWalletClient,http,defineChain,type Hex,type PublicClient} from 'viem';
 import {privateKeyToAccount} from 'viem/accounts';
@@ -22,6 +23,7 @@ export function vaultFunder(client:PublicClient,deployment:WalletDeployment,send
   }
   assertVaultSeller(order.vault,orderSeller(order));
   const view=await checkVaultBinding(client,deployment,order.vault),amount=centsToToken(order.quote,view.decimals),deadline=BigInt(order.vaultFunding.deadline);
+  await verifyOrderQuote(order,Number(view.now));
   if(deadline<=view.now||deadline>view.now+86400n||view.balance<amount||view.spent+amount>view.grant[1])throw new DomainError('Vault balance, deadline or daily allowance does not permit funding.','FORBIDDEN');
   return send(order,encodeFunctionData({abi:vaultABI,functionName:'execute',args:[bytes.id,orderSeller(order),amount,deadline,specHash(order.spec)]}));
  };

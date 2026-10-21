@@ -56,7 +56,8 @@
     "consumer": "node scripts/consumer.mjs",
     "demo:consumer": "node scripts/demo-consumer.mjs",
     "demo:workflow-configurable": "node scripts/demo-configurable-workflow.mjs",
-    "demo:multi-supplier": "node scripts/demo-multi-supplier.mjs"
+    "demo:multi-supplier": "node scripts/demo-multi-supplier.mjs",
+    "demo:quotes": "node scripts/demo-quotes.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

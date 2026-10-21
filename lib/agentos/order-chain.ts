@@ -1,3 +1,4 @@
+import {verifyOrderQuote} from './supplier-quote.ts';
 import {orderSeller} from './order-parties.ts';
 import { keccak256,stringToHex,type Hex,type PublicClient } from 'viem';
 import { AgentChainClient,centsToToken,escrowABI,type ChainIntent } from '../../sdk/chain.ts';
@@ -28,7 +29,7 @@ export function orderChain(client:PublicClient,deployment:WalletDeployment,local
   return {
     inspect,
     verifySignature:(order:ChainOrder,message:string,signature:Hex)=>client.verifyMessage({address:order.buyer,message,signature}),
-    async funding(order:ChainOrder,hash:Hex){const current=await inspect(order);if(![1,3].includes(current.status))throw new DomainError('A funded or refunded escrow is required for confirmation.');return {evidence:await chain.verifyEvidence(current.intent,hash,'funding'),deadline:current.intent.deadline,chainNow:current.timestamp,currentStatus:current.status};},
+    async funding(order:ChainOrder,hash:Hex){const current=await inspect(order);if(![1,3].includes(current.status))throw new DomainError('A funded or refunded escrow is required for confirmation.');const evidence=await chain.verifyEvidence(current.intent,hash,'funding');if(order.supplierQuote)await verifyOrderQuote(order,Number((await client.getBlock({blockNumber:BigInt(evidence.blockNumber)})).timestamp));return {evidence,deadline:current.intent.deadline,chainNow:current.timestamp,currentStatus:current.status};},
     settlement:verifySettlement,
     async completeEvidence(order:ChainOrder){
       if(!completeEvidence)return true;
