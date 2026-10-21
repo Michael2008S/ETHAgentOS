@@ -2,7 +2,7 @@
 
 The runtime now supports a bounded directory of 1–8 operator-configured execution suppliers. Each order freezes one descriptor (provider ID, signer, revision, skills and configuration hash) and one registry identity. Execution and retries resolve that exact descriptor rather than the current default. Reordering the directory cannot redirect an existing order; a changed/missing descriptor never silently selects another provider.
 
-This milestone implements the directory, explicit selection, independent ERC-8004 payment wallets, multi-payee Vault sessions and recovery of the originally selected supplier. Provider-signed offers are now implemented for all new supplier purchases; see [SUPPLIER-QUOTES](SUPPLIER-QUOTES.md). Automatic switching and an open registration/discovery market remain subsequent work. AI catalog hints still use workspace service prices; the signed offer determines the actual purchase price.
+This milestone implements the directory, explicit selection, independent ERC-8004 payment wallets, multi-payee Vault sessions and recovery of the originally selected supplier. Provider-signed offers are now implemented for all new supplier purchases; see [SUPPLIER-QUOTES](SUPPLIER-QUOTES.md). Automatic switching and an open registration/discovery market remain subsequent work. Wallet-bound AI comparison now obtains and compares signed provider prices; legacy no-buyer calls compare built-ins only. See [PURCHASE-COMPARISON](PURCHASE-COMPARISON.md).
 
 ## Operator configuration
 
@@ -24,7 +24,7 @@ GET `/api/suppliers` returns the historical default `descriptor` plus `descripto
 
 The default deployment object is preserved, so token/escrow/forwarder/receiver/RPC matching is not relaxed. Order identity and supplier are already part of the frozen order commitment. An arbitrary client-supplied seller address is not accepted as a new order field.
 
-AI comparison now enumerates the actually delegated supplier for each service and preserves its ID/configuration hash in the choice. Applying a suggestion selects that supplier explicitly. Comparison is advisory and creates no order or payment. Dynamic skill intent support and reputation-weighted routing remain separate work.
+AI comparison now enumerates the actually delegated supplier for each service, obtains signed offers for the current input/payer and preserves the exact offer, order UUID and supplier ID/configuration hash in the choice. Applying a suggestion selects that supplier explicitly. Comparison is advisory and creates no order or payment. Dynamic skill intent support and reputation-weighted routing remain separate work.
 
 ## Vault authorization
 
@@ -44,6 +44,6 @@ The primary local supplier publishes a bounded catalog of its own configuration 
 - `npm run demo:multi-supplier`: real HTTP/D1/SDK/local-EVM execution with two identities/signers/payees; manual and Vault payments; unauthorized supplier/payee refusal; a one-provider outage while the other completes; original-provider recovery; single funding events; recipient balances; revocation and workspace isolation. Its JSON report is under `outputs/multi-supplier-demo-*.json`.
 - `npm run test:browser`: provider directory, second provider wallet registration/delegation, persisted supplier selection, payment to the actual registry wallet, English/Chinese and mobile layout. The dedicated case requires a two-provider fixture; the standard test configuration supplies one.
 
-The full demo includes this check; adding signed quotes brings it to 26 ordered stages. Its setup records and, only on the local mock-token chain 31337, supplements the buyer to a 500-token fixture balance when needed; it does not reset the chain or workspace. This avoids failures caused solely by repeatedly consuming test tokens across prior runs. Set all service URLs to the same runtime, or run `npm run demo:full -- --runtime .sites-runtime/isolated-demo/current.json`. Existing reports with older sequences cannot be resumed as evidence of the new sequence.
+The full demo includes this check; adding signed-quote comparison brings it to 27 ordered stages. Its setup records and, only on the local mock-token chain 31337, supplements the buyer to a 500-token fixture balance when needed; it does not reset the chain or workspace. This avoids failures caused solely by repeatedly consuming test tokens across prior runs. Set all service URLs to the same runtime, or run `npm run demo:full -- --runtime .sites-runtime/isolated-demo/current.json`. Existing reports with older sequences cannot be resumed as evidence of the new sequence.
 
 A failed supplier execution currently retains its own checkpoint or follows that order's established refund rules. A future fallback must preserve the original escrow, confirm its terminal outcome and fit all attempts within an explicitly authorized budget before purchasing from a different provider. This document does not mark that routing controller as implemented. Public Sepolia, real browser-wallet and DON acceptance and hosted deployment remain independent gates.

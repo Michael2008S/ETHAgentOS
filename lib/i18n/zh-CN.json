@@ -822,5 +822,18 @@
   "Supplier quote is not currently valid. Request a new quote.": "供应商报价尚未生效或已过期，请重新获取报价。",
   "Supplier quote signature or purchase commitment differs.": "供应商报价签名或采购承诺不匹配。",
   "Order price differs from the signed supplier quote.": "订单价格与供应商签名报价不一致。",
-  "Supplier quote service is unavailable.": "供应商报价服务暂不可用。"
+  "Supplier quote service is unavailable.": "供应商报价服务暂不可用。",
+  "Supplier comparison uses signed offers for this input and payer. Unavailable offers are excluded; planning creates no order or payment.": "供应商比较使用绑定当前输入和付款方的签名报价；不可用报价会明确排除，规划不会创建订单或付款。",
+  "Purchase input changed. Compare services again.": "采购输入已变化，请重新比较服务。",
+  "A verified supplier offer is required.": "需要已验证的供应商报价。",
+  "Compared service prices": "参与比较的服务价格",
+  "Price evidence": "价格凭证",
+  "Workspace service price": "工作区服务价格",
+  "Offers excluded from comparison": "未参与比较的报价",
+  "identity-unavailable": "身份或委托不可用",
+  "quote-unavailable": "报价暂不可用或已过期",
+  "quote-rejected": "报价验证失败",
+  "over-budget": "超出预算",
+  "session-denied": "会话未授权",
+  "input-rejected": "输入不兼容"
 }
