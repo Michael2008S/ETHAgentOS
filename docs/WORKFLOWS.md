@@ -36,7 +36,7 @@ Workflow state and the first order are committed in one workspace CAS/D1 transac
 - `sdk/workflows.ts`: wallet/deployment-checked creation, listing and recovery controls.
 - Wallet UI: bilingual form, persisted draft/session selection, response-loss-safe request identity, progress, order links, cancellation and recovery.
 
-The runtime currently publishes workflow evidence through the configured local service. Public immutable publishing and actual DON execution remain roadmap item 5. This feature does not claim a public deployment. Workspaces are bounded to 100 workflows.
+The runtime publishes workflow evidence through the local service or a configured public HTTPS evidence service. The public publisher adapter is implemented; actual public deployment and DON execution remain roadmap item 5. This feature does not claim a public deployment. Workspaces are bounded to 100 workflows.
 
 ## Verification
 

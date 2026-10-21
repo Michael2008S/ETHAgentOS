@@ -1,5 +1,12 @@
 import {test,expect} from '@playwright/test';
+import {encodeFunctionData,formatUnits,parseAbi} from 'viem';
+import {AgentWalletSession,localWalletProvider} from '../../sdk/wallet.ts';
 const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',chain=process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545';
+test.beforeAll(async()=>{
+ const deployment=await(await fetch(chain+'/config')).json();if(deployment.mode!=='local'||deployment.chainId!==31337)throw new Error('Browser regression requires the local test chain.');
+ const wallet=await AgentWalletSession.connect(localWalletProvider(chain),deployment,false);
+ if(BigInt((await wallet.balances()).token)<20000000n){await wallet.send({to:deployment.token,data:encodeFunctionData({abi:parseAbi(['function mint(address,uint256)']),functionName:'mint',args:[wallet.account,100000000n]})});console.log('Added local test tokens for browser regression; existing balances/history were preserved.');}
+});
 test.beforeEach(async({context,page},info)=>{
  const sandbox='browser-'+crypto.randomUUID();info.annotations.push({type:'sandbox',description:sandbox});
  await context.route(base+'/api/**',route=>route.continue({headers:{...route.request().headers(),'x-agentos-sandbox':sandbox}}));
@@ -7,6 +14,7 @@ test.beforeEach(async({context,page},info)=>{
 });
 test.afterEach(async({},info)=>{if(info.errorsSeen)expect(info.errorsSeen).toEqual([]);});
 const headers=info=>({'x-agentos-sandbox':info.annotations.find(a=>a.type==='sandbox').description});
+const browserDailyCap=async(page,info)=>{const r=await page.request.get('/api/vault',{headers:headers(info)});expect(r.status()).toBe(200);const {view}=await r.json();return formatUnits(BigInt(view.spent)+100n*10n**BigInt(view.decimals),view.decimals);};
 
 test('lost create response retries the same real backend intent and pays once',async({page,context},info)=>{
  const ids=[];let lose=true;
@@ -72,7 +80,7 @@ test('Vault grant purchases without another signature and revocation removes pur
  // Use English controls to exercise the new translations and wallet state together.
  await page.getByLabel('Switch to English',{exact:true}).click();
  const panel=page.locator('details').filter({has:page.locator('summary',{hasText:'AgentVault · bounded purchasing'})});
- await panel.locator('summary').click();await panel.locator('input[name=deposit]').fill('10');await panel.locator('input[name=perTask]').fill('3');await panel.locator('input[name=total]').fill('10');await panel.locator('input[name=daily]').fill('100');
+ await panel.locator('summary').click();await panel.locator('input[name=deposit]').fill('10');await panel.locator('input[name=perTask]').fill('3');await panel.locator('input[name=total]').fill('10');await panel.locator('input[name=daily]').fill(await browserDailyCap(page,info));
  await panel.getByRole('button',{name:'Deposit, grant & sign session',exact:true}).click();
  const revoke=panel.getByRole('button',{name:'Revoke Vault purchases',exact:true});await expect(revoke).toBeEnabled({timeout:90000});expect(signatures).toBe(1);
  await page.getByText('Create a pre-funded order',{exact:true}).click();const form=page.locator('details.order-create');
@@ -101,7 +109,7 @@ test('workflow retry survives refresh and recovers two paid steps with accepted 
   if(lose){lose=false;await route.abort('failed');}else await route.fulfill({response});
  });
  await page.goto('/#vault');await page.getByRole('button',{name:'连接本地测试钱包',exact:true}).click();await page.getByLabel('Switch to English',{exact:true}).click();
- const vault=page.locator('details').filter({has:page.locator('summary',{hasText:'AgentVault · bounded purchasing'})});await vault.locator('summary').click();await vault.locator('input[name=deposit]').fill('10');await vault.locator('input[name=perTask]').fill('5');await vault.locator('input[name=total]').fill('10');await vault.locator('input[name=daily]').fill('100');await vault.getByRole('button',{name:'Deposit, grant & sign session',exact:true}).click();await expect(vault.getByRole('button',{name:'Revoke Vault purchases',exact:true})).toBeEnabled({timeout:90000});expect(signatures).toBe(1);
+ const vault=page.locator('details').filter({has:page.locator('summary',{hasText:'AgentVault · bounded purchasing'})});await vault.locator('summary').click();await vault.locator('input[name=deposit]').fill('10');await vault.locator('input[name=perTask]').fill('5');await vault.locator('input[name=total]').fill('10');await vault.locator('input[name=daily]').fill(await browserDailyCap(page,info));await vault.getByRole('button',{name:'Deposit, grant & sign session',exact:true}).click();await expect(vault.getByRole('button',{name:'Revoke Vault purchases',exact:true})).toBeEnabled({timeout:90000});expect(signatures).toBe(1);
  const panel=page.locator('#workflow-panel');await panel.locator('summary').click();await panel.locator('input[name=workflowTitle]').fill('Browser accepted memory workflow');
  await expect(panel.locator('select[name=workflowSession] option')).toHaveCount(2);const sessionId=await panel.locator('select[name=workflowSession] option').nth(1).getAttribute('value');await panel.locator('select[name=workflowSession]').selectOption(sessionId);
  await panel.getByRole('button',{name:'Start two-step workflow',exact:true}).click();await expect.poll(()=>ids.length).toBe(1);await expect(panel.getByRole('button',{name:'Start two-step workflow',exact:true})).toBeEnabled();

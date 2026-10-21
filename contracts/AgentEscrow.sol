@@ -25,7 +25,13 @@ contract AgentEscrow {
         require(token_!=address(0) && forwarder_!=address(0) && metadataHash_!=bytes32(0), "configuration");
         token=IERC20(token_);forwarder=forwarder_;metadataHash=metadataHash_;
     }
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId==0x01ffc9a7 || interfaceId==bytes4(keccak256("onReport(bytes,bytes)"));
+    }
+    function _readyForFunding() internal view virtual returns (bool) { return true; }
+    function _authorizedMetadata(bytes calldata metadata) internal view virtual returns (bool) { return keccak256(metadata)==metadataHash; }
     function openTask(bytes32 id, address seller, uint256 amount, uint64 deadline, bytes32 specHash) external nonReentrant {
+        require(_readyForFunding(),"workflow not bound");
         require(tasks[id].status==Status.None && id!=bytes32(0), "duplicate task");
         require(seller!=address(0) && seller!=address(this) && amount>0 && specHash!=bytes32(0), "task parameters");
         require(deadline>block.timestamp && deadline<=block.timestamp+7 days, "deadline");
@@ -39,7 +45,7 @@ contract AgentEscrow {
         Task storage t=tasks[id]; return(t.specHash,uint8(t.status),t.deadline);
     }
     function onReport(bytes calldata metadata, bytes calldata report) external nonReentrant {
-        require(msg.sender==forwarder && keccak256(metadata)==metadataHash, "untrusted report");
+        require(msg.sender==forwarder && _authorizedMetadata(metadata), "untrusted report");
         (bytes32 id,bytes32 specHash,bytes32 outputHash,bool accepted)=abi.decode(report,(bytes32,bytes32,bytes32,bool));
         Task storage t=tasks[id];require(t.status==Status.Funded,"terminal or missing task");
         require(t.specHash==specHash && block.timestamp<t.deadline,"stale or wrong task");

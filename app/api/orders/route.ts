@@ -36,7 +36,7 @@ export async function POST(request:Request){
    const snapshot=await read(ownerId),prior=snapshot.state.chainOrders?.find(o=>o.requestId===body.requestId),normalized=normalizeInput(body.input),selected=snapshot.state.agents.find(a=>a.id===body.agentId),bytes=inputEvidence({id:'chain-'+body.requestId,input:normalized,skill:selected?.skill},body.buyer as `0x${string}`);
    if(!prior)await checkInputSource(request,normalized);
    if(body.vaultSessionId&&!prior){const session=snapshot.state.vaultSessions?.find(s=>s.sessionId===body.vaultSessionId);if(!session?.signature||session.revokedAt)throw new DomainError('No active Vault session authorizes this purchase.','FORBIDDEN');await checkVaultBinding(client,deployment,session);}
-   const spec=prior?.spec??(localCall?await localCall<DeliverySpec>('/drafts',bytes):body.spec);
+   const spec=prior?.spec??(localCall?await localCall<DeliverySpec>('/drafts',bytes):configured.evidence?await configured.evidence.prepare(bytes):body.spec);
    if(!spec||spec.datasetHash!==bytes.datasetHash||body.spec&&canonical(body.spec)!==canonical(spec))throw new DomainError('Evidence URLs and hash must match the committed order input.');
    if(body.planner==='llm'&&!planner)throw new DomainError('Model service is not configured.','UNAVAILABLE');
    const bound=prior?prior.agentIdentity:snapshot.state.agentIdentities?.find(i=>i.agentId===body.agentId);

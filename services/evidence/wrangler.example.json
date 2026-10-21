@@ -1,0 +1,7 @@
+{
+  "name": "agentos-evidence",
+  "main": "worker.ts",
+  "compatibility_date": "2026-05-15",
+  "r2_buckets": [{"binding": "BUCKET", "bucket_name": "replace-with-your-evidence-bucket"}],
+  "vars": {"PUBLIC_ORIGIN": "https://replace-with-your-evidence-host.example", "ESCROW_ADDRESS": "REPLACE_WITH_DEPLOYED_SEPOLIA_RECEIVER"}
+}

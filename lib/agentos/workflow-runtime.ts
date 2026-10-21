@@ -8,7 +8,7 @@ import type {Workspace} from './types';
 import type {DeliverySpec} from '../../cre/workflow/verify';
 
 export function workflowPublisher(configured:Awaited<ReturnType<typeof configuredOrderChain>>):EvidencePublisher{
- return async bytes=>{if(!configured.localCall)throw new DomainError('Immutable workflow evidence publishing is not configured.','UNAVAILABLE');return configured.localCall!<DeliverySpec>('/drafts',bytes);};
+ return async bytes=>{if(configured.localCall)return configured.localCall<DeliverySpec>('/drafts',bytes);if(configured.evidence)return configured.evidence.prepare(bytes);throw new DomainError('Immutable workflow evidence publishing is not configured.','UNAVAILABLE');};
 }
 export function scheduleWorkflows(ownerId:string,state:Workspace,request:Request){
  const workflows=pendingWorkflows(state).slice(0,4);if(!workflows.length)return;

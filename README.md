@@ -181,3 +181,5 @@ console.log(result.status, result.receipt);
 Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/链上每日额度并签名会话，随后选择该会话创建自动注资订单，后续采购无需逐单签名。撤销阻止新注资，已注资订单保留原结算条件，退款回到 Vault 且不补回已用额度。配置与边界见 [VAULT](docs/VAULT.md)。`npm run demo:isolated` 使用 5187/8555/7471 和独立数据库，不覆盖已有环境；运行 `npm run demo:vault` 验证采购与退款。最终完整演示使用启用身份的隔离实例及 `npm run demo:full -- --runtime .sites-runtime/isolated-demo/current.json`；Vault 专项的跳过身份模式不算完整演示。
 
 两步工作流：钱包页可选择 Vault 会话，先采购资金分配报告，再采购基于已验收分配明细的汇总。两步报价、预算和成果引用固定，支持丢失响应、刷新、并发恢复与取消。运行 `npm run demo:workflow`，实现与信任边界见 [WORKFLOWS](docs/WORKFLOWS.md)。公共网络与最终完整演示仍按路线图单独验收。
+
+公共 CRE 接入准备：新增符合 ERC165/生产 metadata 布局的 AgentEscrowReceiver、一次性工作流绑定、独立 R2 证据发布和自动结算事件发现。实际公网部署、可复用 DON 工作流与真实钱包验收仍待完成；实现和配置边界见 [PUBLIC-CRE](docs/PUBLIC-CRE.md)。

@@ -3,6 +3,8 @@ declare namespace Cloudflare {
     DB?: D1Database;
     BUCKET?: R2Bucket;
     AGENTOS_CHAIN_CONFIGURATION?: string;
+    AGENTOS_EVIDENCE_CONFIGURATION?: string;
+    AGENTOS_EVIDENCE_WRITE_TOKEN?: string;
     AGENTOS_VAULT_EXECUTOR_PRIVATE_KEY?: string;
     AGENTOS_MODEL_CONFIGURATION?: string;
     AGENTOS_MODEL_API_KEY?: string;

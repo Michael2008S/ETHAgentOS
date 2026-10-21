@@ -5,12 +5,22 @@ import { DomainError } from './engine.ts';
 import { canonical } from '../../cre/workflow/verify.ts';
 import type { ModelPlan,OrderPlanner } from './model.ts';
 import { supplierRequest,type OrderSupplier,type SupplierDelivery } from './supplier.ts';
-import {claimVaultFunding,activateVaultOrder} from './orders.ts';
+import {claimVaultFunding,activateVaultOrder,vaultEscrowWindow} from './orders.ts';
 import type {VaultFunder} from './vault-executor.ts';
 import {verifyMemoryAuthority} from './artifact-memory.ts';
+import type {ChainOrder} from './orders.ts';
 type OrderStore={read(ownerId:string):Promise<{state:Workspace}>;updateWorkspace(ownerId:string,reduce:(state:Workspace)=>Promise<Workspace>|Workspace):Promise<{state:Workspace}>};
 export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:OrderChain,options:{delayMs?:number;now?:()=>string;maxSteps?:number;planner?:OrderPlanner;supplier?:OrderSupplier;supplierAuthority?:OrderSupplier['authorize'];vaultFunder?:VaultFunder}={}){
   let failures=0;
+  async function settlementHash(order:ChainOrder){
+    const hash=await chain.settle(order);if(hash)return hash;
+    const scan=await chain.scanSettlement(order);if(scan.transactionHash)return scan.transactionHash;
+    if(canonical(scan.cursor??null)!==canonical(order.settlementScan??null))await store.updateWorkspace(ownerId,state=>{
+      const current=findOrder(state,id);if(current.settlement||canonical(current.settlementScan??null)!==canonical(order.settlementScan??null))return state;
+      const next=structuredClone(state),updated=findOrder(next,id);if(scan.cursor)updated.settlementScan=scan.cursor;else delete updated.settlementScan;return next;
+    });
+    return null;
+  }
   for(let step=0;step<(options.maxSteps??16);step++){
     try{
       const {state}=await store.read(ownerId),order=findOrder(state,id),now=options.now?.()??new Date().toISOString();
@@ -21,7 +31,7 @@ export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:O
         const token=crypto.randomUUID();
         try{
           if(view.status===0)await verifyMemoryAuthority(state,order,chain);
-          const claimed=await store.updateWorkspace(ownerId,current=>claimVaultFunding(current,id,token,view.timestamp+BigInt(Math.max(30,order.timeoutSeconds)),now,view.status!==0)),leased=findOrder(claimed.state,id);
+          const claimed=await store.updateWorkspace(ownerId,current=>claimVaultFunding(current,id,token,view.timestamp+BigInt(vaultEscrowWindow(order)),now,view.status!==0)),leased=findOrder(claimed.state,id);
           if(leased.vaultFunding?.token!==token)return {orderId:id,status:'funding'};
           if(!options.vaultFunder)throw new DomainError('Vault executor is unavailable.','UNAVAILABLE');
           const hash=await options.vaultFunder(leased),verified=await chain.funding(leased,hash);
@@ -43,7 +53,7 @@ export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:O
           await store.updateWorkspace(ownerId,current=>{const next=structuredClone(current),o=findOrder(next,id);if(!o.settlementAuthorization&&!o.settlement){o.failure=error.message;o.status='awaiting-settlement';}return next;});continue;
         }
       }
-      if(view.status===2||view.status===3){const hash=await chain.settle(order);if(!hash)return {orderId:id,status:'awaiting-settlement'};const evidence=await chain.settlement(order,hash);await store.updateWorkspace(ownerId,current=>finishOrder(current,id,evidence,now));continue;}
+      if(view.status===2||view.status===3){const hash=await settlementHash(order);if(!hash)return {orderId:id,status:'awaiting-settlement'};const evidence=await chain.settlement(order,hash);await store.updateWorkspace(ownerId,current=>finishOrder(current,id,evidence,now));continue;}
       if(order.status==='awaiting-settlement'){
         if(order.executor==='supplier'&&!order.failure&&!order.settlementAuthorization){
           let denied=orderPolicy(state,order,now)??(order.deadlineAt&&order.deadlineAt<=now?'Execution deadline passed.':null);
@@ -52,7 +62,7 @@ export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:O
         }
         // Linearize the final authority check and immutable publication intent in D1.
         const prepared=await store.updateWorkspace(ownerId,current=>authorizeSettlement(current,id,view.intent.id,now)),ready=findOrder(prepared.state,id);
-        const hash=await chain.settle(ready);if(!hash)return {orderId:id,status:'awaiting-settlement'};
+        const hash=await settlementHash(ready);if(!hash)return {orderId:id,status:'awaiting-settlement'};
         const evidence=await chain.settlement(ready,hash);await store.updateWorkspace(ownerId,current=>finishOrder(current,id,evidence,now));continue;
       }
       if(view.timestamp>=view.intent.deadline){await store.updateWorkspace(ownerId,current=>{const next=structuredClone(current),o=findOrder(next,id);o.failure='Escrow deadline passed.';o.status='awaiting-settlement';return next;});continue;}

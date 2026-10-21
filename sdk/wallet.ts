@@ -21,6 +21,7 @@ export function walletDeployment(value: unknown): WalletDeployment {
   validateChainDeployment(d);
   if((d.mode==='local'?d.chainId!==31337:d.mode!=='testnet'||d.chainId!==11155111)||!/^0x[0-9a-fA-F]{40}$/.test(d.seller)||/^0x0{40}$/.test(d.seller)||!/^\d{1,20}$/.test(d.deployedBlock))throw new Error('Use local chain 31337 or Sepolia 11155111 with an actual seller and deployment block.');
   if(Boolean(d.vault)!==Boolean(d.vaultExecutor)||[d.vault,d.vaultExecutor].some(a=>a!==undefined&&(!/^0x[0-9a-fA-F]{40}$/.test(a)||/^0x0{40}$/.test(a))))throw new Error('Invalid Vault deployment.');
+  if(d.mode==='testnet'&&!d.receiver)throw new Error('Public testnet requires a bound CRE receiver identity.');
   return {...d};
 }
 export const walletNamespace=(buyer:Address)=>'wallet:'+buyer.toLowerCase();

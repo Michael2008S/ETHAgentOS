@@ -1,5 +1,6 @@
 import { decodeEventLog, encodeAbiParameters, encodeFunctionData, keccak256, parseAbi, parseAbiParameters, stringToHex, type Address, type Hex, type PublicClient } from 'viem';
 import { specHash, type DeliverySpec } from '../cre/workflow/verify.ts';
+import {creIdentityHash,validateReceiverIdentity,verifyCREReceiver,type CREReceiverIdentity} from './cre-receiver.ts';
 
 export const escrowABI = parseAbi([
   'function token() view returns(address)',
@@ -17,7 +18,7 @@ export const tokenABI = parseAbi([
   'function allowance(address owner,address spender) view returns(uint256)',
   'function approve(address spender,uint256 amount) returns(bool)',
 ]);
-export type ChainDeployment = {chainId:number;escrow:Address;token:Address;forwarder:Address;metadataHash:Hex;confirmations:number};
+export type ChainDeployment = {chainId:number;escrow:Address;token:Address;forwarder:Address;metadataHash:Hex;confirmations:number;receiver?:CREReceiverIdentity};
 export type ChainIntent = {id:Hex;buyer:Address;seller:Address;amount:bigint;deadline:bigint;specHash:Hex};
 export type TransactionIntent = {to:Address;data:Hex};
 export type ChainEvidence = {
@@ -31,6 +32,7 @@ const address=(value:string)=>/^0x[0-9a-fA-F]{40}$/.test(value)&&!/^0x0{40}$/.te
 const hash=(value:string)=>/^0x[0-9a-fA-F]{64}$/.test(value);
 export function validateChainDeployment(deployment:ChainDeployment){
   if(!Number.isSafeInteger(deployment.chainId)||deployment.chainId<=0||!Number.isSafeInteger(deployment.confirmations)||deployment.confirmations<1||![deployment.escrow,deployment.token,deployment.forwarder].every(value=>typeof value==='string'&&address(value))||typeof deployment.metadataHash!=='string'||!hash(deployment.metadataHash))throw new Error('Invalid chain deployment.');
+    if(deployment.receiver){validateReceiverIdentity(deployment.receiver);if(deployment.metadataHash!==creIdentityHash(deployment.receiver.workflowName,deployment.receiver.workflowOwner))throw new Error('CRE workflow identity differs from the configured metadata hash.');}
 }
 
 /** Preserve exact cents; never silently round a budget into token base units. */
@@ -66,6 +68,7 @@ export class AgentChainClient {
       c.readContract({address:d.token,abi:tokenABI,functionName:'decimals'}),
     ]);
     if(!same(token,d.token)||!same(forwarder,d.forwarder)||!same(metadata,d.metadataHash))throw new Error('Escrow deployment identity does not match configuration.');
+    if(d.receiver)await verifyCREReceiver(c,d.escrow,d.receiver);
     if(decimals>36)throw new Error('Unsupported token precision.');
     return {decimals};
   }

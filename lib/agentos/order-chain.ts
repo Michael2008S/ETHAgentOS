@@ -5,9 +5,11 @@ import { canonical,specHash } from '../../cre/workflow/verify.ts';
 import { matchingDeployment } from './chain-reconciliation.ts';
 import { DomainError } from './engine.ts';
 import { orderArtifact,type ChainOrder } from './orders.ts';
+import {scanSettledTask} from '../../sdk/settlements.ts';
+import type {EvidenceService} from './evidence-publisher.ts';
 
 export type LocalOrderCall=(path:string,body:unknown)=>Promise<{hash:Hex}>;
-export function orderChain(client:PublicClient,deployment:WalletDeployment,localCall?:LocalOrderCall){
+export function orderChain(client:PublicClient,deployment:WalletDeployment,localCall?:LocalOrderCall,publishArtifact?:EvidenceService['publish']){
   const chain=new AgentChainClient(client,deployment);
   async function inspect(order:ChainOrder){
     if(!matchingDeployment(order.deployment,deployment))throw new DomainError('Order deployment differs from the server configuration.','CONFLICT');
@@ -27,10 +29,17 @@ export function orderChain(client:PublicClient,deployment:WalletDeployment,local
       return evidence;
     },
     async settle(order:ChainOrder){
-      if(!localCall)return null;
       const current=await inspect(order);
+      if(!localCall){
+        if(current.status===1&&current.timestamp<current.intent.deadline&&publishArtifact){if(!order.settlementAuthorization)throw new DomainError('Artifact publication requires a committed settlement intent.','CONFLICT');await publishArtifact(current.intent.id,order.spec,order.settlementAuthorization.artifactText);}
+        return null;
+      }
       if(current.status===1&&current.timestamp<current.intent.deadline)await localCall('/artifacts',{id:current.intent.id,artifactText:orderArtifact(order,current.intent.id)});
       return (await localCall('/settle',{id:current.intent.id})).hash;
+    },
+    async scanSettlement(order:ChainOrder){
+      if(localCall||!order.funding)return {transactionHash:null,cursor:undefined};
+      return scanSettledTask(client,{escrow:deployment.escrow,taskId:inputEvidence(order,order.buyer).id,fundingBlock:order.funding.blockNumber,confirmations:deployment.confirmations,cursor:order.settlementScan});
     },
   };
 }

@@ -63,4 +63,6 @@ next-env.d.ts
 /cre/project.yaml
 /cre/workflow/workflow.yaml
 /cre/workflow/.cre_build_tmp.*
+/services/evidence/.dev.vars*
+/services/evidence/wrangler.local.json
 !/.env.example

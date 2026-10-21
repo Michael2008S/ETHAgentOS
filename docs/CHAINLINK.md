@@ -35,11 +35,13 @@ YAML 结构来自[官方模板](https://github.com/smartcontractkit/cre-template
 
 1. 按[官方安装文档](https://docs.chain.link/cre/getting-started/cli-installation/macos-linux)安装并登录 CRE CLI，执行 `npm run cre:prepare`，检查基于官方模板的 project.yaml / workflow.yaml；本地样例仍需实际网络与账户配置。
 2. 将 `workflow/main.ts` 和 `verify.ts` 加入生成的 TypeScript 工作流，安装项目已固定的 SDK 版本。复制 config.example.json 到忽略的 config.local.json，替换全部占位值。公开不可变 fixture 和交付文件，计算 hash。
-3. 从[官方 forwarder 目录](https://docs.chain.link/cre/guides/workflow/using-evm-client/onchain-write/forwarder-directory)核实目标链的 forwarder。拿到实际 workflow metadata 字节（对应登记的 workflow identity）后计算 metadataHash；不能用本地 EVM 测试中的 mock 字节代替真实配置。测试用 forwarder 与生产 forwarder 不混用。
-4. 编译、部署 AgentEscrow，构造器传标准测试 ERC-20、核实后的 forwarder 和 metadataHash；部署 AgentVault、存入测试代币、批准 executor 和 seller，设置小额度 grant。通过 owner 钱包签名，密钥留在钱包/秘密管理系统。
+3. 从[官方 forwarder 目录](https://docs.chain.link/cre/guides/workflow/using-evm-client/forwarder-directory)核实目标链的 forwarder。拿到实际 workflow metadata 字节（对应登记的 workflow identity）后计算 metadataHash；不能用本地 EVM 测试中的 mock 字节代替真实配置。测试用 forwarder 与生产 forwarder 不混用。
+4. 公共网络使用 AgentEscrowReceiver，传入标准测试 ERC-20、核实后的真实 forwarder、工作流 owner 和编码名称；在实际工作流登记后由部署者一次性绑定返回的 workflowId，绑定前不能注资。SDK 会核验 ERC165 接口与绑定。见 PUBLIC-CRE.md；部署 AgentVault、存入测试代币、批准 executor 和 seller，设置小额度 grant。通过 owner 钱包签名，密钥留在钱包/秘密管理系统。
 5. 用同一 DeliverySpec 计算 specHash，openTask 并保存 taskId、deadline。artifact JSON 使用 `deliveryArtifact()` 生成的 v2 完整成果信封，包含完整 output、outputHash、技能验收描述、datasetHash 与 taskId；不能继续发布旧摘要格式。
 6. 用官方 CLI 模拟生成的 workflow；需要广播测试交易时按官方文档启用广播，并确认使用测试资金。本地 CLI dry-run 已通过，公共网络广播和 DON 仍未验收。[模拟文档](https://docs.chain.link/cre/guides/operations/simulating-workflows)。
 7. 按账户权限申请 workflow 部署，并验证 report 通过真实 forwarder 到达合约。记录 execution ID、交易 hash、余额变化、相同任务二次 report 拒绝和超时退款。
 8. 网站已提供 EIP-1193 连接、链上余额、回执核验、买方签名、预注资后台执行及服务端复核写回 D1。仍需持续链重组监控并验收公共网络配置。不得把本地 D1 余额简单切换标签当作链上资金。
 
 ERC-8004 身份适配器位于 `sdk/identity.ts` 与 `sdk/agent-identity.ts`。已完成官方注册表的本地 EVM 注册、补齐 registrations、工作区签名绑定、订单身份快照、已付款反馈及撤销；公共测试网待验收。详见 `IDENTITY.md`。身份协议本身不承担付款。[ERC-8004 规范](https://ercs.ethereum.org/ERCS/erc-8004)。
+
+公共接收合约、R2 不可变证据发布适配器和已确认结算事件发现已实现，实际公网部署/DON 验收仍未完成。当前单任务 CRE 配置尚需改为复用的订单分发入口，详见 [PUBLIC-CRE](PUBLIC-CRE.md)。

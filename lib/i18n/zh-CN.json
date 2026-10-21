@@ -712,5 +712,7 @@
   "Inspect workflow": "查看工作流数据",
   "Workflow list is unavailable. Retry after recovery.": "工作流列表暂不可用，请在服务恢复后重试。",
   "Select Vault session": "选择 Vault 会话",
-  "Recover workflow": "继续执行工作流"
+  "Recover workflow": "继续执行工作流",
+  "Committed input and delivery artifacts will be published to the configured public HTTPS evidence service. Submit only data you intend to make public. Confirmed settlement receipts are discovered automatically.": "固定的输入与交付成果会发布到已配置的公开 HTTPS 证据服务。请仅提交你愿意公开的数据。运行时会自动发现并核验已确认的结算回执。",
+  "Public testnet requires a bound CRE receiver identity.": "公共测试网需要配置已绑定工作流身份的 CRE 接收合约。"
 }

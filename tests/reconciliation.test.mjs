@@ -56,9 +56,12 @@ test('server reconciliation verifies EVM evidence, binds wallet/workspace and sa
 
 test('server chain configuration has no production loopback fallback and rejects credential URLs',async()=>{
  const {serverChain}=await import('../lib/agentos/chain-config.ts');
+ const {creWorkflowName,creIdentityHash}=await import('../sdk/cre-receiver.ts');
  for(const origin of ['https://agentos.example','http://127.0.0.1:5177'])await assert.rejects(serverChain(new Request(origin)),error=>error.code==='UNAVAILABLE');
  const deployment={mode:'testnet',chainId:11155111,escrow:'0x'+'11'.repeat(20),token:'0x'+'22'.repeat(20),forwarder:'0x'+'33'.repeat(20),seller:'0x'+'44'.repeat(20),metadataHash:'0x'+'55'.repeat(32),confirmations:2,deployedBlock:'123'};
  for(const rpcUrl of ['http://127.0.0.1:8545','https://user:secret@rpc.example','https://rpc.example/#secret'])await assert.rejects(serverChain(new Request('https://agentos.example'),JSON.stringify({rpcUrl,deployment})),/HTTPS endpoint/);
+ await assert.rejects(serverChain(new Request('https://agentos.example'),JSON.stringify({rpcUrl:'https://rpc.example',deployment})),/bound CRE receiver/);
+ deployment.receiver={format:'cre-v1',workflowId:'0x'+'66'.repeat(32),workflowName:creWorkflowName('test-config'),workflowOwner:'0x'+'77'.repeat(20)};deployment.metadataHash=creIdentityHash(deployment.receiver.workflowName,deployment.receiver.workflowOwner);
  const resolved=await serverChain(new Request('https://agentos.example'),JSON.stringify({rpcUrl:'https://rpc.example',deployment}));assert.equal(resolved.deployment.chainId,11155111);
  await assert.rejects(serverChain(new Request('https://agentos.example'),JSON.stringify({rpcUrl:'https://rpc.example',deployment:{...deployment,mode:'local',chainId:31337}})),/wrong network mode/);
 });
