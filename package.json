@@ -59,7 +59,8 @@
     "demo:multi-supplier": "node scripts/demo-multi-supplier.mjs",
     "demo:quotes": "node scripts/demo-quotes.mjs",
     "demo:quote-planning": "node scripts/demo-quote-planning.mjs",
-    "demo:purchase-routes": "node scripts/demo-purchase-routes.mjs"
+    "demo:purchase-routes": "node scripts/demo-purchase-routes.mjs",
+    "demo:workflow-suppliers": "node scripts/demo-supplier-workflows.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

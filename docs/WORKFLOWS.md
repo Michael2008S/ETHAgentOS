@@ -4,6 +4,8 @@ Workflows can now compose 2–8 enabled services, including installed extension 
 
 The existing `agentIds: [report, summary]` / `budgets: [number, number]` API and persisted `agentos.workflow.v1` records keep their two-step behavior. New configurations use `steps` and are stored as `agentos.workflow.v2`; requests cannot mix both formats. No database migration is required.
 
+Configurations selecting an independent `supplierId` use `agentos.workflow.v3` and explicitly approve signed prices obtained at execution under per-step fee ceilings. Suppliers, identities and payees are frozen before the first purchase. See [supplier-backed workflows](SUPPLIER-WORKFLOWS.md) for pricing, reservations and recovery; v2 configurations retain their existing fixed prices.
+
 ## Creating a configuration
 
 The SDK accepts the same fields as the authenticated `POST /api/workflows` create endpoint. References use zero-based indices; the UI displays one-based step numbers.
@@ -73,4 +75,4 @@ Use a freshly launched isolated local chain for changes to verifier formats: the
 
 ## Remaining scope
 
-This is bounded sequential composition with conditional skipping and earlier-step references. Parallel execution, multi-input merges, generic workflow template distribution, dynamic model replanning, supplier-backed composed steps and arbitrary plugin code remain separate work. All skills still use the supported transfer/result contracts. Public Sepolia/browser-wallet/DON acceptance and hosted deployment are separate gates; local success does not satisfy them.
+This is bounded sequential composition with conditional skipping and earlier-step references. Parallel execution, multi-input merges, generic workflow template distribution, dynamic model replanning and arbitrary plugin code remain separate work. All skills still use the supported transfer/result contracts. Public Sepolia/browser-wallet/DON acceptance and hosted deployment are separate gates; local success does not satisfy them.

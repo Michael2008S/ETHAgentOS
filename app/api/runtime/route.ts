@@ -1,3 +1,4 @@
+import {workflowSupplierAccess} from '@/lib/agentos/workflow-supplier-runtime';
 import { owner, checkOrigin, read, execute,updateWorkspace } from '@/lib/agentos/store';
 import { runTask, pendingTasks } from '@/lib/agentos/runner';
 import { apiFailure } from '@/lib/agentos/api-failure';
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
     const orders=pendingOrders((await read(ownerId)).state).slice(0,8),orderResults=[];
     if(orders.length){const {chain,planner,supplier,supplierAuthority,vaultFunder}=await configuredOrderChain(request);for(const order of orders)orderResults.push(await runOrder({read,updateWorkspace},ownerId,order.id,chain,{planner,supplier,supplierAuthority,vaultFunder}));}
     const workflows=pendingWorkflows((await read(ownerId)).state).slice(0,4),workflowResults=[];
-    if(workflows.length){const configured=await configuredOrderChain(request);for(const workflow of workflows)workflowResults.push(await runWorkflow({read,updateWorkspace},ownerId,workflow.id,configured.chain,workflowPublisher(configured),configured));}
+    if(workflows.length){const configured=await configuredOrderChain(request);for(const workflow of workflows)workflowResults.push(await runWorkflow({read,updateWorkspace},ownerId,workflow.id,configured.chain,workflowPublisher(configured),{...configured,workflowSuppliers:workflowSupplierAccess(configured,before.scope)}));}
     const routes=pendingPurchaseRoutes((await read(ownerId)).state).slice(0,4),routeResults=[];
     if(routes.length){const configured=await configuredOrderChain(request);for(const route of routes)routeResults.push(await runPurchaseRoute({read,updateWorkspace},ownerId,route.id,purchaseRouteAccess(configured),configured));}
     const current = await read(ownerId);

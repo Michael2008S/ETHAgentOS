@@ -1,7 +1,8 @@
 import {after} from 'next/server';
 import {configuredOrderChain} from './order-runtime';
 import * as store from './store';
-import {DomainError} from './engine';
+import {DomainError,digest} from './engine';
+import {workflowSupplierAccess} from './workflow-supplier-runtime';
 import {pendingWorkflows,type EvidencePublisher} from './workflows';
 import {runWorkflow} from './workflow-runner';
 import type {Workspace} from './types';
@@ -12,5 +13,5 @@ export function workflowPublisher(configured:Awaited<ReturnType<typeof configure
 }
 export function scheduleWorkflows(ownerId:string,state:Workspace,request:Request){
  const workflows=pendingWorkflows(state).slice(0,4);if(!workflows.length)return;
- after(async()=>{try{const configured=await configuredOrderChain(request);for(const w of workflows)await runWorkflow(store,ownerId,w.id,configured.chain,workflowPublisher(configured),configured);}catch{console.error('[agentos] Workflow checkpoint awaits runtime recovery.');}});
+ after(async()=>{try{const configured=await configuredOrderChain(request);for(const w of workflows)await runWorkflow(store,ownerId,w.id,configured.chain,workflowPublisher(configured),{...configured,workflowSuppliers:workflowSupplierAccess(configured,await digest({workspace:ownerId}))});}catch{console.error('[agentos] Workflow checkpoint awaits runtime recovery.');}});
 }

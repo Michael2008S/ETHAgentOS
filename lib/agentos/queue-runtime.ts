@@ -1,3 +1,5 @@
+import {workflowSupplierAccess} from './workflow-supplier-runtime';
+import {digest} from './engine';
 import { env } from 'cloudflare:workers';
 import * as store from './store';
 import { claimJob, acknowledgeJob, queueSummary, workItems } from './queue';
@@ -34,7 +36,7 @@ export async function drainQueue(request: Request, ownerId?: string, intervalMs=
         failed=result.status==='retryable' && !!result.error;
       } else if(job.kind==='workflow'){
         const configured=await configuredOrderChain(request);
-        const result=await runWorkflow(store,job.owner_id,job.task_id,configured.chain,workflowPublisher(configured),{...configured,maxSteps:3});
+        const result=await runWorkflow(store,job.owner_id,job.task_id,configured.chain,workflowPublisher(configured),{...configured,maxSteps:3,workflowSuppliers:workflowSupplierAccess(configured,await digest({workspace:job.owner_id}))});
         failed=result.status==='retryable'&&!!result.error;
       } else if(job.kind==='purchase'){
         const configured=await configuredOrderChain(request);const result=await runPurchaseRoute(store,job.owner_id,job.task_id,purchaseRouteAccess(configured),{...configured,maxSteps:3});failed=result.status==='retryable'&&!!result.error;

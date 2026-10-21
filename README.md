@@ -183,6 +183,8 @@ Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/
 
 可配置工作流：钱包页可组合 2–8 步已安装技能，引用前序已验收成果并根据结果决定是否采购；支持条件跳过、预算释放、嵌套成果复核、丢失响应与并发恢复。保留原两步 API。运行 `npm run demo:workflow-configurable`，协议与信任边界见 [WORKFLOWS](docs/WORKFLOWS.md)。公共网络仍按路线图单独验收。
 
+供应商组合工作流：每步可选独立供应商，固定注册身份、签名配置和收款方；在批准的单步费用上限内，待前序已付款成果确定后获取并验证签名报价。超额或撤权阻止新采购，报价丢响应保留持久检查点。运行 `npm run demo:workflow-suppliers`，协议与边界见 [SUPPLIER-WORKFLOWS](docs/SUPPLIER-WORKFLOWS.md)。
+
 新技能接入：智能体页可安装带版本的受限技能定义，注册服务并在权限页明确授权。示例“资金集中度分析”由独立供应商计算，完整规则及成果经 CRE 独立复算后付款或退款。运行 `npm run demo:skill`；协议、SDK、参考供应商及边界见 [SKILL-ONBOARDING](docs/SKILL-ONBOARDING.md)。定义不加载任意代码，也不会自动扩大已有 Vault 会话权限。
 
 消费者运行：任务总览的运行状态面板可签发仅绑定当前工作区、可过期和撤销的消费者凭证。`npm run consumer` 提供独立重试进程及本地健康接口，`npm run demo:consumer` 验证断网、响应丢失、进程重启与撤销；配置和数据库升级见 [CONSUMER-OPERATIONS](docs/CONSUMER-OPERATIONS.md)。代码和本地验收不代表已部署托管消费者；未开启调度。

@@ -1,6 +1,6 @@
 # AgentOS implementation roadmap
 
-User request: complete improvements in the review order, test and commit each item separately, then execute the complete demo. Local evidence, public-chain evidence and deployment remain separate acceptance gates.
+User request: complete improvements in the review order, test and commit each item separately, then execute the complete demo. The updated objective requires a final complete regression after all remaining functions are finished; per-increment checks do not satisfy that final gate. Local evidence, public-chain evidence and deployment remain separate acceptance gates.
 
 | Order | Deliverable | Required evidence | State |
 | --- | --- | --- | --- |
@@ -10,7 +10,7 @@ User request: complete improvements in the review order, test and commit each it
 | 4 | Two-step workflow and memory references | Persisted dependencies, previous accepted artifact as next input, recovery without duplicate payment | Implemented; item validation below |
 | 5 | Public testnet and CRE settlement | Real wallet, registered workflow execution, actual forwarder payment/refund transactions; account access verified rather than assumed | In progress; receiver/publisher/reconciliation/reusable dispatcher implemented; public acceptance pending |
 | 6 | Third-party onboarding and hosted operation | New skill onboarding with integration acceptance; authenticated deployed consumer, monitoring and failure recovery | In progress; new skill and scoped consumer operations locally accepted; actual hosted operation remains open |
-| Local complete-demo gate | Execute the current complete local sequence after implementation commits | Ordered 23-step HTTP/D1/EVM/model/supplier/CRE dry-run evidence | Passed at aae3f7e; public gates below remain incomplete |
+| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 29-step HTTP/D1/EVM/model/supplier/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical 23-stage pass at aae3f7e remains scoped to that source. |
 
 The complete demo is a final gate after the individual changes. Public workflow deployment depends on actual account capabilities and configured infrastructure; local simulation does not satisfy item 5. No unattended schedule is enabled merely to represent deployment.
 
@@ -187,3 +187,22 @@ The complete demo is a final gate after the individual changes. Public workflow 
 - 前 25 步通过，包括自动改购七组验收、新建展示订单和证据检查。第 26 步官方 CLI/Javy WASM 编译成功，首个 accepted-delivery dry-run 成功且托管仍为 Funded；随后准备下一个场景的 httpbin.org 合成 HTTPS 证据预检报 `fetch failed`，整步退出码为 1。它与上次模拟器内部 10 秒 HTTP 超时是不同失败位置，不能合并称为本次模拟器超时。
 - 第 27 步可复用 CRE dispatcher 与第 28 步最终 doctor 未运行，完整演示未通过。报告：`outputs/full-demo-effa8791-ab91-460f-92ec-7fc8e0932411/report.json`。保留全部 26 步日志和 23 份子报告副本，`verification.json` 记录源码版本、报告、日志和子报告 SHA-256，包括可变的 showcase 输出快照。
 - 结束后另行运行本地 doctor，结果保留为同目录 `post-run-doctor.log`；这项独立检查不替代完整序列中未运行的最终 doctor。供应商组合工作流、其他平台能力和公网验收仍待继续；本次未发布站点、启用托管调度或向公共链广播交易。
+
+## 后续能力完善：供应商组合工作流（2026-10-22，香港时间）
+
+- [x] v3 工作流允许每步选择内置或独立供应商；固定供应商描述符、注册身份和收款方，保留 v1/v2 的固定价格与记录。
+- [x] 明确批准 `signed-at-execution-under-cap` 模式：前序付款成果尚未生成时不伪造提前报价；预留全部未来供应商费用上限、内置报价、工作区预算和订单槽位，逐步获取并独立验证精确输入的签名报价。超额停止，不自动换供应商或抬高预算。
+- [x] 已验收成果和规范付款逐层复核，条件跳过不报价、不付款；报价写入后丢响应保留原请求及持久检查点；撤权阻止后续采购，恢复相同委托后可显式继续；无效交付退款并阻断依赖采购。
+- [x] 内联执行、owner 恢复与持久消费者共用执行器；中英文供应商选择、收款/签名地址、费用上限说明、草稿恢复和同编号重试。
+
+协议及信任边界见 [SUPPLIER-WORKFLOWS.md](SUPPLIER-WORKFLOWS.md)。真实 HTTP/D1/SDK/双进程供应商/官方 ERC-8004/Vault/本地 EVM 的六组验收通过：`outputs/supplier-workflow-demo-e4c773e3-81ba-4c82-8f34-c39c73c56912.json`。实际注资 10 笔，9 笔付款、1 笔退款，另两笔未注资取消；累计注资 2960 分、实际付款 2760 分，两家供应商分别收到 2160 与 600 分，余额增量一致。主测试只签一份买方会话，链上存款/批准/委托另计；19 个队列作业完成，pending/leased/dead 均为零。
+
+新增混合执行专项也已通过：进程内 EVM 部署真实 ERC-8004 注册表和委托，执行“内置报告 → 独立签名供应商摘要 → 内置报告”，三步实际价格为 360/200/360 分，分别核对规范付款、嵌套成果和唯一 Opened 事件。供应商在该专项中使用进程内签名适配器，外部 HTTP/供应商日志由上述六组独立验证，不把进程内适配器说成公开第三方服务。
+
+最终 145/145 Node 回归、13/13 Chromium 回归、5/5 CRE SDK 测试（80 assertions）、网站/CRE 类型检查及生产构建均通过，新增混合专项所在文件的 5 项测试也单独通过。失败证据保留于 `outputs/validation-supplier-workflows-2026-10-22/`：报价故障模式误用、队列排空没有等待退避、浏览器首次恢复只完成父步骤，以及 Chromium 无法读取诊断响应体。测试已改用真实报价丢响应模式、等待队列可运行、明确等待创建重试结束，并直接复核 UI/工作区/链结果；补充等待后的专项和完整 13 项均通过，但不据此认定首次恢复失败的唯一原因。
+
+七组 HTTP 扩展脚本已加入混合场景，但补跑因自动权限审核连续两次超时未启动；这不是已执行的测试失败，也不是安全性拒绝。本轮不宣称七组 HTTP 全部通过。完整 demo 已加入本项，现为 29 步；用户要求的最终完整测试在其余功能全部完成后执行，本轮增量回归不替代该最终验收。
+
+原始日志、六组 HTTP 报告、混合 EVM 专项、完整回归、移动端截图及失败快照已留存；`verification.json` 记录逐文件 SHA-256 和证据范围。代码摘要为 `9d5b1c0763ab4f835ac474b69c5062e1758c9aa9d0a0ce4c717ecedc219a49f4`，测试源码摘要为 `74fa448ac0bf99075974769ca304f72e28dcb7797ad0b59129ee3661a7fc4979`。
+
+仍需完成动态目标拆解/重规划、并行与多输入合并、模板复用、语义记忆选择、通用插件、开放市场/信誉路由、独立钱包及细粒度链上授权，以及公网/实际 DON/托管运维的外部验收。仍按用户选择以本地 demo 交付，不发布站点或启用托管调度；总体目标尚未完成。
