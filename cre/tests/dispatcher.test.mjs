@@ -4,7 +4,7 @@ import {getNetwork,hexToBase64,bytesToHex} from '@chainlink/cre-sdk';
 import {decodeFunctionData,encodeAbiParameters,parseAbiParameters,parseAbi,decodeAbiParameters,keccak256,stringToHex} from 'viem';
 import {onCron} from '../workflow/handler.ts';
 import {evidenceRoot,selectReadyIds,SLOT_MILLISECONDS} from '../workflow/dispatcher.ts';
-import {deliveryVerification,deliveryArtifact,resultHash,specHash} from '../workflow/verify.ts';
+import {deliveryVerification,deliveryArtifact,resultHash,specHash,acceptedMemoryRecords} from '../workflow/verify.ts';
 import {expectedOutput} from '../../lib/agentos/engine.ts';
 import {executeRankedFlows} from '../../lib/agentos/ranked-flows.ts';
 
@@ -52,4 +52,21 @@ test('one unchanged dispatcher configuration independently accepts a new bounded
   task.spec.verification=verification;task.artifactText=JSON.stringify(deliveryArtifact(task.taskId,verification,task.spec.datasetHash,output));
  }
  expect(f.run().outcomes.every(o=>o.status==='reported')).toBe(true);expect(f.reports).toHaveLength(2);expect(f.reports.find(r=>r[0]===good.taskId)[3]).toBe(true);expect(f.reports.find(r=>r[0]===bad.taskId)[3]).toBe(false);expect(JSON.stringify(f.config)).toBe(before);
+});
+
+test('dispatcher independently validates nested accepted extension memory and rejects altered derived records',()=>{
+ const f=fixture(),parent=f.add('parent-report'),ranked=f.add('accepted-ranked-parent'),child=f.add('nested-summary'),bad=f.add('forged-nested-summary');
+ const definition={protocol:'agentos.skill-definition.v1',id:'ext:community.flow-ranking@1.0.0',version:'1.0.0',name:'Flow ranking',description:'Rank recipient concentration.',capabilities:['dataset.read','artifact.write'],input:'transfers.v1',output:'ranked-flows.v1',recipe:{kind:'ranked-flows.v1',groupBy:'to',topN:2,thresholdBps:5000}};
+ const base={dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:JSON.parse(parent.datasetText)},v=deliveryVerification('treasury-report',base);
+ parent.spec.verification=v;parent.artifactText=JSON.stringify(deliveryArtifact(parent.taskId,v,parent.spec.datasetHash,expectedOutput({skill:'treasury-report',input:base})));
+ const envelope=(task,version,projection)=>({version,...(projection?{projection}:{}),orderId:'chain-'+task.taskId.slice(2),chainId:11155111,escrow:f.config.escrowAddress,taskId:task.taskId,settlementTransactionHash:resultHash('payment '+task.taskId),artifactHash:resultHash(JSON.parse(task.artifactText)),datasetText:task.datasetText,artifactText:task.artifactText,spec:task.spec});
+ const memory=envelope(parent,'agentos.accepted-artifact.v1');
+ function set(task,skill,input){const verification=deliveryVerification(skill,input);task.datasetText=JSON.stringify({version:'agentos.memory-evidence.v1',memory:input.memory,records:input.records});const datasetHash=keccak256(stringToHex(task.datasetText));task.spec={...task.spec,datasetHash,datasetUrl:evidenceRoot(f.config.evidenceOrigin,f.config.escrowAddress)+'/dataset/'+datasetHash,verification};task.artifactText=JSON.stringify(deliveryArtifact(task.taskId,verification,task.spec.datasetHash,expectedOutput({skill,input})));}
+ set(ranked,definition.id,{dataset:'custom-transfers-v1',blockFrom:0,blockTo:0,records:acceptedMemoryRecords(memory),memory,skillDefinition:definition});
+ const nested=envelope(ranked,'agentos.accepted-artifact.v2','ranked-accounts.v1'),input={dataset:'custom-transfers-v1',blockFrom:0,blockTo:0,records:acceptedMemoryRecords(nested),memory:nested};
+ set(child,'event-analysis',input);set(bad,'event-analysis',input);
+ const changed=JSON.parse(bad.datasetText);changed.records[0].cents++;bad.datasetText=JSON.stringify(changed);bad.spec.datasetHash=keccak256(stringToHex(bad.datasetText));bad.spec.datasetUrl=evidenceRoot(f.config.evidenceOrigin,f.config.escrowAddress)+'/dataset/'+bad.spec.datasetHash;
+ f.tasks.delete(parent.taskId);f.tasks.delete(ranked.taskId);f.run();
+ expect(f.reports.find(r=>r[0]===child.taskId)[3]).toBe(true);
+ expect(f.reports.some(r=>r[0]===bad.taskId&&r[3])).toBe(false);
 });

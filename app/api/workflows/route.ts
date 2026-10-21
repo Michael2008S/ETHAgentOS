@@ -7,13 +7,7 @@ import {checkVaultBinding} from '@/lib/agentos/vault';
 import {createWorkflow,controlWorkflow,findWorkflow} from '@/lib/agentos/workflows';
 import {scheduleWorkflows,workflowPublisher} from '@/lib/agentos/workflow-runtime';
 import {deferInline} from '@/lib/agentos/auth';
-import {transferSourceSchema} from '@/lib/agentos/transfer-source';
-const id=z.string().min(1).max(128),integer=z.number().int().nonnegative().safe();
-const input=z.object({dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:integer,blockTo:integer,source:transferSourceSchema.optional(),records:z.array(z.object({block:integer,from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:integer}).strict()).min(1).max(100).optional()}).strict();
-const schema=z.discriminatedUnion('action',[
- z.object({action:z.literal('create'),requestId:z.string().uuid(),title:z.string().trim().min(1).max(120),buyer:z.string().regex(/^0x[0-9a-fA-F]{40}$/),vaultSessionId:z.string().uuid(),agentIds:z.tuple([id,id]),budgets:z.tuple([integer.positive().max(1000000),integer.positive().max(1000000)]),input:input.optional(),timeoutSeconds:z.number().int().min(30).max(86400).default(300)}).strict(),
- z.object({action:z.enum(['resume','cancel']),workflowId:id}).strict(),
-]);
+import {workflowRequestSchema as schema} from '@/lib/agentos/workflow-schema';
 function failure(error:unknown){const status=error instanceof DomainError?({UNAUTHORIZED:401,FORBIDDEN:403,NOT_FOUND:404,CONFLICT:409,IDEMPOTENCY_CONFLICT:409,UNAVAILABLE:503}[error.code]??400):error instanceof z.ZodError||error instanceof SyntaxError?400:503;return Response.json({error:error instanceof DomainError?error.message:error instanceof z.ZodError||error instanceof SyntaxError?'Invalid workflow request.':'Workflow service is unavailable. Checkpoint retained.'},{status,headers:{'Cache-Control':'no-store'}});}
 export async function POST(request:Request){try{
  checkOrigin(request);const ownerId=owner(request);

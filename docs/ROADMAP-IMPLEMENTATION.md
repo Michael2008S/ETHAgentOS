@@ -96,3 +96,21 @@ The complete demo is a final gate after the individual changes. Public workflow 
 - The report sequence was independently matched against scripts/demo-full.mjs. All step logs and 19 referenced child artifacts were hashed; the artifacts were copied into the run's artifacts/ directory, including the otherwise mutable outputs/showcase.json. verification.json retains these hashes, the tested source commit and source digest 47b0c1a61d0367e9bfecc61420ff03d8c37448786bc01531a19a7218e8ee4a9e. A newer run cannot silently replace this run's retained evidence.
 - The earlier 115 Node tests, nine Chromium regressions, four SDK CRE tests, type checks and production build remain the applicable implementation checks. This local run does not claim a new remote CI execution, Site deployment, extension-wallet acceptance or registered DON execution.
 - Completion audit: items 1–4 and the current local-demo gate have direct implementation/runtime evidence. Item 5 lacks actual Sepolia contracts/evidence hosting, browser wallet and production-forwarder/DON receipts; item 6 lacks an actual external consumer/monitoring deployment. No hosted schedule was enabled under the user's existing preference. The overall goal remains incomplete; public gates must be accepted separately, and any later code changes require appropriate regression and a renewed complete-demo check.
+
+## 后续能力完善：可配置成果工作流（2026-10-21）
+
+本轮持续目标仍是补齐未完成功能并按项提交，不以本地 demo 通过替代完整 AgentOS 或公共链验收。
+
+- [x] 固定两步扩展为 2–8 步配置，支持已安装的扩展技能、原始输入或前序成果引用，保留 v1 API/记录。
+- [x] 前序已验收结果条件判断、跳过采购、依赖跳过传播和对应预算释放。
+- [x] 带显式投影的 v2 成果记忆，支持报告、排名、摘要以及有深度和大小上限的嵌套引用，逐层验算及付款复核。
+- [x] 中英文配置界面、工作区/买家隔离草稿、同请求恢复、阶段状态展示。
+- [x] 新的真实 HTTP/D1/SDK/队列/本地 EVM 六步演示，四笔付款、两步跳过；加入完整 demo 序列。
+
+说明、协议及验收命令见 [WORKFLOWS.md](WORKFLOWS.md)。仍需继续：并行/多输入合并及模板复用、多供应商发现/比较/切换、目标驱动采购与记忆检索、通用插件和验收扩展、独立钱包及链上细粒度授权、市场信誉路由、持续数据/商业结算/运维能力。公网钱包、实际 CRE DON 和托管部署的外部验收保持待完成；本轮未发布站点或启用托管调度。
+
+本项最终验收：119/119 Node 测试、9/9 Chromium 回归、5/5 CRE SDK 测试（80 assertions）、网站与 CRE 类型检查、生产构建通过。真实本地六步验收见 `outputs/configurable-workflow-demo-b49ca987-1679-477a-bacf-df57d121fe4c.json`；旧版恢复回归见 `outputs/workflow-demo-2b7736ee-f567-4d40-b996-471aa1ffd6f7.json`。本项的独立浏览器失败复现发现条件控件的精确标签无法匹配，已补充明确的可访问名称，单项复测和最终九项整套回归均通过。
+
+新的验收环境为 `http://127.0.0.1:5487`（链 8855、供应商 7771）。旧链 8755 使用启动时加载的旧验证器，实测 `/drafts` 对新 v2 成果记忆返回 400；因此保留旧运行环境与付款记录，另起隔离环境。旧环境失败演示的后续未购买步骤已取消，已付两笔保持原状。完整 demo 序列已加入新检查，变为 24 步；尚未重跑新的整套 24 步，既有 23 步证据只证明此前版本。
+
+实际 CRE CLI/Javy WASM 构建也通过，binary SHA-256：`856515606505a86b37bf5f444380ef9040e9b697fb2608b590a3c08bb389bfd4`；这只证明编译成功，不代表已注册或由 DON 执行。
