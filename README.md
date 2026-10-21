@@ -191,6 +191,8 @@ Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/
 
 目标驱动规划：模型从已授权服务目录生成 2–8 步计划，可引用前序成果并在明确启用后添加结果条件。规划只保存审核记录，批准摘要后才创建对应工作流和订单；价格或供应商身份变更会拒绝沿用旧计划。运行 `npm run demo:workflow-planning`，协议及模型配置见 [WORKFLOW-PLANNING](docs/WORKFLOW-PLANNING.md)。
 
+自动修复提案：可为未完成工作流明确设置模型尝试次数、有效期和累计费用上限；失败后由持久消费者核验退款及已付款成果，并自动生成替代方案。每份方案仍须人工批准才启动新采购；批准后沿用原到期时间、累计额度与尝试次数，停用会丢弃尚未完成的推理结果。运行 `npm run demo:auto-repair`，协议和本地验收边界见 [AUTOMATIC-REPAIR](docs/AUTOMATIC-REPAIR.md)。
+
 新技能接入：智能体页可安装带版本的受限技能定义，注册服务并在权限页明确授权。示例“资金集中度分析”由独立供应商计算，完整规则及成果经 CRE 独立复算后付款或退款。运行 `npm run demo:skill`；协议、SDK、参考供应商及边界见 [SKILL-ONBOARDING](docs/SKILL-ONBOARDING.md)。定义不加载任意代码，也不会自动扩大已有 Vault 会话权限。
 
 消费者运行：任务总览的运行状态面板可签发仅绑定当前工作区、可过期和撤销的消费者凭证。`npm run consumer` 提供独立重试进程及本地健康接口，`npm run demo:consumer` 验证断网、响应丢失、进程重启与撤销；配置和数据库升级见 [CONSUMER-OPERATIONS](docs/CONSUMER-OPERATIONS.md)。代码和本地验收不代表已部署托管消费者；未开启调度。

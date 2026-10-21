@@ -3,7 +3,7 @@ import ganache from 'ganache';import {createPublicClient,createWalletClient,cust
 import {compile} from '../scripts/compile-contracts.mjs';import {seed} from '../lib/agentos/engine.ts';
 import {createOrder,findOrder} from '../lib/agentos/orders.ts';import {orderChain} from '../lib/agentos/order-chain.ts';import {runOrder} from '../lib/agentos/order-runner.ts';
 import {inputEvidence} from '../sdk/wallet.ts';import {escrowABI,encodeSettlementReport} from '../sdk/chain.ts';import {specHash,verifyDelivery} from '../cre/workflow/verify.ts';
-import {prepareVaultSession,checkVaultBinding,vaultABI} from '../lib/agentos/vault.ts';import {vaultFunder} from '../lib/agentos/vault-executor.ts';
+import {prepareVaultSession,checkVaultBinding,checkVaultSessionAllowance,vaultABI} from '../lib/agentos/vault.ts';import {vaultFunder} from '../lib/agentos/vault-executor.ts';
 
 test('one signed Vault session funds two purchases, refunds to Vault, caps total and recovers a mined transfer after lost response',async()=>{
  const provider=ganache.provider({logging:{quiet:true},chain:{hardfork:'shanghai',chainId:31337}}),client=createPublicClient({transport:custom(provider),cacheTime:0}),wallet=createWalletClient({transport:custom(provider),chain:null}),[buyer,seller,forwarder,executor]=await wallet.getAddresses(),contracts=compile();
@@ -16,6 +16,9 @@ test('one signed Vault session funds two purchases, refunds to Vault, caps total
   const account=privateKeyToAccount(provider.getInitialAccounts()[buyer.toLowerCase()].secretKey),session=await prepareVaultSession(state,'owner',deployment,client,{buyer,perTaskCents:300,totalCents:720,dailyCents:1000},crypto.randomUUID());
   assert.equal(session.totalCents,720);assert.equal(session.dailyCents,1000);
   session.signature=await account.signMessage({message:session.message});signatures++;assert.equal(await client.verifyMessage({address:buyer,message:session.message,signature:session.signature}),true);state.vaultSessions=[session];
+  assert.equal((await checkVaultSessionAllowance(client,deployment,session,0)).spent,0n);
+  await assert.rejects(checkVaultSessionAllowance(client,deployment,{...session,signature:undefined},0),/active Vault session/);
+  await assert.rejects(checkVaultSessionAllowance(client,deployment,session,-1),/fee ceiling/);
   const records=new Map(),artifacts=new Map(),settlements=new Map();
   const access=orderChain(client,deployment,async(path,body)=>{
    if(path==='/artifacts'){artifacts.set(body.id,body.artifactText);return {};}
@@ -30,8 +33,12 @@ test('one signed Vault session funds two purchases, refunds to Vault, caps total
   }
   assert.equal(fundCalls,3);assert.equal(signatures,1);assert.equal((await client.readContract({address:token,abi:contracts.MockToken.abi,functionName:'balanceOf',args:[vault]})),15200000n);
   assert.equal(await client.readContract({address:vault,abi:vaultABI,functionName:'spent',args:[executor,(await client.getBlock()).timestamp/86400n]}),7200000n);
+  assert.equal((await checkVaultSessionAllowance(client,deployment,session,0)).spent,7200000n);
+  await checkVaultSessionAllowance(client,deployment,session,280);
+  await assert.rejects(checkVaultSessionAllowance(client,deployment,session,281),/daily allowance/);
   await assert.rejects(create(),/total allowance/);
   await write(vault,vaultABI,'revoke',[executor]);await assert.rejects(checkVaultBinding(client,deployment,session),/revoked/);
+  await assert.rejects(checkVaultSessionAllowance(client,deployment,session,0),/revoked/);
   await write(vault,vaultABI,'grant',[executor,3000000n,10000000n,expires]);await assert.rejects(checkVaultBinding(client,deployment,session),/revoked/);
   assert.equal(await client.readContract({address:vault,abi:vaultABI,functionName:'spent',args:[executor,(await client.getBlock()).timestamp/86400n]}),7200000n,'re-granting cannot reset daily spending');
  }finally{await provider.disconnect();}

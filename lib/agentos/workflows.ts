@@ -1,3 +1,4 @@
+import {cancelWorkflowRepairs} from './workflow-repair-policy.ts';
 import type {Address} from 'viem';
 import type {WalletDeployment} from '../../sdk/wallet.ts';
 import {inputEvidence} from '../../sdk/wallet.ts';
@@ -117,5 +118,5 @@ export function controlWorkflow(state:Workspace,id:string,action:'resume'|'cance
  const next=structuredClone(state),w=findWorkflow(next,id);if(w.status==='completed'||w.status==='cancelled')return state;
  if(action==='resume'){if(w.status!=='blocked')return state;if(w.steps.some(s=>s.orderId&&['refunded','cancelled'].includes(findOrder(next,s.orderId).status)))throw new DomainError('A terminal failed step requires a new workflow.');w.status='running';delete w.lastError;}
  else{w.status='cancelled';delete w.lastError;for(const step of w.steps){if(!step.orderId)continue;const o=findOrder(next,step.orderId);if(o.settlement||o.settlementAuthorization)continue;if(!o.funding&&!o.vaultFunding)o.status='cancelled';else if(o.funding){o.failure='Workflow was cancelled.';o.status='awaiting-settlement';}}}
- w.updatedAt=now;return next;
+ w.updatedAt=now;return action==='cancel'?cancelWorkflowRepairs(next,id,now):next;
 }

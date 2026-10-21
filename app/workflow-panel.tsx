@@ -10,6 +10,7 @@ import type {SupplierDescriptor} from '@/lib/agentos/supplier';
 import type {Agent,TaskInput} from '@/lib/agentos/types';
 import {submissionIntent} from '@/lib/agentos/client-intent';
 import {useLanguage} from '@/lib/i18n/context';
+import {WorkflowRepairPanel} from './workflow-repair-panel';
 import {WorkflowPlanningPanel} from './workflow-planning-panel';
 import {WorkflowTemplatePanel} from './workflow-template-panel';
 const sample:TaskInput={dataset:'custom-transfers-v1',blockFrom:1,blockTo:3,records:[{block:1,from:'treasury',to:'research',cents:123},{block:2,from:'treasury',to:'operations',cents:456},{block:3,from:'treasury',to:'research',cents:100}]};
@@ -30,6 +31,7 @@ export function WorkflowPanel({scope,session,agents,sessions,orders,busy,perform
  return <details className="panel workflow-panel" id="workflow-panel"><summary>{tr('Configurable workflow · accepted artifact memory')}</summary><p>{tr('Compose installed skills, reuse accepted results and run purchases only when earlier results match your conditions.')}</p>
   {session.deployment.mode==='testnet'&&<p className="form-note">{tr('Committed input and delivery artifacts will be published to the configured public HTTPS evidence service. Submit only data you intend to make public. Confirmed settlement receipts are discovered automatically.')}</p>}
   {error&&<p role="alert">{tr(error)}</p>}
+  <WorkflowRepairPanel scope={scope} session={session} sessions={sessions} workflows={workflows} orders={orders} busy={busy} perform={perform}/>
   <WorkflowPlanningPanel workflows={workflows} orders={orders} scope={scope} session={session} sessions={sessions} input={editor.input} inputReady={loaded===draftKey} busy={busy} perform={perform} onAccepted={refresh}/>
   <WorkflowTemplatePanel scope={scope} agents={agents} suppliers={suppliers} busy={busy} ready={loaded===draftKey} perform={perform} source={()=>({steps:readSteps(),timeoutSeconds:Number(editor.timeout)})} onApply={draft=>save({...editor,title:draft.title,sessionId:'',timeout:String(draft.timeoutSeconds),steps:draft.steps.map(s=>({...newStep(s.agentId,(s.budget/100).toFixed(2),s.input.from==='step'?String(s.input.step):'original'),...(s.supplierId?{supplierId:s.supplierId}:{}),...(s.when?{condition:String(s.when.step),field:s.when.field,operator:s.when.operator,value:String(s.when.value)}:{})}))})}/>
   <form onSubmit={event=>{event.preventDefault();void perform(async()=>{

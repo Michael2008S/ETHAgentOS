@@ -1,3 +1,5 @@
+import {configuredRepairRuntime} from './workflow-repair-runtime';
+import {runWorkflowRepair} from './workflow-repair-runner';
 import {workflowSupplierAccess} from './workflow-supplier-runtime';
 import {digest} from './engine';
 import { env } from 'cloudflare:workers';
@@ -38,6 +40,8 @@ export async function drainQueue(request: Request, ownerId?: string, intervalMs=
         const configured=await configuredOrderChain(request);
         const result=await runWorkflow(store,job.owner_id,job.task_id,configured.chain,workflowPublisher(configured),{...configured,maxSteps:3,workflowSuppliers:workflowSupplierAccess(configured,await digest({workspace:job.owner_id}))});
         failed=result.status==='retryable'&&!!result.error;
+      } else if(job.kind==='repair'){
+        const runtime=await configuredRepairRuntime(request,await digest({workspace:job.owner_id}));await runWorkflowRepair(store,job.owner_id,job.task_id,runtime);
       } else if(job.kind==='purchase'){
         const configured=await configuredOrderChain(request);const result=await runPurchaseRoute(store,job.owner_id,job.task_id,purchaseRouteAccess(configured),{...configured,maxSteps:3});failed=result.status==='retryable'&&!!result.error;
       } else failed=true;

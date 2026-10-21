@@ -49,6 +49,14 @@ export async function checkVaultBinding(client:PublicClient,deployment:WalletDep
  if(!(await Promise.all(sellers.map(seller=>client.readContract({address:view.vault,abi:vaultABI,functionName:'sellers',args:[seller]})))).every(Boolean))throw new DomainError('A permitted Vault seller has been revoked.','FORBIDDEN');
  return view;
 }
+/** A zero-cost preflight still verifies the live grant; no token amount is rounded or transferred. */
+export async function checkVaultSessionAllowance(client:PublicClient,deployment:WalletDeployment,session:VaultSession,gross:number){
+ if(!session.signature||session.revokedAt)throw new DomainError('An active Vault session is required.','FORBIDDEN');
+ if(!Number.isSafeInteger(gross)||gross<0)throw new DomainError('Invalid workflow fee ceiling.','FORBIDDEN');
+ const view=await checkVaultBinding(client,deployment,session),amount=gross===0?0n:centsToToken(gross,view.decimals);
+ if(view.spent+amount>view.grant[1])throw new DomainError('Remaining onchain daily allowance cannot cover the approved workflow ceilings.','FORBIDDEN');
+ return view;
+}
 export async function prepareVaultSession(state:Workspace,ownerId:string,deployment:WalletDeployment,client:PublicClient,input:{buyer:Address;perTaskCents:number;totalCents:number;dailyCents?:number;sellers?:Address[]},id:string,now=new Date().toISOString()){
  const view=await inspectVault(client,deployment);
  const dailyCents=input.dailyCents??input.totalCents;

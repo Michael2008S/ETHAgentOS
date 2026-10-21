@@ -1,3 +1,4 @@
+import {repairWorkItems} from './workflow-repair-policy.ts';
 import { pendingTasks } from './runner.ts';
 import { pendingOrders } from './orders.ts';
 import type { Workspace } from './types.ts';
@@ -5,10 +6,11 @@ import { taskDeadline } from './lifecycle.ts';
 import {pendingPurchaseRoutes} from './purchase-route-state.ts';
 import {pendingWorkflows} from './workflows.ts';
 
-export type JobKind = 'task' | 'order' | 'workflow' | 'purchase';
+export type JobKind = 'task' | 'order' | 'workflow' | 'purchase' | 'repair';
 export type Job = { id: string; owner_id: string; kind: JobKind; task_id: string; status: string; lease_token: string; attempts: number; failures: number };
 export function workItems(state: Workspace, now = Date.now()) {
   return [
+    ...repairWorkItems(state,now),
     ...pendingTasks(state, undefined, new Date(now).toISOString()).map(t => ({kind: 'task' as const, taskId: t.id, deadline: taskDeadline(t), notBefore: 0})),
     ...state.tasks.filter(t => t.executionMode !== 'manual' && t.status === 'paused' && t.paid === 0 && Date.parse(taskDeadline(t)) > now).map(t => ({kind:'task' as const,taskId:t.id,deadline:taskDeadline(t),notBefore:Date.parse(taskDeadline(t))})),
     ...pendingOrders(state).map(o => ({kind: 'order' as const, taskId: o.id, deadline: o.deadlineAt, notBefore: o.evidencePendingAck&&o.evidenceAckAfter?Date.parse(o.evidenceAckAfter):o.status==='funding'&&o.vaultFunding?Math.min(Date.parse(o.vaultFunding.leaseUntil),Number(o.vaultFunding.deadline)*1000):0})),

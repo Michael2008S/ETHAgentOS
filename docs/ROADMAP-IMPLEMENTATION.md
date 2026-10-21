@@ -10,7 +10,7 @@ User request: complete improvements in the review order, test and commit each it
 | 4 | Two-step workflow and memory references | Persisted dependencies, previous accepted artifact as next input, recovery without duplicate payment | Implemented; item validation below |
 | 5 | Public testnet and CRE settlement | Real wallet, registered workflow execution, actual forwarder payment/refund transactions; account access verified rather than assumed | In progress; receiver/publisher/reconciliation/reusable dispatcher implemented; public acceptance pending |
 | 6 | Third-party onboarding and hosted operation | New skill onboarding with integration acceptance; authenticated deployed consumer, monitoring and failure recovery | In progress; new skill and scoped consumer operations locally accepted; actual hosted operation remains open |
-| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 32-step HTTP/D1/EVM/model/supplier/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical 23-stage pass at aae3f7e remains scoped to that source. |
+| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 33-step HTTP/D1/EVM/model/supplier/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical 23-stage pass at aae3f7e remains scoped to that source. |
 
 The complete demo is a final gate after the individual changes. Public workflow deployment depends on actual account capabilities and configured infrastructure; local simulation does not satisfy item 5. No unattended schedule is enabled merely to represent deployment.
 
@@ -249,3 +249,18 @@ The complete demo is a final gate after the individual changes. Public workflow 
 浏览器实测使用真实模型与实际退款场景，刷新后来源和额度保留；故意无关的编辑器 JSON 不覆盖原输入；生成时零新采购，批准丢响应后从历史恢复同一替代工作流；完成两步付款且原付款/退款 hash 不变，双语移动宽度通过，实际截图已查看。原始报告、编译/回归日志、截图及逐文件 SHA-256 保存于 `outputs/validation-workflow-replanning-2026-10-22/`；协议、信任边界与限制见 [WORKFLOW-REPLANNING.md](WORKFLOW-REPLANNING.md)。
 
 本项完成由 owner 触发并明确批准的动态替代规划，不启用无人值守的失败触发提案或自动批准；该自动触发能力仍在剩余范围。并行/多输入合并、语义记忆选择、通用插件、开放市场/信誉路由、独立钱包/细链上授权、演示外部 HTTPS 依赖改善与公网/实际 DON/托管运维验收仍待继续。当前完整演示为 32 步，按总体目标要求，最终整套验收在剩余功能完成后执行；本轮增量回归不替代它。未发布站点、启用托管调度或公共链广播。
+
+## 后续能力完善：受限的自动失败修复提案（2026-10-22，香港时间）
+
+- [x] owner 为未完成工作流配置固定模型、目标、Vault 会话、累计目标/剩余方案/单步费用上限、1–3 次尝试与有效期。配置、重试和只读轮询均不调用模型、不创建替代采购；配置丢响应后按同一编号恢复。
+- [x] 工作流受阻后原子发布独立持久 repair 作业；消费者先核验已付款成果、全部退款最终确认、未决注资、授权和目录，再持久领取推理租约。并发只发起一个有效尝试，失败及租约过期消耗次数，迟到结果或停用后的结果不能回写；凭证不可用等待不消耗模型次数。
+- [x] 自动生成提案后等待人工批准。明确批准原子创建替代工作流，并沿用策略原摘要、到期时间、累计上限和已用次数；停用、撤权、模型漂移和原工作流取消均保留边界。已经保存的提案仍可在原期限内手动批准，停用策略不会因此重新启用。
+- [x] owner API/SDK、中英文配置与历史、刷新恢复、审阅链接、停用/恢复和移动布局接通。修复零费用授权预检查误调用正金额转换器的问题；实际 EVM 专项同时验证零费用仍检查当前授权、正费用剩余额度精确边界及撤权拒绝。
+
+真实模型 HTTP/D1/SDK/独立认证消费者进程/签名供应商/官方 ERC-8004/Vault/本地 EVM 三组验收通过：`outputs/auto-repair-demo-2263f630-8528-4550-9060-43a5f9ae76d8.json`。无浏览器推进地完成原报告付款 360 分、错误摘要退款 200 分，并自动生成复用已付款报告的两步提案；批准前仍只有两笔原订单。批准后重启本轮自己的消费者完成摘要/报告采购，累计注资 1100 分、实际付款 900 分、退款 200 分，仅一次买方会话签名和一次真实模型尝试。原付款/退款 hash、唯一 Opened 和余额增量吻合；7 个队列作业完成，pending/leased/dead 为零；两次消费者进程均正常退出并撤销本轮凭证。
+
+184/184 Node 回归、17/17 Chromium 回归、5/5 CRE SDK 测试（80 assertions）、网站/CRE 类型检查及生产构建通过。新增浏览器专项实际验证丢配置响应后刷新并同编号重试、字段恢复、无 owner 生成请求的自动提案、批准前零新采购、停用后手动批准不重新启用、一次会话签名、原回执保留、中英文和移动宽度；移动截图已查看。最终恢复了通用 `failed` 的既有翻译，另跑 4 项语言专项和生产构建；没有改变全站失败状态的含义。
+
+失败证据保留：首次实际消费者演示在推理前等待超时（`outputs/auto-repair-demo-cd8b91eb-6175-4eb1-9d87-bbd737bf43a0.json`），定位到零金额预检查，修复后上述同范围三组通过；完整 Node 首轮 180/184，通过本地监听的四项因沙箱 `listen EPERM` 失败，允许本地监听后完整 184 项通过。未将环境失败或首次失败计为成功。原始日志、成功/失败报告、截图与逐文件 SHA-256 见 `outputs/validation-auto-repair-2026-10-22/`。
+
+协议及范围见 [AUTOMATIC-REPAIR.md](AUTOMATIC-REPAIR.md)。本项完成受限的失败触发提案，不实现自动批准或无限自主重试。当前完整演示为 33 步，最终整套验收仍在其余功能完成后执行；本轮增量回归不替代该关卡。并行/多输入汇合、语义记忆选择、通用插件、开放市场/信誉路由、独立钱包/细链上授权、外部 HTTPS 演示依赖改善与公网/实际 DON/托管运维验收仍未完成。继续按用户选择本地交付，不发布站点或启用托管调度，总体目标保持进行中。
