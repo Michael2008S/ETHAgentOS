@@ -4,12 +4,12 @@ import {digest,DomainError,skillCatalog} from './engine.ts';
 import type {Workspace} from './types.ts';
 import {skillIdSchema} from './skill-schema.ts';
 import {skillDefinitionHash} from './skill-definition.ts';
-import {workflowStepDraftSchema,workflowConditionSchema} from './workflow-schema.ts';
+import {portableWorkflowInputSchema,workflowStepDraftSchema,workflowConditionSchema} from './workflow-schema.ts';
 import {validateWorkflowCondition} from './workflow-constraints.ts';
 import type {WorkflowStepDraft} from './workflow-state.ts';
 
 const hash=z.string().regex(/^0x[0-9a-f]{64}$/),name=z.string().trim().min(1).max(120),revision=z.string().regex(/^(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})$/),timeout=z.number().int().min(30).max(86400),id=z.string().regex(/^template-[0-9a-fA-F-]{36}$/);
-const slot=z.object({skill:skillIdSchema,skillVersion:revision,skillHash:hash.optional(),budget:z.number().int().positive().max(1000000),input:workflowStepDraftSchema.shape.input,when:workflowConditionSchema.optional(),executor:z.enum(['builtin','supplier'])}).strict();
+const slot=z.object({skill:skillIdSchema,skillVersion:revision,skillHash:hash.optional(),budget:z.number().int().positive().max(1000000),input:portableWorkflowInputSchema,when:workflowConditionSchema.optional(),executor:z.enum(['builtin','supplier'])}).strict();
 export const workflowTemplateDefinitionSchema=z.object({protocol:z.literal('agentos.workflow-template.v1'),name,description:z.string().trim().max(500),revision,timeoutSeconds:timeout,steps:z.array(slot).min(2).max(8)}).strict();
 export type WorkflowTemplateDefinition=z.infer<typeof workflowTemplateDefinitionSchema>;
 export type WorkflowTemplate={id:string;requestId:string;workspaceHash:string;definition:WorkflowTemplateDefinition;digest:string;createdAt:string;archivedAt?:string};

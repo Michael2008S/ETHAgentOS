@@ -1,3 +1,4 @@
+import {verifyReplanFunding} from './workflow-replan.ts';
 import {verifyRouteFunding} from './purchase-route-proof.ts';
 import {verifyOrderQuote} from './supplier-quote.ts';
 import {supplierForOrder} from './supplier-pool.ts';
@@ -40,7 +41,7 @@ export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:O
         if(view.status===0&&order.vaultFunding&&BigInt(order.vaultFunding.deadline)<=view.timestamp){await store.updateWorkspace(ownerId,current=>{const next=structuredClone(current),o=findOrder(next,id);if(o.status==='funding'&&!o.funding){o.status='cancelled';o.failure='Vault funding deadline passed without an escrow.';orderEvent(o,'Vault purchase denied',o.failure,now,'warning');}return next;});return {orderId:id,status:'cancelled'};}
         const token=crypto.randomUUID();
         try{
-          if(view.status===0){await verifyRouteFunding(state,order,chain);await verifyOrderQuote(order,Number(view.timestamp));await verifyMemoryAuthority(state,order,chain);if(order.executor==='supplier'){const authority=options.supplierAuthority??options.supplier?.authorize;if(!authority)throw new DomainError('Supplier authorization is unavailable.','UNAVAILABLE');try{await authority(order);}catch(error){if(error instanceof DomainError&&error.code==='SUPPLIER_REJECTED')throw new DomainError(error.message,'FORBIDDEN');throw error;}}}
+          if(view.status===0){await verifyRouteFunding(state,order,chain);await verifyReplanFunding(state,order,chain);await verifyOrderQuote(order,Number(view.timestamp));await verifyMemoryAuthority(state,order,chain);if(order.executor==='supplier'){const authority=options.supplierAuthority??options.supplier?.authorize;if(!authority)throw new DomainError('Supplier authorization is unavailable.','UNAVAILABLE');try{await authority(order);}catch(error){if(error instanceof DomainError&&error.code==='SUPPLIER_REJECTED')throw new DomainError(error.message,'FORBIDDEN');throw error;}}}
           const claimed=await store.updateWorkspace(ownerId,current=>claimVaultFunding(current,id,token,view.timestamp+BigInt(vaultEscrowWindow(order)),now,view.status!==0)),leased=findOrder(claimed.state,id);
           if(leased.vaultFunding?.token!==token)return {orderId:id,status:'funding'};
           if(!options.vaultFunder)throw new DomainError('Vault executor is unavailable.','UNAVAILABLE');

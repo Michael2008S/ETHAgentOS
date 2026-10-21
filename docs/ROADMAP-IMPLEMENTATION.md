@@ -10,7 +10,7 @@ User request: complete improvements in the review order, test and commit each it
 | 4 | Two-step workflow and memory references | Persisted dependencies, previous accepted artifact as next input, recovery without duplicate payment | Implemented; item validation below |
 | 5 | Public testnet and CRE settlement | Real wallet, registered workflow execution, actual forwarder payment/refund transactions; account access verified rather than assumed | In progress; receiver/publisher/reconciliation/reusable dispatcher implemented; public acceptance pending |
 | 6 | Third-party onboarding and hosted operation | New skill onboarding with integration acceptance; authenticated deployed consumer, monitoring and failure recovery | In progress; new skill and scoped consumer operations locally accepted; actual hosted operation remains open |
-| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 31-step HTTP/D1/EVM/model/supplier/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical 23-stage pass at aae3f7e remains scoped to that source. |
+| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 32-step HTTP/D1/EVM/model/supplier/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical 23-stage pass at aae3f7e remains scoped to that source. |
 
 The complete demo is a final gate after the individual changes. Public workflow deployment depends on actual account capabilities and configured infrastructure; local simulation does not satisfy item 5. No unattended schedule is enabled merely to represent deployment.
 
@@ -234,3 +234,18 @@ The complete demo is a final gate after the individual changes. Public workflow 
 保留集成失败证据：测试只在进程起始补币，连续用例中余额不足导致存款回退；模板测试拦截器遗漏隔离头，使一份测试模板写入默认本地工作区，已按固定 ID/摘要核对并归档，未删除历史或产生采购；供应商恢复遇到订单执行租约竞争，诊断 API 记录 `executing/running`。补币现按每个用例实际缺额补足，拦截器保留隔离头，SDK 可额外绑定预期工作区。发现的 GET 执行副作用单独提交为 `40e3c89`，见 [READ-ONLY-OBSERVATION](READ-ONLY-OBSERVATION.md)；移除后供应商恢复实际返回订单/工作流均 completed、pending 为零，完整 15 项通过。
 
 原始成功/失败日志、报告、截图、测试隔离清理记录及逐文件 SHA-256 保存在 `outputs/validation-workflow-templates-2026-10-22/`，只读专项证据另存于 `outputs/validation-workspace-read-only-2026-10-22/`。协议及使用方法见 [WORKFLOW-TEMPLATES.md](WORKFLOW-TEMPLATES.md)。本项加入完整演示后现为 31 步，最终整套测试仍待其余功能完成；运行中重规划、并行/多输入合并、语义记忆、通用插件、开放市场/信誉路由、独立钱包/细链上授权及公网外部验收继续保留为未完成项。未发布站点、启用托管调度或公共链广播。
+
+## 后续能力完善：保留已付款成果的审阅式重规划（2026-10-22，香港时间）
+
+- [x] 从尚未完成且未被替代的工作流构建受限历史：核验全部已付款成果、规范退款最终确认与未发送意图，保留原始目标、已花累计额度、状态快照、可复用根与每步历史。活动托管或未决注资须先处理，生成提案不改变旧工作流或预留。
+- [x] 真实模型从授权目录生成 1–8 个剩余步骤，可引用原始输入、任意可用的已付款祖先成果或新方案前序成果。模型只看到汇总事实/摘要和目录；不读取转账明细、完整凭证、签名或密钥。原工作流与新方案目标/供应商均作为不可信文本处理，采购仍由服务端独立校验。
+- [x] 用户审阅总体累计上限、此前尝试费用、剩余方案与成果引用后显式批准。旧的未支出预留仅在批准的同一 CAS 中释放，旧工作流写入 supersededBy，新方案、首单、持久作业和计划关联原子提交；原付款/退款及不可变成果不被改写。
+- [x] 每次新注资再次检查批准程序、来源关联及全部此前退款/未发送证明；成果与父/祖先付款继续逐层复核。退款回 Vault，但不补回目标累计额度、签名会话与链上额度；方案不会自动提高总上限。中英文、选择/额度刷新恢复、编辑器无关输入隔离与移动端展示均接通。
+
+真实模型 HTTP/D1/SDK/独立签名供应商/官方 ERC-8004/Vault/本地 EVM 四组最终验收通过：`outputs/workflow-replan-demo-7c1928d7-a3da-434a-b33b-6ec0a5179394.json`。原报告付款 360 分、错误摘要退款 200 分，模型分别产生一步和两步不同修复程序。批准两步方案后复用原报告，只新购摘要/报告共 540 分，累计注资 1100 分低于审阅的 1200 分上限；实际付款 900 分、退款 200 分。四笔唯一注资，三笔付款、一笔退款，一次买方会话签名；Vault/收款方余额、原交易 hash、成果血缘与唯一 Opened 均吻合。六个队列作业完成，pending/leased/dead 为零。首次同范围通过报告另行保留，不合并为一次运行。
+
+177/177 Node 回归、16/16 Chromium 回归、5/5 CRE SDK 测试（80 assertions）、网站/CRE 类型检查及生产构建通过。新增实际进程内 EVM 专项验证了刚好用满签名会话额度时正确替换旧未来预留、退款未最终确认拒绝批准/新注资、不可变发布后提交失败、并发批准、竞争提案拒绝、单步修复选择非首个付款根，以及两次重规划后选用更早祖先成果；其模型响应受控，不冒充真实推理。五项额外单测覆盖严格字段、推理前超额拒绝、快照漂移/诊断稳定、原始输入不入模型及 SDK 模式/来源/额度拒绝。
+
+浏览器实测使用真实模型与实际退款场景，刷新后来源和额度保留；故意无关的编辑器 JSON 不覆盖原输入；生成时零新采购，批准丢响应后从历史恢复同一替代工作流；完成两步付款且原付款/退款 hash 不变，双语移动宽度通过，实际截图已查看。原始报告、编译/回归日志、截图及逐文件 SHA-256 保存于 `outputs/validation-workflow-replanning-2026-10-22/`；协议、信任边界与限制见 [WORKFLOW-REPLANNING.md](WORKFLOW-REPLANNING.md)。
+
+本项完成由 owner 触发并明确批准的动态替代规划，不启用无人值守的失败触发提案或自动批准；该自动触发能力仍在剩余范围。并行/多输入合并、语义记忆选择、通用插件、开放市场/信誉路由、独立钱包/细链上授权、演示外部 HTTPS 依赖改善与公网/实际 DON/托管运维验收仍待继续。当前完整演示为 32 步，按总体目标要求，最终整套验收在剩余功能完成后执行；本轮增量回归不替代它。未发布站点、启用托管调度或公共链广播。
