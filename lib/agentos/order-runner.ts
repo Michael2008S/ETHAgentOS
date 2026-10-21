@@ -5,14 +5,35 @@ import { DomainError } from './engine.ts';
 import { canonical } from '../../cre/workflow/verify.ts';
 import type { ModelPlan,OrderPlanner } from './model.ts';
 import { supplierRequest,type OrderSupplier,type SupplierDelivery } from './supplier.ts';
+import {claimVaultFunding,activateVaultOrder} from './orders.ts';
+import type {VaultFunder} from './vault-executor.ts';
 type OrderStore={read(ownerId:string):Promise<{state:Workspace}>;updateWorkspace(ownerId:string,reduce:(state:Workspace)=>Promise<Workspace>|Workspace):Promise<{state:Workspace}>};
-export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:OrderChain,options:{delayMs?:number;now?:()=>string;maxSteps?:number;planner?:OrderPlanner;supplier?:OrderSupplier;supplierAuthority?:OrderSupplier['authorize']}={}){
+export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:OrderChain,options:{delayMs?:number;now?:()=>string;maxSteps?:number;planner?:OrderPlanner;supplier?:OrderSupplier;supplierAuthority?:OrderSupplier['authorize'];vaultFunder?:VaultFunder}={}){
   let failures=0;
   for(let step=0;step<(options.maxSteps??16);step++){
     try{
       const {state}=await store.read(ownerId),order=findOrder(state,id),now=options.now?.()??new Date().toISOString();
       if(!pendingOrders(state).some(o=>o.id===id))return {orderId:id,status:order.status};
       const view=await chain.inspect(order);
+      if(order.status==='funding'&&!order.funding){
+        if(view.status===0&&order.vaultFunding&&BigInt(order.vaultFunding.deadline)<=view.timestamp){await store.updateWorkspace(ownerId,current=>{const next=structuredClone(current),o=findOrder(next,id);if(o.status==='funding'&&!o.funding){o.status='cancelled';o.failure='Vault funding deadline passed without an escrow.';orderEvent(o,'Vault purchase denied',o.failure,now,'warning');}return next;});return {orderId:id,status:'cancelled'};}
+        const token=crypto.randomUUID();
+        try{
+          const claimed=await store.updateWorkspace(ownerId,current=>claimVaultFunding(current,id,token,view.timestamp+BigInt(Math.max(30,order.timeoutSeconds)),now,view.status!==0)),leased=findOrder(claimed.state,id);
+          if(leased.vaultFunding?.token!==token)return {orderId:id,status:'funding'};
+          if(!options.vaultFunder)throw new DomainError('Vault executor is unavailable.','UNAVAILABLE');
+          const hash=await options.vaultFunder(leased),verified=await chain.funding(leased,hash);
+          await store.updateWorkspace(ownerId,current=>activateVaultOrder(current,id,token,verified,options.now?.()??new Date().toISOString()));continue;
+        }catch(error){
+          if(error instanceof DomainError&&error.code==='FORBIDDEN'&&view.status===0){
+            const snapshot=await store.read(ownerId),current=findOrder(snapshot.state,id);
+            // A lost broadcast response is not proof that no funds moved. A
+            // committed intent stays recoverable until its chain deadline.
+            if(!current.vaultFunding||BigInt(current.vaultFunding.deadline)<=view.timestamp){await store.updateWorkspace(ownerId,state=>{const next=structuredClone(state),o=findOrder(next,id);if(o.status==='funding'&&!o.funding){o.status='cancelled';o.failure=error.message;orderEvent(o,'Vault purchase denied',error.message,now,'warning');}return next;});return {orderId:id,status:'cancelled'};}
+          }
+          throw error;
+        }
+      }
       if(view.status===0)throw new DomainError('Confirmed escrow is no longer available. Execution is suspended.','CONFLICT');
       if(view.status===2||view.status===3){const hash=await chain.settle(order);if(!hash)return {orderId:id,status:'awaiting-settlement'};const evidence=await chain.settlement(order,hash);await store.updateWorkspace(ownerId,current=>finishOrder(current,id,evidence,now));continue;}
       if(order.status==='awaiting-settlement'){

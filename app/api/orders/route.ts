@@ -12,12 +12,13 @@ import { authorizeSupplier } from '@/lib/agentos/supplier-chain';
 import { inspectIdentity } from '@/lib/agentos/identity';
 import { canonical } from '@/cre/workflow/verify';
 import { deferInline } from '@/lib/agentos/auth';
+import {checkVaultBinding} from '@/lib/agentos/vault';
 const id=z.string().min(1).max(128),hash=z.string().regex(/^0x[0-9a-fA-F]{64}$/),address=z.string().regex(/^0x[0-9a-fA-F]{40}$/).refine(s=>!/^0x0{40}$/.test(s));
 const input=z.object({dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe(),source:transferSourceSchema.optional(),records:z.array(z.object({block:z.number().int().nonnegative().safe(),from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:z.number().int().nonnegative().safe()}).strict()).min(1).max(100).optional()}).strict();
 const https=z.string().url().max(4096).refine(s=>{const u=new URL(s);return u.protocol==='https:'&&!u.username&&!u.password&&!u.hash;});
 const verification=z.object({version:z.literal('agentos.delivery.v2'),skill:z.enum(['event-analysis','treasury-report']),skillVersion:z.literal('1.0.0'),dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:z.number().int().nonnegative().safe(),blockTo:z.number().int().nonnegative().safe(),sourceHash:hash.optional()}).strict();
 const schema=z.discriminatedUnion('action',[
-  z.object({action:z.literal('create'),executor:z.enum(['builtin','supplier']).default('builtin'),planner:z.enum(['deterministic','llm']).default('deterministic'),requestId:z.string().uuid(),title:z.string().trim().min(1).max(160),agentId:id,budget:z.number().int().positive().max(1000000),buyer:address,input:input.optional(),scenario:z.enum(['success','injection','interruption','invalid-delivery']).default('success'),timeoutSeconds:z.number().int().min(1).max(86400).default(300),spec:z.object({datasetUrl:https,artifactUrl:https,datasetHash:hash,verification:verification.optional()}).strict().optional()}).strict(),
+  z.object({action:z.literal('create'),vaultSessionId:z.string().uuid().optional(),executor:z.enum(['builtin','supplier']).default('builtin'),planner:z.enum(['deterministic','llm']).default('deterministic'),requestId:z.string().uuid(),title:z.string().trim().min(1).max(160),agentId:id,budget:z.number().int().positive().max(1000000),buyer:address,input:input.optional(),scenario:z.enum(['success','injection','interruption','invalid-delivery']).default('success'),timeoutSeconds:z.number().int().min(1).max(86400).default(300),spec:z.object({datasetUrl:https,artifactUrl:https,datasetHash:hash,verification:verification.optional()}).strict().optional()}).strict(),
   z.object({action:z.literal('challenge'),orderId:id,transactionHash:hash}).strict(),
   z.object({action:z.literal('activate'),orderId:id,nonce:z.string().uuid(),signature:z.string().regex(/^0x[0-9a-fA-F]+$/).min(130).max(8194)}).strict(),
   z.object({action:z.literal('sync'),orderId:id,transactionHash:hash.optional()}).strict(),
@@ -30,10 +31,11 @@ export async function POST(request:Request){
   checkOrigin(request);const ownerId=owner(request);
   if(!request.headers.get('content-type')?.includes('application/json'))return Response.json({error:'JSON required.'},{status:415});
   const raw=await request.text();if(new TextEncoder().encode(raw).length>65536)return Response.json({error:'Request too large.'},{status:413});
-  const body=schema.parse(JSON.parse(raw)),configured=await configuredOrderChain(request),{chain,deployment,localCall,planner,client,supplier,supplierAuthority}=configured;
+  const body=schema.parse(JSON.parse(raw)),configured=await configuredOrderChain(request),{chain,deployment,localCall,planner,client,supplier,supplierAuthority,vaultFunder}=configured;
   if(body.action==='create'){
    const snapshot=await read(ownerId),prior=snapshot.state.chainOrders?.find(o=>o.requestId===body.requestId),normalized=normalizeInput(body.input),selected=snapshot.state.agents.find(a=>a.id===body.agentId),bytes=inputEvidence({id:'chain-'+body.requestId,input:normalized,skill:selected?.skill},body.buyer as `0x${string}`);
    if(!prior)await checkInputSource(request,normalized);
+   if(body.vaultSessionId&&!prior){const session=snapshot.state.vaultSessions?.find(s=>s.sessionId===body.vaultSessionId);if(!session?.signature||session.revokedAt)throw new DomainError('No active Vault session authorizes this purchase.','FORBIDDEN');await checkVaultBinding(client,deployment,session);}
    const spec=prior?.spec??(localCall?await localCall<DeliverySpec>('/drafts',bytes):body.spec);
    if(!spec||spec.datasetHash!==bytes.datasetHash||body.spec&&canonical(body.spec)!==canonical(spec))throw new DomainError('Evidence URLs and hash must match the committed order input.');
    if(body.planner==='llm'&&!planner)throw new DomainError('Model service is not configured.','UNAVAILABLE');
@@ -41,7 +43,7 @@ export async function POST(request:Request){
    const identity=bound?(prior?bound:await inspectIdentity(client,deployment,bound)):undefined;
    if(body.executor==='supplier'){if(!supplier)throw new DomainError('Skill supplier is not configured.','UNAVAILABLE');if(!identity)throw new DomainError('Supplier execution requires an identity-bound order.');await authorizeSupplier(client,deployment,identity,supplier.descriptor);}
    const {action:_,...fields}=body,draft={...fields,spec,input:normalized,...(body.planner==='llm'?{model:planner!.descriptor}:{}),...(identity?{agentIdentity:identity}:{}),...(body.executor==='supplier'?{supplier:supplier!.descriptor}:{})} as OrderDraft;
-   const result=await updateWorkspace(ownerId,state=>createOrder(state,draft,deployment));return Response.json({...result,order:findOrder(result.state,'chain-'+body.requestId)},{headers:{'Cache-Control':'no-store'}});
+   const result=await updateWorkspace(ownerId,state=>createOrder(state,draft,deployment));if(draft.vaultSessionId&&!deferInline(request))scheduleOrders(ownerId,result.state,request);return Response.json({...result,order:findOrder(result.state,'chain-'+body.requestId)},{headers:{'Cache-Control':'no-store'}});
   }
   const {state}=await read(ownerId),order=findOrder(state,body.orderId);
   if(body.action==='challenge'){
@@ -56,7 +58,7 @@ export async function POST(request:Request){
    else{const funding=await chain.funding(order,auth.transactionHash);result=await updateWorkspace(ownerId,current=>activateOrder(current,body.orderId,body.nonce,funding));}
   }else if(body.action==='sync'){
    if(body.transactionHash){const evidence=await chain.settlement(order,body.transactionHash as `0x${string}`);result=await updateWorkspace(ownerId,current=>finishOrder(current,body.orderId,evidence));}
-   else{const execution=await runOrder({read,updateWorkspace},ownerId,body.orderId,chain,{planner,supplier,supplierAuthority});if(execution.status==='retryable')throw new DomainError('Order checkpoint retained. Retry synchronization after chain recovery.','UNAVAILABLE');result=await read(ownerId);}
+   else{const execution=await runOrder({read,updateWorkspace},ownerId,body.orderId,chain,{planner,supplier,supplierAuthority,vaultFunder});if(execution.status==='retryable')throw new DomainError('Order checkpoint retained. Retry synchronization after chain recovery.','UNAVAILABLE');result=await read(ownerId);}
   }else{
    const view=await chain.inspect(order);
    result=await updateWorkspace(ownerId,current=>{
@@ -64,7 +66,7 @@ export async function POST(request:Request){
     if(body.action==='resume'){if(o.status==='paused'&&o.settlement?.status==='paid'){o.status='completed';o.step=6;orderEvent(o,'Order completed','Resumed an existing paid receipt without another transaction.',undefined,'success');}return next;}
     if(o.settlement)return current;
     if(o.settlementAuthorization)throw new DomainError('Settlement intent is already committed. Reconcile its existing transaction.','CONFLICT');
-    if(!o.funding){if(view.status!==0)throw new DomainError('Confirm this escrow funding before cancelling or refund it directly after its deadline.');o.status='cancelled';}
+    if(!o.funding){if(o.vaultFunding&&view.timestamp<BigInt(o.vaultFunding.deadline))throw new DomainError('Vault funding may be in flight. Reconcile it before cancelling.','CONFLICT');if(view.status!==0)throw new DomainError('Confirm this escrow funding before cancelling or refund it directly after its deadline.');o.status='cancelled';}
     else{o.failure='Order cancelled by its owner.';o.status='awaiting-settlement';}
     orderEvent(o,'Cancellation requested','No new skill operations will run. Any funded escrow still requires a mined refund.');return next;
    });

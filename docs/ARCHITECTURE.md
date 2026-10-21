@@ -10,7 +10,7 @@
 | Skills | 两个版本化技能、内置或独立 HTTP 执行进程、链上签名委托、成果签名与独立复算 | MCP/A2A 发现与通用代码沙箱 |
 | Reputation | 官方信誉表交易、原买方付款证明核验、独立订单去重评分、撤销与对账 | 公共网络、持续重组监控与全网索引 |
 | Payments | 模拟账本、单链 ERC-20 托管、回执核验与 UI 同步；买方签名绑定工作区、服务端复核、D1 幂等历史 | 公共测试网、持续重组监控与 x402 采购 |
-| Permissions | 服务端 typed operation gate；预算；实时撤销 | 签名 session grant、目标合约与 selector 授权 |
+| Permissions | 服务端 typed operation gate；预算；实时撤销；Vault 签名会话与链上执行者限额 | 公共网络会话验收与通用目标合约/selector 委托 |
 | Escrow | 原子预留/结算/退款；真实托管回执、输入预承诺、先注资后后台执行、失败链上退款 | 公共网络验收与持续重组监控 |
 | Marketplace | 本地目录、固定报价、已配置供应商描述与链上委托，订单固定执行方 | 多供应商发现、真实服务 SLA |
 | Execution | 服务端后台执行、D1 持久队列及租约、幂等请求、有限退避重试、恢复 API、本地 worker 与任务期限 | 生产队列运维、外部执行 SLA |
@@ -25,6 +25,8 @@ flowchart LR
  E --> V[Local recomputation]
  V -->|sandbox| D[D1 task + ledger + receipt]
  B[Buyer wallet] --> G[ERC20 approve + openTask]
+ B --> AV[AgentVault bounded grant + signed session]
+ AV --> G
  G --> C[AgentEscrow]
  C --> R[Server funding and signature verification]
  R --> Q[D1 order checkpoints]
@@ -41,7 +43,7 @@ flowchart LR
  F --> Q
 ```
 
-两条支付模式均已接通网页。预注资订单通过 `demo:prefund` 验证先确认真实托管、再执行并结算的链路；既有成果还可通过 `demo:chain`/`demo:reconcile` 接入独立托管并保存回执。资金账本分别记录。AgentVault 合约当前独立测试，网页预注资入口由买方直接调用 AgentEscrow。CRE CLI 已通过本地 RPC 与真实 HTTPS 的 dry-run；DON/公共测试网尚未联调。
+两条支付模式均已接通网页。预注资订单通过 `demo:prefund` 验证先确认真实托管、再执行并结算的链路；既有成果还可通过 `demo:chain`/`demo:reconcile` 接入独立托管并保存回执。资金账本分别记录。AgentVault 订单可通过已签名会话自动注资，保留人类买方与 Vault 实际付款方的区别；会话与每日额度、撤销、退款和恢复边界见 VAULT.md，当前验收状态见 ROADMAP-IMPLEMENTATION.md。CRE CLI 已通过本地 RPC 与真实 HTTPS 的 dry-run；DON/公共测试网尚未联调。
 
 ## 并发与恢复
 

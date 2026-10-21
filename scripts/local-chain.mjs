@@ -1,3 +1,5 @@
+import {inputEvidence} from '../sdk/wallet.ts';
+import {vaultFunder} from '../lib/agentos/vault-executor.ts';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import ganache from 'ganache';
@@ -10,16 +12,17 @@ import { specHash, verifyDelivery, validateVerification } from '../cre/workflow/
 import { deployIdentityRegistries } from './compile-identity.mjs';
 
 const rpcMethods=new Set(['personal_sign','eth_chainId','eth_accounts','eth_blockNumber','eth_call','eth_getBalance','eth_getTransactionReceipt','eth_getTransactionByHash','eth_getBlockByNumber','eth_getBlockByHash','eth_estimateGas','eth_gasPrice','eth_maxPriorityFeePerGas','eth_feeHistory','eth_getTransactionCount','eth_sendTransaction','web3_clientVersion','net_version','eth_getCode','eth_getLogs']);
-export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:5177'}={}){
+export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:5177',identity=true}={}){
   const origin=new URL(appOrigin);if(!['127.0.0.1','localhost','[::1]'].includes(origin.hostname))throw new Error('Local chain requires a loopback app origin.');
   const provider=ganache.provider({logging:{quiet:true},chain:{hardfork:'shanghai',chainId:31337}});
   const client=createPublicClient({transport:custom(provider),cacheTime:0}),wallet=createWalletClient({transport:custom(provider),chain:null});
-  const [buyer,seller,forwarder]=await wallet.getAddresses(),artifacts=compile();
+  const [buyer,seller,forwarder,executor]=await wallet.getAddresses(),artifacts=compile();
   async function deploy(name,args=[]){const hash=await wallet.deployContract({...artifacts[name],account:buyer,args,gas:6000000n});return(await client.waitForTransactionReceipt({hash})).contractAddress;}
   const token=await deploy('MockToken'),metadata=stringToHex('agentos-local-verifier:v1'),metadataHash=keccak256(metadata),escrow=await deploy('AgentEscrow',[token,forwarder,metadataHash]);
   await client.waitForTransactionReceipt({hash:await wallet.writeContract({address:token,abi:artifacts.MockToken.abi,functionName:'mint',args:[buyer,100000000n],account:buyer,gas:6000000n})});
-  const registries=await deployIdentityRegistries(client,wallet,buyer);
-  const config={mode:'local',chainId:31337,token,escrow,forwarder,metadataHash,confirmations:1,seller,deployedBlock:'0',...registries},deliveries=new Map(),settlements=new Map();
+  const vault=await deploy('AgentVault',[escrow]);
+  const registries=identity?await deployIdentityRegistries(client,wallet,buyer):{};
+  const config={mode:'local',chainId:31337,token,escrow,forwarder,metadataHash,confirmations:1,seller,vault,vaultExecutor:executor,deployedBlock:'0',...registries},deliveries=new Map(),settlements=new Map();
   let base;
   const server=createServer(async(req,res)=>{
     const json=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data));};
@@ -46,9 +49,16 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
           const account=privateKeyToAccount(provider.getInitialAccounts()[actor.toLowerCase()].secretKey);
           return json(200,{jsonrpc:'2.0',id,result:await account.signMessage({message:{raw:params[0]}})});
         }
-        const targets=actor===seller?[registries.identityRegistry]:[token,escrow,registries.reputationRegistry];
+        const targets=(actor===seller?[registries.identityRegistry]:[token,escrow,vault,registries.reputationRegistry]).filter(address=>typeof address==='string');
         if(method==='eth_sendTransaction'&&(params[0]?.from?.toLowerCase()!==actor.toLowerCase()||!targets.some(address=>address.toLowerCase()===params[0]?.to?.toLowerCase())))return json(200,{jsonrpc:'2.0',id,error:{code:-32602,message:'Local wallet only signs its role-specific test contracts.'}});
         try{return json(200,{jsonrpc:'2.0',id,result:await provider.request({method,params})});}catch(error){return json(200,{jsonrpc:'2.0',id,error:{code:error.code??-32000,message:error.message}});}
+      }
+      if(path==='/vault-fund'){
+        if(req.headers.origin)throw new Error('Vault executor is server-to-server only.');
+        const order=body.order,record=order&&deliveries.get(inputEvidence(order,order.buyer).id);
+        if(!record?.locked||specHash(record.spec)!==specHash(order.spec))throw new Error('A committed local order is required.');
+        const fund=vaultFunder(client,config,async(_order,data)=>{const hash=await wallet.sendTransaction({account:executor,to:vault,data,gas:6000000n});const receipt=await client.waitForTransactionReceipt({hash});if(receipt.status!=='success')throw new Error('Vault execute reverted.');return hash;});
+        return json(200,{hash:await fund(order)});
       }
       if(path==='/drafts'){
         if(!/^0x[0-9a-f]{64}$/.test(body.id)||typeof body.datasetText!=='string')throw new Error('Invalid local input commitment.');
@@ -117,7 +127,8 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
   return {base,config,buyer,provider,close:async()=>{await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});await provider.disconnect();}};
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
-  const local=await startLocalChain({port:Number(process.env.AGENTOS_CHAIN_PORT||8545),appOrigin:process.env.AGENTOS_APP_ORIGIN||'http://127.0.0.1:5177'});
+  console.log('Preparing local EVM contracts'+(process.env.AGENTOS_DEMO_SKIP_IDENTITY==='1'?' (Vault-only validation; identity disabled)':' including official identity registries')+'…');
+  const local=await startLocalChain({port:Number(process.env.AGENTOS_CHAIN_PORT||8545),appOrigin:process.env.AGENTOS_APP_ORIGIN||'http://127.0.0.1:5177',identity:process.env.AGENTOS_DEMO_SKIP_IDENTITY!=='1'});
   console.log('AgentOS temporary local EVM: '+local.base+' (chain 31337; test tokens; no DON)');
   console.log('Public deployment: '+JSON.stringify(local.config));
   let closing=false;for(const signal of ['SIGINT','SIGTERM'])process.on(signal,async()=>{if(closing)return;closing=true;await local.close();process.exitCode=0;});

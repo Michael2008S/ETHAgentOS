@@ -3,7 +3,7 @@ import { mkdir,writeFile } from 'node:fs/promises';
 import { AgentWalletSession,localWalletProvider,inputEvidence } from '../sdk/wallet.ts';
 import { AgentOrderClient } from '../sdk/orders.ts';
 import { escrowABI } from '../sdk/chain.ts';
-const baseURL=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',localBase='http://127.0.0.1:8545';
+const baseURL=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',localBase=(process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545');
 if(!['localhost','127.0.0.1','[::1]'].includes(new URL(baseURL).hostname))throw new Error('Live model demo requires a loopback workspace.');
 const id=crypto.randomUUID(),headers={'x-agentos-sandbox':'model-'+id},report={id,mode:'actual local Qwen inference + typed tools + D1 + EVM settlement',startedAt:new Date().toISOString(),cases:[]};
 try{

@@ -4,7 +4,7 @@ import { AgentOSClient } from '../sdk/index.ts';
 import { AgentWalletSession,deliveryBytes,localWalletProvider } from '../sdk/wallet.ts';
 import { reconcileReceipt } from '../sdk/reconciliation.ts';
 
-const baseURL=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',localBase='http://127.0.0.1:8545';
+const baseURL=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',localBase=(process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545');
 if(!['localhost','127.0.0.1','[::1]'].includes(new URL(baseURL).hostname))throw new Error('Reconciliation demo requires a loopback workspace.');
 const id=crypto.randomUUID(),headers={'x-agentos-sandbox':'reconcile-'+id},os=new AgentOSClient(baseURL,headers),report={id,mode:'server verified EVM receipts + wallet challenge + D1 CAS',cases:[],startedAt:new Date().toISOString()};
 async function local(path,body){const r=await fetch(localBase+path,{method:body?'POST':'GET',...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const data=await r.json();assert.equal(r.ok,true,JSON.stringify(data));return data;}

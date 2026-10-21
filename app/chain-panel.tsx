@@ -10,15 +10,19 @@ import type { Task } from '@/lib/agentos/types';
 import { reconcileReceipt } from '@/sdk/reconciliation';
 import type { SavedChainReceipt } from '@/lib/agentos/chain-reconciliation';
 import type { PaidFeedback } from '@/lib/agentos/identity';
+import {VaultPanel} from './vault-panel';
+import type {VaultSession} from '@/lib/agentos/vault';
 import { OrderPanel } from './order-panel';
 import type { Agent } from '@/lib/agentos/types';
+import {localServices} from '@/lib/agentos/local-services';
 import type { ChainOrder } from '@/lib/agentos/orders';
 
-const localBase='http://127.0.0.1:8545';
+const localBase=localServices().chain;
 type Balance=Awaited<ReturnType<AgentWalletSession['balances']>>;
 type ChainTask=Awaited<ReturnType<AgentWalletSession['task']>>;
 export function ChainPanel({scope,tasks,receipts=[],agents,orders=[],feedback=[],onSaved}:{scope:string;tasks:Task[];receipts?:SavedChainReceipt[];agents:Agent[];orders?:ChainOrder[];feedback?:PaidFeedback[];onSaved?:()=>Promise<void>}){
   const {tr}=useLanguage(),lock=useRef(false);
+  const [vaultSessions,setVaultSessions]=useState<VaultSession[]>([]);
   const [loopback,setLoopback]=useState(false),[session,setSession]=useState<AgentWalletSession|null>(null),[config,setConfig]=useState('');
   const [selected,setSelected]=useState(''),[balances,setBalances]=useState<Balance|null>(null),[current,setCurrent]=useState<ChainTask|null>(null),[proof,setProof]=useState<ChainEvidence|null>(null);
   const [datasetUrl,setDatasetUrl]=useState(''),[artifactUrl,setArtifactUrl]=useState(''),[windowSeconds,setWindowSeconds]=useState(3600),[spec,setSpec]=useState<DeliverySpec|undefined>();
@@ -67,7 +71,7 @@ export function ChainPanel({scope,tasks,receipts=[],agents,orders=[],feedback=[]
           })}>{tr('Sign & save receipt to workspace')}</button>{saved&&<span>{tr('Receipt saved by server verification')}</span>}</div><small>{tr('A one-time wallet signature binds this receipt to your workspace. No tokens are transferred.')}</small></div>}
         </>:<p className="form-note">{tr('Complete a task first to connect its delivery to escrow.')}</p>}
       </>}{busy&&<p role="status" className="form-note">{tr('Waiting for wallet or chain confirmation…')}</p>}{error&&<p className="chain-error" role="alert">{tr(error)}</p>}
-      <OrderPanel scope={scope} feedback={feedback} session={session} agents={agents} orders={orders} busy={busy} perform={perform} onChanged={onSaved}/>
+      {session&&<VaultPanel refreshKey={orders.filter(o=>o.funding).length+':'+orders.filter(o=>o.settlement).length} session={session} busy={busy} perform={perform} onSessions={setVaultSessions}/>}<OrderPanel vaultSessions={vaultSessions} scope={scope} feedback={feedback} session={session} agents={agents} orders={orders} busy={busy} perform={perform} onChanged={onSaved}/>
       <details className="chain-history"><summary>{tr('Saved chain receipts')} · {receipts.length}</summary><a className="text-button" href="/api/exports?kind=chain-receipts" download>{tr('Export chain receipts')}</a><p className="form-note">{tr('Server-verified snapshots. Recheck onchain before relying on an old receipt. Sandbox credits are unchanged.')}</p>{receipts.length===0?<p className="form-note">{tr('No chain receipts saved yet.')}</p>:[...receipts].reverse().map(item=><article key={item.id} className="chain-proof"><b>{tasks.find(t=>t.id===item.webTaskId)?.title??orders.find(o=>o.id===item.webTaskId)?.title??item.webTaskId} · {tr(item.evidence.status[0].toUpperCase()+item.evidence.status.slice(1))}</b><p>{item.deployment.mode==='local'?tr('Local EVM · 31337'):tr('Sepolia · 11155111')} · {tr('Block')} {item.evidence.blockNumber} · {new Date(item.verifiedAt).toLocaleString()}</p><code>{item.evidence.transactionHash}</code><details><summary>{tr('Inspect chain evidence')}</summary><pre className="artifact-json">{JSON.stringify(item,null,2)}</pre></details></article>)}</details>
     </div></section>;
 }

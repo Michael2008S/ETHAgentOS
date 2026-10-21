@@ -52,6 +52,7 @@ export default defineConfig(async ({ command }) => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    ...(process.env.AGENTOS_DEV_CACHE_DIRECTORY?{cacheDir:process.env.AGENTOS_DEV_CACHE_DIRECTORY}:{}),
     server: {
       ...(managedLinux
         ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] }
@@ -68,6 +69,7 @@ export default defineConfig(async ({ command }) => {
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
+        ...(process.env.AGENTOS_DEV_STATE_DIRECTORY?{persistState:{path:process.env.AGENTOS_DEV_STATE_DIRECTORY}}:{}),
         config: {
           ...localBindingConfig,
           ...(command === "serve"

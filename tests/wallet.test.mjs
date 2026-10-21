@@ -7,6 +7,7 @@ import { encodeSettlementReport } from '../sdk/chain.ts';
 import { specHash,verifyDelivery } from '../cre/workflow/verify.ts';
 import { seed,transition } from '../lib/agentos/engine.ts';
 import { compile } from '../scripts/compile-contracts.mjs';
+import { startLocalChain } from '../scripts/local-chain.mjs';
 
 test('wallet session funds, reads and verifies real escrow and rejects network/account changes',async()=>{
  const provider=ganache.provider({logging:{quiet:true},chain:{hardfork:'shanghai',chainId:31337}}),client=createPublicClient({transport:custom(provider),cacheTime:0}),wallet=createWalletClient({transport:custom(provider),chain:null});
@@ -34,4 +35,12 @@ test('wallet session funds, reads and verifies real escrow and rejects network/a
   await assert.rejects(session.refund(task),/No funded/);
   for(const patch of [{chainId:1},{seller:'0x'+'0'.repeat(40)},{mode:'testnet'},{confirmations:0},{token:undefined}])assert.throws(()=>walletDeployment({...deployment,...patch}));
  }finally{await provider.disconnect();}
+});
+
+test('Vault-only local wallet rejects unknown targets when optional identity registries are absent',async()=>{
+ const local=await startLocalChain({port:0,identity:false});
+ try{
+  const response=await fetch(local.base+'/rpc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_sendTransaction',params:[{from:local.buyer,to:'0x0000000000000000000000000000000000000001',data:'0x'}]})});
+  assert.equal(response.status,200);const data=await response.json();assert.equal(data.error.code,-32602);assert.match(data.error.message,/role-specific/);
+ }finally{await local.close();}
 });

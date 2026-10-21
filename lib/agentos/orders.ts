@@ -7,10 +7,11 @@ import type { Event, Policy, Scenario, Skill, TaskInput, Workspace } from './typ
 import type { ModelDescriptor,ModelPlan } from './model.ts';
 import type { AgentIdentity } from './identity.ts';
 import { supplierRequest,supplierJobId,verifySupplierDelivery,type SupplierDescriptor,type SupplierDelivery } from './supplier.ts';
-export type OrderStatus='awaiting-funding'|'queued'|'running'|'awaiting-settlement'|'paused'|'completed'|'refunded'|'cancelled';
-export type ChainOrder={executor?:'builtin'|'supplier';supplier?:SupplierDescriptor;supplierDelivery?:SupplierDelivery;supplierLease?:{token:string;expiresAt:string;requestHash:string};supplierAttempts?:number;agentIdentity?:AgentIdentity;id:string;requestId:string;title:string;agentId:string;skill:Skill;quote:number;budget:number;buyer:Address;deployment:WalletDeployment;spec:DeliverySpec;input:TaskInput;inputHash:string;scenario:Scenario;timeoutSeconds:number;status:OrderStatus;step:number;createdAt:string;updatedAt:string;deadlineAt?:string;chainDeadline?:string;settledAt?:string;lastError?:string;planner?:'deterministic'|'llm';model?:ModelDescriptor;modelPlan?:ModelPlan;modelLease?:{token:string;expiresAt:string};output:Record<string,unknown>|null;outputHash:string|null;failure:string|null;funding:ChainEvidence|null;settlement:ChainEvidence|null;policySnapshot:Policy|null;events:Event[];authorization?:{nonce:string;message:string;expiresAt:string;transactionHash:Hex};settlementAuthorization?:{artifactText:string;authorizedAt:string;policyHash:string}};
-export type OrderDraft={executor?:'builtin'|'supplier';supplier?:SupplierDescriptor;agentIdentity?:AgentIdentity;planner?:'deterministic'|'llm';model?:ModelDescriptor;requestId:string;title:string;agentId:string;budget:number;buyer:Address;spec:DeliverySpec;input?:TaskInput;scenario:Scenario;timeoutSeconds:number};
-export const pendingOrders=(state:Workspace)=>(state.chainOrders??[]).filter(o=>['queued','running','awaiting-settlement'].includes(o.status));
+import {vaultAllowance,sessionBinding,type VaultBinding} from './vault.ts';
+export type OrderStatus='awaiting-funding'|'funding'|'queued'|'running'|'awaiting-settlement'|'paused'|'completed'|'refunded'|'cancelled';
+export type ChainOrder={vault?:VaultBinding;vaultSessionId?:string;vaultFunding?:{deadline:string;token:string;leaseUntil:string};executor?:'builtin'|'supplier';supplier?:SupplierDescriptor;supplierDelivery?:SupplierDelivery;supplierLease?:{token:string;expiresAt:string;requestHash:string};supplierAttempts?:number;agentIdentity?:AgentIdentity;id:string;requestId:string;title:string;agentId:string;skill:Skill;quote:number;budget:number;buyer:Address;deployment:WalletDeployment;spec:DeliverySpec;input:TaskInput;inputHash:string;scenario:Scenario;timeoutSeconds:number;status:OrderStatus;step:number;createdAt:string;updatedAt:string;deadlineAt?:string;chainDeadline?:string;settledAt?:string;lastError?:string;planner?:'deterministic'|'llm';model?:ModelDescriptor;modelPlan?:ModelPlan;modelLease?:{token:string;expiresAt:string};output:Record<string,unknown>|null;outputHash:string|null;failure:string|null;funding:ChainEvidence|null;settlement:ChainEvidence|null;policySnapshot:Policy|null;events:Event[];authorization?:{nonce:string;message:string;expiresAt:string;transactionHash:Hex};settlementAuthorization?:{artifactText:string;authorizedAt:string;policyHash:string}};
+export type OrderDraft={vaultSessionId?:string;executor?:'builtin'|'supplier';supplier?:SupplierDescriptor;agentIdentity?:AgentIdentity;planner?:'deterministic'|'llm';model?:ModelDescriptor;requestId:string;title:string;agentId:string;budget:number;buyer:Address;spec:DeliverySpec;input?:TaskInput;scenario:Scenario;timeoutSeconds:number};
+export const pendingOrders=(state:Workspace)=>(state.chainOrders??[]).filter(o=>['funding','queued','running','awaiting-settlement'].includes(o.status));
 export function orderEvent(o:ChainOrder,title:string,detail:string,now=new Date().toISOString(),level:Event['level']='info'){
   o.events.push({id:`${o.id}:${o.events.length}`,at:now,title,detail,level,step:o.step});o.updatedAt=now;
 }
@@ -19,7 +20,7 @@ export function orderPolicy(state:Workspace,order:ChainOrder,now:string){
   if(!state.agents.find(a=>a.id===order.agentId)?.enabled)return 'Agent is disabled.';
   if(!state.policy.allowedSkills.includes(order.skill))return 'Skill is outside the current allowlist.';
   if(order.budget>state.policy.maxTaskBudget)return 'Task budget exceeds the current per-task limit.';
-  const used=(state.chainOrders??[]).filter(o=>o.id!==order.id&&o.deployment.chainId===order.deployment.chainId&&o.deployment.token.toLowerCase()===order.deployment.token.toLowerCase()&&o.funding).reduce((sum,o)=>sum+(o.settlement?.status==='paid'?(o.settledAt?.slice(0,10)===now.slice(0,10)?o.quote:0):!o.settlement?o.budget:0),0);
+  const used=(state.chainOrders??[]).filter(o=>o.id!==order.id&&o.deployment.chainId===order.deployment.chainId&&o.deployment.token.toLowerCase()===order.deployment.token.toLowerCase()&&(o.funding||o.vault&&o.status==='funding')).reduce((sum,o)=>sum+(o.settlement?.status==='paid'?(o.settledAt?.slice(0,10)===now.slice(0,10)?o.quote:0):!o.settlement?o.budget:0),0);
   if(used+order.budget>state.policy.dailyBudget)return 'Onchain daily allowance, including funded orders, would be exceeded.';
   return null;
 }
@@ -27,7 +28,7 @@ export async function createOrder(state:Workspace,draft:OrderDraft,deployment:Wa
   const input=normalizeInput(draft.input),prior=state.chainOrders?.find(o=>o.requestId===draft.requestId);
   const parameters={...draft,input,planner:draft.planner??'deterministic',model:draft.model??null,agentIdentity:draft.agentIdentity??null,executor:draft.executor??'builtin',supplier:draft.supplier??null};
   if(prior){
-    const previous={planner:prior.planner??'deterministic',model:prior.model??null,agentIdentity:prior.agentIdentity??null,executor:prior.executor??'builtin',supplier:prior.supplier??null,requestId:prior.requestId,title:prior.title,agentId:prior.agentId,budget:prior.budget,buyer:prior.buyer,spec:prior.spec,input:prior.input,scenario:prior.scenario,timeoutSeconds:prior.timeoutSeconds};
+    const previous={planner:prior.planner??'deterministic',model:prior.model??null,agentIdentity:prior.agentIdentity??null,executor:prior.executor??'builtin',supplier:prior.supplier??null,...(prior.vaultSessionId?{vaultSessionId:prior.vaultSessionId}:{}),requestId:prior.requestId,title:prior.title,agentId:prior.agentId,budget:prior.budget,buyer:prior.buyer,spec:prior.spec,input:prior.input,scenario:prior.scenario,timeoutSeconds:prior.timeoutSeconds};
     if(canonical(previous)!==canonical(parameters)||canonical(prior.deployment)!==canonical(deployment))throw new DomainError('Request ID was already used with different chain order parameters.','IDEMPOTENCY_CONFLICT');return state;
   }
   if((state.chainOrders?.length??0)>=300)throw new DomainError('This prototype supports up to 300 onchain orders per workspace.');
@@ -37,12 +38,28 @@ export async function createOrder(state:Workspace,draft:OrderDraft,deployment:Wa
   if(!Number.isSafeInteger(draft.budget)||draft.budget<agent.price||draft.budget>1000000||!Number.isSafeInteger(draft.timeoutSeconds)||draft.timeoutSeconds<1||draft.timeoutSeconds>86400)throw new DomainError('Invalid onchain budget or execution window.');
   if(draft.planner==='llm'&&!draft.model)throw new DomainError('A configured model is required for LLM planning.');
   if(draft.executor==='supplier'&&(!draft.supplier||!draft.agentIdentity||!draft.supplier.skills.includes(agent.skill)))throw new DomainError('An authorized identity and supplier skill are required.');
-  const order:ChainOrder={...draft,executor:draft.executor??'builtin',planner:draft.planner??'deterministic',id:'chain-'+draft.requestId,title:draft.title.trim(),skill:agent.skill,quote:agent.price,deployment:{...deployment},input,inputHash:await digest(input),status:'awaiting-funding',step:0,createdAt:now,updatedAt:now,output:null,outputHash:null,failure:null,funding:null,settlement:null,policySnapshot:null,events:[]};
+  const vault=draft.vaultSessionId?sessionBinding(vaultAllowance(state,draft.vaultSessionId,draft.buyer,agent.skill,draft.budget,agent.price,now)):undefined;
+  const order:ChainOrder={...draft,...(vault?{vault}:{}),executor:draft.executor??'builtin',planner:draft.planner??'deterministic',id:'chain-'+draft.requestId,title:draft.title.trim(),skill:agent.skill,quote:agent.price,deployment:{...deployment},input,inputHash:await digest(input),status:vault?'funding':'awaiting-funding',step:0,createdAt:now,updatedAt:now,output:null,outputHash:null,failure:null,funding:null,settlement:null,policySnapshot:null,events:[]};
   const violation=orderPolicy(state,order,now);if(violation)throw new DomainError(violation);
   orderEvent(order,'Awaiting escrow funding','Input and service quote are frozen. No adapter has executed and no sandbox funds were used.',now);
   return {...state,chainOrders:[order,...state.chainOrders??[]]};
 }
 export function findOrder(state:Workspace,id:string){const order=state.chainOrders?.find(o=>o.id===id);if(!order)throw new DomainError('Onchain order not found.','NOT_FOUND');return order;}
+export function claimVaultFunding(state:Workspace,id:string,token:string,deadline:bigint,now=new Date().toISOString(),recoverExisting=false){
+ const current=findOrder(state,id);if(current.funding||current.status!=='funding'||!recoverExisting&&current.vaultFunding&&current.vaultFunding.leaseUntil>now)return state;
+ if(!current.vaultSessionId||!current.vault)throw new DomainError('Vault funding requires a bound session.','FORBIDDEN');
+ if(!recoverExisting){vaultAllowance(state,current.vaultSessionId,current.buyer,current.skill,current.budget,current.quote,now,id);const violation=orderPolicy(state,current,now);if(violation)throw new DomainError(violation,'FORBIDDEN');}
+ const next=structuredClone(state),order=findOrder(next,id);
+ order.vaultFunding={deadline:order.vaultFunding?.deadline??deadline.toString(),token,leaseUntil:new Date(Date.parse(now)+90000).toISOString()};
+ orderEvent(order,'Vault funding authorized','A bounded session reserved this frozen quote before contacting the executor.',now);return next;
+}
+export function activateVaultOrder(state:Workspace,id:string,token:string,verified:{evidence:ChainEvidence;deadline:bigint;chainNow:bigint;currentStatus:number},now=new Date().toISOString()){
+ const next=structuredClone(state),order=findOrder(next,id);
+ if(order.funding){if(order.funding.transactionHash!==verified.evidence.transactionHash)throw new DomainError('Vault funding receipt conflicts.','CONFLICT');return state;}
+ if(order.status!=='funding'||order.vaultFunding?.token!==token||!order.vault)throw new DomainError('Vault funding lease changed.','CONFLICT');
+ order.authorization={nonce:token,message:'Funding authorized by bounded Vault session '+order.vault.sessionId,expiresAt:new Date(Date.parse(now)+300000).toISOString(),transactionHash:verified.evidence.transactionHash};order.status='awaiting-funding';
+ return activateOrder(next,id,token,verified,now);
+}
 export function claimModelLease(state:Workspace,id:string,token:string,now=new Date().toISOString()):Workspace{
   const next=structuredClone(state),o=findOrder(next,id);
   if(!o.funding||o.planner!=='llm'||o.modelPlan||o.step!==2||o.status!=='running'||o.modelLease&&o.modelLease.expiresAt>now)return state;
@@ -81,7 +98,7 @@ export async function commitSupplierDelivery(state:Workspace,id:string,token:str
   if(canonical(delivery.payload.output)!==canonical(expectedOutput(o))){o.failure='Supplier result differs from independent recomputation.';o.status='awaiting-settlement';orderEvent(o,'Supplier delivery rejected',o.failure,now,'error');return next;}
   o.output=delivery.payload.output;o.outputHash=await digest(o.output);o.step=3;delete o.lastError;orderEvent(o,'Supplier delivery verified','Supplier signature, input commitment and independent result recomputation passed.',now,'success');return next;
 }
-export const orderCommitment=(o:ChainOrder)=>digest({id:o.id,agentId:o.agentId,skill:o.skill,quote:o.quote,budget:o.budget,buyer:o.buyer,input:o.input,spec:o.spec,deployment:o.deployment,scenario:o.scenario,timeoutSeconds:o.timeoutSeconds,planner:o.planner??'deterministic',model:o.model??null,...(o.agentIdentity?{agentIdentity:o.agentIdentity}:{}),...(o.executor==='supplier'?{executor:'supplier',supplier:o.supplier}:{})});
+export const orderCommitment=(o:ChainOrder)=>digest({id:o.id,agentId:o.agentId,skill:o.skill,quote:o.quote,budget:o.budget,buyer:o.buyer,input:o.input,spec:o.spec,deployment:o.deployment,scenario:o.scenario,timeoutSeconds:o.timeoutSeconds,...(o.vault?{vault:o.vault}:{}),planner:o.planner??'deterministic',model:o.model??null,...(o.agentIdentity?{agentIdentity:o.agentIdentity}:{}),...(o.executor==='supplier'?{executor:'supplier',supplier:o.supplier}:{})});
 export async function authorizeOrder(state:Workspace,id:string,ownerId:string,transactionHash:Hex,nonce:string,now=new Date().toISOString()){
   const next=structuredClone(state),o=findOrder(next,id);
   if(o.status!=='awaiting-funding')throw new DomainError('This order has already been activated or cancelled.');

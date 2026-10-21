@@ -5,7 +5,7 @@ import { AgentIdentityClient } from '../sdk/agent-identity.ts';
 import { AgentOrderClient } from '../sdk/orders.ts';
 import { supplierRequest,supplierJobId,verifySupplierDelivery } from '../lib/agentos/supplier.ts';
 import { escrowABI } from '../sdk/chain.ts';
-const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',supplierBase='http://127.0.0.1:7461',chainBase='http://127.0.0.1:8545';
+const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',supplierBase=(process.env.AGENTOS_SUPPLIER_URL||'http://127.0.0.1:7461'),chainBase=(process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545');
 if(!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname))throw new Error('Supplier demo requires loopback services.');
 const id=crypto.randomUUID(),headers={'x-agentos-sandbox':'supplier-'+id},report={id,mode:'independent signed HTTP supplier + registry delegation + real Qwen + D1 + local EVM',startedAt:new Date().toISOString(),cases:[]};
 async function control(mode){const r=await fetch(supplierBase+'/testing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,delayMs:2500})});assert.equal(r.status,200);}

@@ -9,7 +9,7 @@ try {
   const sql=(await Promise.all(migrations.map(name=>readFile(join('drizzle',name),'utf8')))).join('\n');
   const path=join(directory,'schema.sql');await writeFile(path,sql);
   const code=await new Promise((resolve,reject)=>{
-    const child=spawn(process.execPath,['--import','./scripts/sites-env.mjs','./node_modules/wrangler/bin/wrangler.js','d1','execute','DB','--local','--config','dist/server/wrangler.json','--persist-to','.wrangler/state','--file',path],{stdio:'inherit'});
+    const child=spawn(process.execPath,['--import','./scripts/sites-env.mjs','./node_modules/wrangler/bin/wrangler.js','d1','execute','DB','--local','--config','dist/server/wrangler.json','--persist-to',process.env.AGENTOS_DEV_STATE_DIRECTORY||'.wrangler/state','--file',path],{stdio:'inherit'});
     child.on('error',reject);child.on('close',resolve);
   });process.exitCode=code??1;
 } finally { await rm(directory,{recursive:true,force:true}); }

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';import {mkdir,writeFile} from 'node:fs/promises';
-const base='http://127.0.0.1:5177',id=crypto.randomUUID(),headers={'x-agentos-sandbox':'planning-'+id,'Content-Type':'application/json'},cases=[];
+const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',id=crypto.randomUUID(),headers={'x-agentos-sandbox':'planning-'+id,'Content-Type':'application/json'},cases=[];
 const state=async()=> (await(await fetch(base+'/api/workspace',{headers})).json()).state;
 const before=await state();
 for(const [goal,expected] of [['Choose the most affordable agent','relay'],['I need a recipient allocation-report using the treasury-report skill','sage']]){

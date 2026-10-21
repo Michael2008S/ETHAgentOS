@@ -45,7 +45,9 @@
     "test:browser": "node scripts/test-browser.mjs",
     "demo:evidence": "node scripts/demo-evidence.mjs",
     "demo:full": "node scripts/demo-full.mjs",
-    "demo:data": "node scripts/demo-data.mjs"
+    "demo:data": "node scripts/demo-data.mjs",
+    "demo:isolated": "node scripts/demo-isolated.mjs",
+    "demo:vault": "node scripts/demo-vault.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

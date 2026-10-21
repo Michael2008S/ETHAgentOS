@@ -25,8 +25,8 @@ export async function drainQueue(request: Request, ownerId?: string) {
         const task=snapshot.state.tasks.find(t=>t.id===job.task_id);
         if(task?.executionMode!=='manual') failed=(await runTask(store,job.owner_id,job.task_id,{delayMs:0})).status==='retryable';
       } else if(job.kind==='order') {
-        const {chain,planner,supplier,supplierAuthority}=await configuredOrderChain(request);
-        const result=await runOrder(store,job.owner_id,job.task_id,chain,{maxSteps:3,planner,supplier,supplierAuthority});
+        const {chain,planner,supplier,supplierAuthority,vaultFunder}=await configuredOrderChain(request);
+        const result=await runOrder(store,job.owner_id,job.task_id,chain,{maxSteps:3,planner,supplier,supplierAuthority,vaultFunder});
         failed=result.status==='retryable' && !!result.error;
       } else failed=true;
     } catch { failed=true; }

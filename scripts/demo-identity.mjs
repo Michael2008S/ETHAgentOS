@@ -5,7 +5,7 @@ import { AgentWalletSession,localWalletProvider } from '../sdk/wallet.ts';
 import { AgentOrderClient } from '../sdk/orders.ts';
 import { AgentIdentityClient } from '../sdk/agent-identity.ts';
 import { identityABI,reputationABI } from '../sdk/identity.ts';
-const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',local='http://127.0.0.1:8545';
+const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',local=(process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545');
 if(!['localhost','127.0.0.1','[::1]'].includes(new URL(base).hostname))throw new Error('Identity demo requires a loopback workspace.');
 const id=crypto.randomUUID(),headers={'x-agentos-sandbox':'identity-'+id},report={id,mode:'official ERC-8004 registries + HTTP wallets + D1 + paid EVM order',startedAt:new Date().toISOString(),cases:[]};
 async function api(body,extra=headers){const r=await fetch(base+'/api/identity',{method:'POST',headers:{'Content-Type':'application/json',...extra},body:JSON.stringify(body)});return {status:r.status,data:await r.json()};}

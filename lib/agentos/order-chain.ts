@@ -12,8 +12,8 @@ export function orderChain(client:PublicClient,deployment:WalletDeployment,local
   async function inspect(order:ChainOrder){
     if(!matchingDeployment(order.deployment,deployment))throw new DomainError('Order deployment differs from the server configuration.','CONFLICT');
     const {decimals}=await chain.validateDeployment(),bytes=inputEvidence(order,order.buyer);
-    const [task,block]=await Promise.all([client.readContract({address:deployment.escrow,abi:escrowABI,functionName:'tasks',args:[bytes.id]}),client.getBlock()]);
-    const intent:ChainIntent={id:bytes.id,buyer:order.buyer,seller:deployment.seller,amount:centsToToken(order.quote,decimals),deadline:task[3],specHash:specHash(order.spec)};
+    const block=await client.getBlock(),task=await client.readContract({address:deployment.escrow,abi:escrowABI,functionName:'tasks',args:[bytes.id],blockNumber:block.number});
+    const intent:ChainIntent={id:bytes.id,buyer:order.vault?.vault??order.buyer,seller:deployment.seller,amount:centsToToken(order.quote,decimals),deadline:task[3],specHash:specHash(order.spec)};
     if(task[5]!==0&&(task[0].toLowerCase()!==intent.buyer.toLowerCase()||task[1].toLowerCase()!==intent.seller.toLowerCase()||task[2]!==intent.amount||task[4]!==intent.specHash))throw new DomainError('Order escrow does not match its frozen commitment.','CONFLICT');
     return {intent,status:task[5],timestamp:block.timestamp,outputHash:task[6]};
   }

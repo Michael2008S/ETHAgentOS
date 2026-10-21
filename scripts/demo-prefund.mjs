@@ -4,7 +4,7 @@ import { AgentWalletSession,localWalletProvider,inputEvidence } from '../sdk/wal
 import { AgentOrderClient } from '../sdk/orders.ts';
 import { escrowABI } from '../sdk/chain.ts';
 import { keccak256,stringToHex } from 'viem';
-const baseURL=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',localBase='http://127.0.0.1:8545';
+const baseURL=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',localBase=(process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545');
 if(!['localhost','127.0.0.1','[::1]'].includes(new URL(baseURL).hostname))throw new Error('Pre-funded demo requires a loopback workspace.');
 const id=crypto.randomUUID(),headers={'x-agentos-sandbox':'prefund-'+id},report={id,mode:'pre-funded HTTP wallet + server runtime + D1 + actual EVM',startedAt:new Date().toISOString(),cases:[]};
 async function local(path,body){const r=await fetch(localBase+path,{method:body?'POST':'GET',...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const b=await r.json();assert.equal(r.ok,true,JSON.stringify(b));return b;}

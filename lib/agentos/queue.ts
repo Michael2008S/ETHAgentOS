@@ -9,7 +9,7 @@ export function workItems(state: Workspace, now = Date.now()) {
   return [
     ...pendingTasks(state, undefined, new Date(now).toISOString()).map(t => ({kind: 'task' as const, taskId: t.id, deadline: taskDeadline(t), notBefore: 0})),
     ...state.tasks.filter(t => t.executionMode !== 'manual' && t.status === 'paused' && t.paid === 0 && Date.parse(taskDeadline(t)) > now).map(t => ({kind:'task' as const,taskId:t.id,deadline:taskDeadline(t),notBefore:Date.parse(taskDeadline(t))})),
-    ...pendingOrders(state).map(o => ({kind: 'order' as const, taskId: o.id, deadline: o.deadlineAt, notBefore: 0})),
+    ...pendingOrders(state).map(o => ({kind: 'order' as const, taskId: o.id, deadline: o.deadlineAt, notBefore: o.status==='funding'&&o.vaultFunding?Math.min(Date.parse(o.vaultFunding.leaseUntil),Number(o.vaultFunding.deadline)*1000):0})),
   ];
 }
 export const jobId = (owner: string, kind: JobKind, taskId: string) => JSON.stringify([owner, kind, taskId]);

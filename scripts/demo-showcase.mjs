@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';import {mkdir,writeFile} from 'node:fs/promises';
 import { AgentWalletSession,localWalletProvider } from '../sdk/wallet.ts';
 import { AgentOrderClient } from '../sdk/orders.ts';import { AgentIdentityClient } from '../sdk/agent-identity.ts';
-const base='http://127.0.0.1:5177',configuration=await(await fetch('http://127.0.0.1:8545/config')).json(),wallet=await AgentWalletSession.connect(localWalletProvider('http://127.0.0.1:8545'),configuration,false),orders=new AgentOrderClient(wallet,base),cases=[];
+const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',configuration=await(await fetch((process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545')+'/config')).json(),wallet=await AgentWalletSession.connect(localWalletProvider((process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545')),configuration,false),orders=new AgentOrderClient(wallet,base),cases=[];
 const fresh=process.argv.includes('--fresh');
 for(const scenario of ['success','invalid-delivery']){
  const title='Showcase signed supplier · '+scenario;

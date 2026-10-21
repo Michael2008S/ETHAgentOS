@@ -1,7 +1,7 @@
 import { AgentWalletSession,localWalletProvider } from '../sdk/wallet.ts';
 import { AgentIdentityClient } from '../sdk/agent-identity.ts';
 import { encodeFunctionData,parseAbi } from 'viem';
-const base='http://127.0.0.1:5177',chain='http://127.0.0.1:8545';
+const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',chain=(process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545');
 const config=await(await fetch(chain+'/config')).json();
 const buyer=await AgentWalletSession.connect(localWalletProvider(chain),config,false);
 if(BigInt((await buyer.balances()).token)<20000000n){const hash=await buyer.signer.sendTransaction({account:buyer.account,to:config.token,data:encodeFunctionData({abi:parseAbi(['function mint(address,uint256)']),functionName:'mint',args:[buyer.account,100000000n]}),gas:100000n});await buyer.client.waitForTransactionReceipt({hash});console.log('Added local test tokens only.');}

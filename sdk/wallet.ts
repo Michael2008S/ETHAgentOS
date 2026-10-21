@@ -1,10 +1,10 @@
-import { createPublicClient, createWalletClient, custom, defineChain, keccak256, stringToHex, type Address, type EIP1193Provider, type Hex } from 'viem';
+import { createPublicClient, createWalletClient, custom, defineChain, keccak256, stringToHex, type Address, type EIP1193Provider, type Hex,type PublicClient } from 'viem';
 import { AgentChainClient, centsToToken, chainTaskId, tokenABI, escrowABI, validateChainDeployment, type ChainDeployment, type ChainEvidence, type ChainIntent, type TransactionIntent } from './chain.ts';
 import { DATASET, verifyReceipt } from '../lib/agentos/engine.ts';
 import { canonical,specHash,deliveryVerification,deliveryArtifact, type DeliverySpec } from '../cre/workflow/verify.ts';
 import type { Task } from '../lib/agentos/types.ts';
 
-export type WalletDeployment = ChainDeployment & {mode:'local'|'testnet';seller:Address;deployedBlock:string;identityRegistry?:Address;reputationRegistry?:Address};
+export type WalletDeployment = ChainDeployment & {mode:'local'|'testnet';seller:Address;deployedBlock:string;identityRegistry?:Address;reputationRegistry?:Address;vault?:Address;vaultExecutor?:Address};
 export function localWalletProvider(base:string,role:'buyer'|'seller'='buyer'):EIP1193Provider {
   const url=new URL(base);
   if(url.protocol!=='http:'||url.hostname!=='127.0.0.1'||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw new Error('Local test wallet requires a plain loopback endpoint.');
@@ -20,6 +20,7 @@ export function walletDeployment(value: unknown): WalletDeployment {
   const d=value as WalletDeployment;
   validateChainDeployment(d);
   if((d.mode==='local'?d.chainId!==31337:d.mode!=='testnet'||d.chainId!==11155111)||!/^0x[0-9a-fA-F]{40}$/.test(d.seller)||/^0x0{40}$/.test(d.seller)||!/^\d{1,20}$/.test(d.deployedBlock))throw new Error('Use local chain 31337 or Sepolia 11155111 with an actual seller and deployment block.');
+  if(Boolean(d.vault)!==Boolean(d.vaultExecutor)||[d.vault,d.vaultExecutor].some(a=>a!==undefined&&(!/^0x[0-9a-fA-F]{40}$/.test(a)||/^0x0{40}$/.test(a))))throw new Error('Invalid Vault deployment.');
   return {...d};
 }
 export const walletNamespace=(buyer:Address)=>'wallet:'+buyer.toLowerCase();
@@ -33,7 +34,7 @@ export function deliveryBytes(task: Task, buyer: Address) {
   return {...bytes,artifactText};
 }
 export class AgentWalletSession {
-  readonly client;
+  readonly client:PublicClient;
   readonly signer;
   readonly chain;
   readonly account:Address;
@@ -72,7 +73,7 @@ export class AgentWalletSession {
     const intent:ChainIntent={id,buyer,seller,amount,deadline,specHash:commitment};
     return {id,status:status===1?'funded' as const:status===2?'paid' as const:'refunded' as const,intent,outputHash};
   }
-  private async send(transaction:TransactionIntent,onSubmitted?:(hash:Hex)=>void){
+  async send(transaction:TransactionIntent,onSubmitted?:(hash:Hex)=>void){
     await this.assertSession();
     const estimate=await this.client.estimateGas({...transaction,account:this.account});
     await this.assertSession();

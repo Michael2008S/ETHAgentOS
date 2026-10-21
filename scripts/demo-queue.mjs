@@ -36,7 +36,7 @@ try {
   assert.equal(state.tasks.find(t=>t.id===id+'-invalid').status,'refunded');assert.equal(state.tasks.find(t=>t.id===id+'-injection').status,'blocked');
   assert.equal(state.ledger.filter(l=>l.kind==='settle').length,1);passed('invalid delivery and unauthorized tool still cannot pay',{queue:(await api('/api/runtime/queue')).queue});
 
-  const local='http://127.0.0.1:8545',config=await (await fetch(local+'/config')).json();
+  const local=(process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545'),config=await (await fetch(local+'/config')).json();
   const session=await AgentWalletSession.connect(localWalletProvider(local),config,false),os=new AgentOrderClient(session,base,headers),ledger=structuredClone((await read()).ledger);
   const order=await os.create({requestId:crypto.randomUUID(),agentId:'atlas',title:'Queue recovery with real model',budget:1000,planner:'llm',input:{dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:[{block:1,from:'a.eth',to:'b.eth',cents:123},{block:2,from:'a.eth',to:'c.eth',cents:456}]}});
   const beforeFunding=await api('/api/runtime/queue');await drain();assert.equal((await os.orders()).find(o=>o.id===order.id).status,'awaiting-funding');

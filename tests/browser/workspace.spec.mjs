@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-const base='http://127.0.0.1:5177';
+const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',chain=process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545';
 test.beforeEach(async({context,page},info)=>{
  const sandbox='browser-'+crypto.randomUUID();info.annotations.push({type:'sandbox',description:sandbox});
  await context.route(base+'/api/**',route=>route.continue({headers:{...route.request().headers(),'x-agentos-sandbox':sandbox}}));
@@ -35,7 +35,7 @@ test('wallet and custom draft survive navigation, reload and Chinese/English swi
 });
 
 test('order deep link and evidence remain owner scoped after refresh',async({page},info)=>{
- const config=await(await page.request.get('http://127.0.0.1:8545/config')).json();const rpc=await(await page.request.post('http://127.0.0.1:8545/rpc',{data:{jsonrpc:'2.0',id:1,method:'eth_accounts',params:[]}})).json();
+ const config=await(await page.request.get(chain+'/config')).json();const rpc=await(await page.request.post(chain+'/rpc',{data:{jsonrpc:'2.0',id:1,method:'eth_accounts',params:[]}})).json();
  const response=await page.request.post('/api/orders',{headers:headers(info),data:{action:'create',requestId:crypto.randomUUID(),title:'Linked evidence order',agentId:'atlas',buyer:rpc.result[0],budget:1000}});expect(response.status()).toBe(200);const {order}=await response.json();expect(order.deployment.escrow).toBe(config.escrow);
  for(let index=0;index<10;index++){const newer=await page.request.post('/api/orders',{headers:headers(info),data:{action:'create',requestId:crypto.randomUUID(),title:'Newer order '+index,agentId:'atlas',buyer:rpc.result[0],budget:1000}});expect(newer.status()).toBe(200);}
  await page.goto('/#vault?order='+order.id);const card=page.locator('[id="order-'+order.id+'"]');await expect(card.getByRole('heading',{name:order.title})).toBeVisible();await card.getByText('统一订单证据',{exact:true}).click();await expect(card.getByRole('cell',{name:'输入承诺',exact:true})).toBeVisible();await expect(card.getByRole('cell',{name:'已核验',exact:true}).first()).toBeVisible();
@@ -61,4 +61,33 @@ test('USDC source draft persists after async import, refresh and language switch
  await expect(page.locator('textarea[name=chainInput]')).toHaveValue(JSON.stringify(input,null,2));
  await page.getByLabel('Switch to English',{exact:true}).click();await expect(page.getByRole('button',{name:'Import USDC events',exact:true})).toBeVisible();
  await expect(page.locator('textarea[name=chainInput]')).toHaveValue(JSON.stringify(input,null,2));
+});
+
+test('Vault grant purchases without another signature and revocation removes purchase authority',async({page,context},info)=>{
+ test.setTimeout(240000);
+ let signatures=0;
+ await context.route(chain+'/rpc',async route=>{if(route.request().postDataJSON()?.method==='personal_sign')signatures++;await route.continue();});
+ await page.goto('/#vault');await page.getByRole('button',{name:'连接本地测试钱包',exact:true}).click();
+ await expect(page.getByRole('button',{name:'断开连接',exact:true})).toBeVisible();
+ // Use English controls to exercise the new translations and wallet state together.
+ await page.getByLabel('Switch to English',{exact:true}).click();
+ const panel=page.locator('details').filter({has:page.locator('summary',{hasText:'AgentVault · bounded purchasing'})});
+ await panel.locator('summary').click();await panel.locator('input[name=deposit]').fill('10');await panel.locator('input[name=perTask]').fill('3');await panel.locator('input[name=total]').fill('10');await panel.locator('input[name=daily]').fill('100');
+ await panel.getByRole('button',{name:'Deposit, grant & sign session',exact:true}).click();
+ const revoke=panel.getByRole('button',{name:'Revoke Vault purchases',exact:true});await expect(revoke).toBeEnabled({timeout:90000});expect(signatures).toBe(1);
+ await page.getByText('Create a pre-funded order',{exact:true}).click();const form=page.locator('details.order-create');
+ await form.locator('input[name=title]').fill('Browser Vault purchase');await form.locator('input[name=budget]').fill('3');await form.locator('select[name=fundingMode]').selectOption('vault');
+ await expect(form.locator('select[name=vaultSessionId] option')).toHaveCount(1);await expect(form.locator('select[name=vaultSessionId]')).not.toHaveValue('');
+ await form.getByRole('button',{name:'Commit order input',exact:true}).click();
+ let order;
+ await expect.poll(async()=>{const r=await page.request.get('/api/orders',{headers:headers(info)});const d=await r.json();order=d.orders?.find(o=>o.title==='Browser Vault purchase');return order?.status;},{timeout:120000}).toBe('completed');
+ expect(order.settlement.status).toBe('paid');expect(order.vaultSessionId).toBeTruthy();expect(order.funding.buyer.toLowerCase()).toBe(order.vault.vault.toLowerCase());expect(signatures).toBe(1);
+ await expect(page.locator('[id="order-'+order.id+'"]')).toContainText('Completed');
+ // Reconnect after reload from the existing account permission; do not request a new grant.
+ await page.reload();await expect(page.getByRole('button',{name:'Disconnect',exact:true})).toBeVisible();await panel.locator('summary').click();await expect(revoke).toBeEnabled();
+ await revoke.click();await expect(revoke).toBeDisabled({timeout:60000});expect(signatures).toBe(1);
+ await page.getByText('Create a pre-funded order',{exact:true}).click();await form.locator('select[name=fundingMode]').selectOption('vault');
+ await expect(form.getByRole('button',{name:'Commit order input',exact:true})).toBeDisabled();await expect(form.locator('select[name=vaultSessionId]')).toHaveValue('');
+ const r=await page.request.get('/api/orders',{headers:headers(info)});expect((await r.json()).orders).toHaveLength(1);
+ await page.screenshot({path:'outputs/vault-browser-proof.png',fullPage:true});
 });
