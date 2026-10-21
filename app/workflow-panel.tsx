@@ -1,0 +1,39 @@
+'use client';
+import {useEffect,useRef,useState} from 'react';
+import type {AgentWalletSession} from '@/sdk/wallet';
+import {AgentWorkflowClient} from '@/sdk/workflows';
+import type {AgentWorkflow} from '@/lib/agentos/workflow-state';
+import type {VaultSession} from '@/lib/agentos/vault';
+import type {Agent,TaskInput} from '@/lib/agentos/types';
+import {submissionIntent} from '@/lib/agentos/client-intent';
+import {useLanguage} from '@/lib/i18n/context';
+const sample:TaskInput={dataset:'custom-transfers-v1',blockFrom:1,blockTo:3,records:[{block:1,from:'treasury',to:'research',cents:123},{block:2,from:'treasury',to:'operations',cents:456},{block:3,from:'treasury',to:'research',cents:100}]};
+export function WorkflowPanel({scope,session,agents,sessions,busy,perform,onChanged}:{scope:string;session:AgentWalletSession;agents:Agent[];sessions:VaultSession[];busy:boolean;perform:(action:()=>Promise<void>)=>Promise<void>;onChanged?:()=>Promise<void>}){
+ const {tr}=useLanguage(),[workflows,setWorkflows]=useState<AgentWorkflow[]>([]),[error,setError]=useState(''),[storedDraft,setStoredDraft]=useState<{key:string;values:Record<string,string>}|null>(null),[selectedSession,setSelectedSession]=useState(''),generation=useRef(0),lastSeen=useRef('');
+ const draftKey='agentos.workflow-draft.v1:'+scope+':'+session.account.toLowerCase();
+ const draft=storedDraft?.key===draftKey?storedDraft.values:null;
+ const client=new AgentWorkflowClient(session),active=sessions.filter(s=>s.signature&&!s.revokedAt&&s.owner.toLowerCase()===session.account.toLowerCase()&&Number(s.expires)*1000>Date.now()&&['treasury-report','event-analysis'].every(skill=>s.skills.includes(skill as 'treasury-report'|'event-analysis')));
+ async function refresh(){const expected=generation.current;try{const list=await client.list();if(expected===generation.current){setWorkflows(list);setError('');const fingerprint=JSON.stringify(list.map(w=>[w.id,w.status,w.updatedAt]));if(lastSeen.current!==fingerprint){lastSeen.current=fingerprint;await onChanged?.();}}}catch{if(expected===generation.current)setError('Workflow list is unavailable. Retry after recovery.');}}
+ useEffect(()=>{generation.current++;setWorkflows([]);void refresh();const timer=setInterval(()=>void refresh(),2500);return()=>{generation.current++;clearInterval(timer);};},[scope,session.account,session.deployment.escrow]); // eslint-disable-line react-hooks/exhaustive-deps
+ useEffect(()=>{let values:Record<string,string>={};try{const raw=sessionStorage.getItem(draftKey),value=raw&&raw.length<65536?JSON.parse(raw):{};if(value&&typeof value==='object'&&!Array.isArray(value))values=Object.fromEntries(Object.entries(value).filter(([key,value])=>['workflowTitle','workflowSession','reportAgent','summaryAgent','reportBudget','summaryBudget','workflowInput'].includes(key)&&typeof value==='string')) as Record<string,string>;}catch{}setStoredDraft({key:draftKey,values});setSelectedSession(values.workflowSession??'');},[draftKey]);
+ return <details className="panel workflow-panel" id="workflow-panel"><summary>{tr('Two-step workflow · accepted artifact memory')}</summary><p>{tr('Generate an allocation report, then summarize its accepted allocations. Both purchases use the selected Vault session.')}</p>
+  {error&&<p role="alert">{tr(error)}</p>}
+  <form key={draftKey+':'+!!draft} onChange={event=>{try{sessionStorage.setItem(draftKey,JSON.stringify(Object.fromEntries(new FormData(event.currentTarget).entries())));}catch{}}} onSubmit={event=>{event.preventDefault();const data=new FormData(event.currentTarget);void perform(async()=>{const input=JSON.parse(String(data.get('workflowInput'))) as TaskInput,payload={title:String(data.get('workflowTitle')),vaultSessionId:String(data.get('workflowSession')),agentIds:[String(data.get('reportAgent')),String(data.get('summaryAgent'))] as [string,string],budgets:[Math.round(Number(data.get('reportBudget'))*100),Math.round(Number(data.get('summaryBudget'))*100)] as [number,number],timeoutSeconds:300,input},intent=await submissionIntent(scope,'workflow',payload,sessionStorage);await client.create({...payload,requestId:intent.id});intent.acknowledge();await refresh();});}}>
+   <label className="field">{tr('Workflow title')}<input name="workflowTitle" defaultValue={draft?.workflowTitle??'Treasury allocation review'} maxLength={120} required/></label>
+   <label className="field">{tr('Vault purchasing session')}<select name="workflowSession" value={selectedSession} onChange={e=>setSelectedSession(e.target.value)} required><option value="">{tr('Select Vault session')}</option>{active.map(s=><option key={s.sessionId} value={s.sessionId}>{s.sessionId}</option>)}</select></label>
+   <div className="form-grid"><label className="field">{tr('Step 1 · allocation report')}<select name="reportAgent" defaultValue={draft?.reportAgent} required>{agents.filter(a=>a.enabled&&a.skill==='treasury-report').map(a=><option value={a.id} key={a.id}>{a.name} · {(a.price/100).toFixed(2)}</option>)}</select></label><label className="field">{tr('Step 2 · allocation summary')}<select name="summaryAgent" defaultValue={draft?.summaryAgent} required>{agents.filter(a=>a.enabled&&a.skill==='event-analysis').map(a=><option value={a.id} key={a.id}>{a.name} · {(a.price/100).toFixed(2)}</option>)}</select></label></div>
+   <div className="form-grid"><label className="field">{tr('Step 1 budget')}<input name="reportBudget" type="number" min="0.01" step="0.01" defaultValue={draft?.reportBudget??'4'} required/></label><label className="field">{tr('Step 2 budget')}<input name="summaryBudget" type="number" min="0.01" step="0.01" defaultValue={draft?.summaryBudget??'3'} required/></label></div>
+   <label className="field">{tr('Workflow input · JSON')}<textarea name="workflowInput" rows={7} defaultValue={draft?.workflowInput??JSON.stringify(sample,null,2)} required/></label>
+   <p className="form-note">{tr('Both quotes and future budgets are reserved before execution. Failed steps stop the workflow; cancellation preserves existing escrow terms.')}</p>
+   <button className="btn primary" disabled={busy||!active.length}>{tr('Start two-step workflow')}</button>
+  </form>
+  {!active.length&&<p>{tr('Authorize a Vault session for both skills first.')}</p>}
+  {workflows.map(w=><article className="chain-proof" id={'workflow-'+w.id} key={w.id}><h3>{w.title}</h3><p>{tr(w.status[0].toUpperCase()+w.status.slice(1))} · {tr('Total reserved budget')}: {(w.totalBudget/100).toFixed(2)}</p><ol>{w.steps.map((step,index)=><li key={step.requestId}>{tr(index===0?'Step 1 · allocation report':'Step 2 · allocation summary')} · {step.agentId} · {(step.quote/100).toFixed(2)} {step.orderId?<a href={'#vault?order='+step.orderId}>{tr('View order')}</a>:tr('Waiting for accepted parent artifact')}</li>)}</ol>{w.lastError&&<p role="alert">{tr(w.lastError)}</p>}
+   {w.status==='completed'&&<p>{tr('Both paid artifacts are preserved. Step 2 commits the full parent artifact and payment reference.')}</p>}
+   {w.status==='blocked'&&<button className="btn secondary small" disabled={busy} onClick={()=>void perform(async()=>{await client.resume(w.id);await refresh();})}>{tr('Resume workflow')}</button>}
+   {w.status==='running'&&<button className="btn secondary small" disabled={busy} onClick={()=>void perform(async()=>{await client.recover();await refresh();})}>{tr('Recover workflow')}</button>}
+   {['running','blocked'].includes(w.status)&&<button className="btn secondary small" disabled={busy} onClick={()=>void perform(async()=>{await client.cancel(w.id);await refresh();})}>{tr('Cancel workflow')}</button>}
+   <a className="text-button" href={'/api/workflows?id='+w.id} target="_blank" rel="noreferrer">{tr('Inspect workflow')}</a>
+  </article>)}
+ </details>;
+}

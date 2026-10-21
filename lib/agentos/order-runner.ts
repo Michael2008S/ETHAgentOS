@@ -7,6 +7,7 @@ import type { ModelPlan,OrderPlanner } from './model.ts';
 import { supplierRequest,type OrderSupplier,type SupplierDelivery } from './supplier.ts';
 import {claimVaultFunding,activateVaultOrder} from './orders.ts';
 import type {VaultFunder} from './vault-executor.ts';
+import {verifyMemoryAuthority} from './artifact-memory.ts';
 type OrderStore={read(ownerId:string):Promise<{state:Workspace}>;updateWorkspace(ownerId:string,reduce:(state:Workspace)=>Promise<Workspace>|Workspace):Promise<{state:Workspace}>};
 export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:OrderChain,options:{delayMs?:number;now?:()=>string;maxSteps?:number;planner?:OrderPlanner;supplier?:OrderSupplier;supplierAuthority?:OrderSupplier['authorize'];vaultFunder?:VaultFunder}={}){
   let failures=0;
@@ -19,6 +20,7 @@ export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:O
         if(view.status===0&&order.vaultFunding&&BigInt(order.vaultFunding.deadline)<=view.timestamp){await store.updateWorkspace(ownerId,current=>{const next=structuredClone(current),o=findOrder(next,id);if(o.status==='funding'&&!o.funding){o.status='cancelled';o.failure='Vault funding deadline passed without an escrow.';orderEvent(o,'Vault purchase denied',o.failure,now,'warning');}return next;});return {orderId:id,status:'cancelled'};}
         const token=crypto.randomUUID();
         try{
+          if(view.status===0)await verifyMemoryAuthority(state,order,chain);
           const claimed=await store.updateWorkspace(ownerId,current=>claimVaultFunding(current,id,token,view.timestamp+BigInt(Math.max(30,order.timeoutSeconds)),now,view.status!==0)),leased=findOrder(claimed.state,id);
           if(leased.vaultFunding?.token!==token)return {orderId:id,status:'funding'};
           if(!options.vaultFunder)throw new DomainError('Vault executor is unavailable.','UNAVAILABLE');
@@ -35,6 +37,12 @@ export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:O
         }
       }
       if(view.status===0)throw new DomainError('Confirmed escrow is no longer available. Execution is suspended.','CONFLICT');
+      if(order.input.memory&&!order.failure&&!order.settlementAuthorization&&view.status===1){
+        try{await verifyMemoryAuthority(state,order,chain);}catch(error){
+          if(!(error instanceof DomainError)||error.code!=='FORBIDDEN')throw error;
+          await store.updateWorkspace(ownerId,current=>{const next=structuredClone(current),o=findOrder(next,id);if(!o.settlementAuthorization&&!o.settlement){o.failure=error.message;o.status='awaiting-settlement';}return next;});continue;
+        }
+      }
       if(view.status===2||view.status===3){const hash=await chain.settle(order);if(!hash)return {orderId:id,status:'awaiting-settlement'};const evidence=await chain.settlement(order,hash);await store.updateWorkspace(ownerId,current=>finishOrder(current,id,evidence,now));continue;}
       if(order.status==='awaiting-settlement'){
         if(order.executor==='supplier'&&!order.failure&&!order.settlementAuthorization){

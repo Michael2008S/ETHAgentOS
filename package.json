@@ -47,7 +47,8 @@
     "demo:full": "node scripts/demo-full.mjs",
     "demo:data": "node scripts/demo-data.mjs",
     "demo:isolated": "node scripts/demo-isolated.mjs",
-    "demo:vault": "node scripts/demo-vault.mjs"
+    "demo:vault": "node scripts/demo-vault.mjs",
+    "demo:workflow": "node scripts/demo-workflow.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

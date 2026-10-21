@@ -1,8 +1,9 @@
 import {keccak256,stringToHex,type Hex} from 'viem';
 import {assertSourceInput,sourceCommitment,sourceSummary,type TransferSource} from '../../lib/agentos/transfer-source.ts';
-export type DeliveryVerification={version:'agentos.delivery.v2';skill:'event-analysis'|'treasury-report';skillVersion:'1.0.0';dataset:string;blockFrom:number;blockTo:number;sourceHash?:Hex};
+export type DeliveryVerification={version:'agentos.delivery.v2';skill:'event-analysis'|'treasury-report';skillVersion:'1.0.0';dataset:string;blockFrom:number;blockTo:number;sourceHash?:Hex;memoryHash?:Hex};
 // Optional only for historical v1 commitments. New purchases require v2.
 export type DeliverySpec={datasetUrl:string;datasetHash:Hex;artifactUrl:string;verification?:DeliveryVerification};
+export type AcceptedArtifact={version:'agentos.accepted-artifact.v1';orderId:string;chainId:number;escrow:Hex;taskId:Hex;settlementTransactionHash:Hex;artifactHash:Hex;datasetText:string;artifactText:string;spec:DeliverySpec};
 export function canonical(value:unknown):string {
  if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
  if(value!==null&&typeof value==='object')return '{'+Object.entries(value).sort(([a],[b])=>a<b?-1:a>b?1:0).map(([k,v])=>JSON.stringify(k)+':'+canonical(v)).join(',')+'}';
@@ -10,12 +11,27 @@ export function canonical(value:unknown):string {
 }
 export const specHash=(spec:DeliverySpec)=>keccak256(stringToHex(canonical(spec)));
 export const resultHash=(output:unknown)=>keccak256(stringToHex(canonical(output)));
-export function deliveryVerification(skill:DeliveryVerification['skill'],input:{dataset:string;blockFrom:number;blockTo:number;source?:TransferSource}):DeliveryVerification{
- return {version:'agentos.delivery.v2',skill,skillVersion:'1.0.0',dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo,...(input.source?{sourceHash:sourceCommitment(input.source)}:{})};
+export function deliveryVerification(skill:DeliveryVerification['skill'],input:{dataset:string;blockFrom:number;blockTo:number;source?:TransferSource;memory?:AcceptedArtifact}):DeliveryVerification{
+ return {version:'agentos.delivery.v2',skill,skillVersion:'1.0.0',dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo,...(input.source?{sourceHash:sourceCommitment(input.source)}:{}),...(input.memory?{memoryHash:resultHash(input.memory)}:{})};
 }
 export function validateVerification(value:unknown):asserts value is DeliveryVerification{
  const v=value as DeliveryVerification;
- if(!v||typeof v!=='object'||Array.isArray(v)||Object.keys(v).sort().join(',')!==(v.sourceHash===undefined?'blockFrom,blockTo,dataset,skill,skillVersion,version':'blockFrom,blockTo,dataset,skill,skillVersion,sourceHash,version')||v.sourceHash!==undefined&&!/^0x[0-9a-f]{64}$/.test(v.sourceHash)||v.version!=='agentos.delivery.v2'||!['event-analysis','treasury-report'].includes(v.skill)||v.skillVersion!=='1.0.0'||!['eth-shenzhen-fixture-v1','custom-transfers-v1'].includes(v.dataset)||!Number.isSafeInteger(v.blockFrom)||v.blockFrom<0||!Number.isSafeInteger(v.blockTo)||v.blockTo<v.blockFrom)throw new Error('Invalid versioned delivery verification');
+ const keys=['blockFrom','blockTo','dataset','skill','skillVersion','version',...(v?.sourceHash===undefined?[]:['sourceHash']),...(v?.memoryHash===undefined?[]:['memoryHash'])].sort().join(',');
+ if(!v||typeof v!=='object'||Array.isArray(v)||Object.keys(v).sort().join(',')!==keys||[v.sourceHash,v.memoryHash].some(h=>h!==undefined&&!/^0x[0-9a-f]{64}$/.test(h))||v.sourceHash&&v.memoryHash||v.version!=='agentos.delivery.v2'||!['event-analysis','treasury-report'].includes(v.skill)||v.skillVersion!=='1.0.0'||!['eth-shenzhen-fixture-v1','custom-transfers-v1'].includes(v.dataset)||!Number.isSafeInteger(v.blockFrom)||v.blockFrom<0||!Number.isSafeInteger(v.blockTo)||v.blockTo<v.blockFrom)throw new Error('Invalid versioned delivery verification');
+}
+/** One bounded level: independently verify the complete parent report before deriving its allocation input.
+ * Payment authenticity is separately rechecked by the runtime against its owner-scoped order and chain.
+ */
+export function acceptedMemoryRecords(value:unknown){
+ const m=value as AcceptedArtifact;
+ if(!m||Object.keys(m).sort().join(',')!=='artifactHash,artifactText,chainId,datasetText,escrow,orderId,settlementTransactionHash,spec,taskId,version'||m.version!=='agentos.accepted-artifact.v1'||typeof m.orderId!=='string'||!/^chain-[a-zA-Z0-9-]{1,100}$/.test(m.orderId)||!Number.isSafeInteger(m.chainId)||m.chainId<=0||!/^0x[0-9a-fA-F]{40}$/.test(m.escrow)||[m.taskId,m.settlementTransactionHash,m.artifactHash].some(h=>!/^0x[0-9a-f]{64}$/.test(h))||typeof m.datasetText!=='string'||m.datasetText.length>32768||typeof m.artifactText!=='string'||m.artifactText.length>32768||!m.spec||Object.keys(m.spec).sort().join(',')!=='artifactUrl,datasetHash,datasetUrl,verification'||m.spec.verification?.memoryHash||m.spec.verification?.skill!=='treasury-report')throw new Error('Invalid accepted artifact memory');
+ validateVerification(m.spec.verification);
+ const verdict=verifyDelivery(m.datasetText,m.artifactText,m.taskId,m.spec);
+ if(!verdict.accepted||verdict.outputHash!==m.artifactHash)throw new Error('Parent artifact does not pass complete acceptance');
+ const allocations=JSON.parse(m.artifactText).output.allocations as Record<string,number>;
+ const records=Object.entries(allocations).sort(([a],[b])=>a<b?-1:a>b?1:0).map(([to,cents])=>({block:0,from:m.orderId,to,cents}));
+ if(!records.length||records.length>100)throw new Error('Parent has no supported allocation records');
+ return records;
 }
 export function deliveryArtifact(taskId:Hex,verification:DeliveryVerification,datasetHash:Hex,output:unknown){
  return {version:'agentos.delivery.v2',taskId,verification,datasetHash,output,outputHash:resultHash(output)};
@@ -39,6 +55,10 @@ export function verifyDelivery(datasetText:string,artifactText:string,taskId:Hex
  if(v?.sourceHash){
   if(!decoded||Object.keys(decoded).sort().join(',')!=='records,source,version'||decoded.version!=='agentos.transfer-evidence.v1')throw new Error('Missing source provenance');
   source=assertSourceInput(decoded.source,{...v,records:decoded.records});if(sourceCommitment(source)!==v.sourceHash)throw new Error('Source provenance differs from commitment');rows=decoded.records;
+ }
+ if(v?.memoryHash){
+  if(!decoded||Object.keys(decoded).sort().join(',')!=='memory,records,version'||decoded.version!=='agentos.memory-evidence.v1'||v.dataset!=='custom-transfers-v1'||v.blockFrom!==0||v.blockTo!==0||resultHash(decoded.memory)!==v.memoryHash||canonical(acceptedMemoryRecords(decoded.memory))!==canonical(decoded.records))throw new Error('Accepted memory differs from its commitment or derived records');
+  rows=decoded.records;
  }
  if(!Array.isArray(rows)||rows.length>10000)throw new Error('Invalid evidence');
  const artifact=JSON.parse(artifactText),outputHash=resultHash(artifact);

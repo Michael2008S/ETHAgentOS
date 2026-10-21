@@ -91,3 +91,25 @@ test('Vault grant purchases without another signature and revocation removes pur
  const r=await page.request.get('/api/orders',{headers:headers(info)});expect((await r.json()).orders).toHaveLength(1);
  await page.screenshot({path:'outputs/vault-browser-proof.png',fullPage:true});
 });
+
+test('workflow retry survives refresh and recovers two paid steps with accepted artifact memory',async({page,context},info)=>{
+ test.setTimeout(240000);let signatures=0,lose=true;const ids=[];
+ await context.route(chain+'/rpc',async route=>{if(route.request().postDataJSON()?.method==='personal_sign')signatures++;await route.continue();});
+ await context.route(base+'/api/workflows',async route=>{
+  const body=route.request().postDataJSON();if(body?.action!=='create'){await route.fallback();return;}
+  ids.push(body.requestId);const response=await route.fetch({headers:{...route.request().headers(),...headers(info),'x-agentos-queue-only':'1'}});expect(response.status()).toBe(200);
+  if(lose){lose=false;await route.abort('failed');}else await route.fulfill({response});
+ });
+ await page.goto('/#vault');await page.getByRole('button',{name:'连接本地测试钱包',exact:true}).click();await page.getByLabel('Switch to English',{exact:true}).click();
+ const vault=page.locator('details').filter({has:page.locator('summary',{hasText:'AgentVault · bounded purchasing'})});await vault.locator('summary').click();await vault.locator('input[name=deposit]').fill('10');await vault.locator('input[name=perTask]').fill('5');await vault.locator('input[name=total]').fill('10');await vault.locator('input[name=daily]').fill('100');await vault.getByRole('button',{name:'Deposit, grant & sign session',exact:true}).click();await expect(vault.getByRole('button',{name:'Revoke Vault purchases',exact:true})).toBeEnabled({timeout:90000});expect(signatures).toBe(1);
+ const panel=page.locator('#workflow-panel');await panel.locator('summary').click();await panel.locator('input[name=workflowTitle]').fill('Browser accepted memory workflow');
+ await expect(panel.locator('select[name=workflowSession] option')).toHaveCount(2);const sessionId=await panel.locator('select[name=workflowSession] option').nth(1).getAttribute('value');await panel.locator('select[name=workflowSession]').selectOption(sessionId);
+ await panel.getByRole('button',{name:'Start two-step workflow',exact:true}).click();await expect.poll(()=>ids.length).toBe(1);await expect(panel.getByRole('button',{name:'Start two-step workflow',exact:true})).toBeEnabled();
+ await page.reload();await expect(page.getByRole('button',{name:'Disconnect',exact:true})).toBeVisible();await panel.locator('summary').click();await expect(panel.locator('input[name=workflowTitle]')).toHaveValue('Browser accepted memory workflow');await expect(panel.locator('select[name=workflowSession]')).toHaveValue(sessionId);
+ await panel.getByRole('button',{name:'Start two-step workflow',exact:true}).click();await expect.poll(()=>ids.length).toBe(2);expect(ids[0]).toBe(ids[1]);
+ await expect(panel.getByRole('button',{name:'Recover workflow',exact:true})).toBeVisible();await panel.getByRole('button',{name:'Recover workflow',exact:true}).click();
+ await expect(panel).toContainText('Both paid artifacts are preserved.',{timeout:120000});expect(signatures).toBe(1);
+ const {state}=await(await page.request.get('/api/workspace',{headers:headers(info)})).json();expect(state.workflows).toHaveLength(1);expect(state.workflows[0].status).toBe('completed');expect(state.chainOrders).toHaveLength(2);const second=state.chainOrders.find(o=>o.input.memory);expect(second.output.transferCount).toBe(2);expect(second.output.totalCents).toBe(679);expect(second.input.memory.orderId).toBe(state.workflows[0].steps[0].orderId);expect(state.chainOrders.every(o=>o.settlement.status==='paid')).toBe(true);
+ for(const order of state.chainOrders)await expect(page.locator('[id="order-'+order.id+'"]')).toContainText('Completed');
+ await page.getByLabel('切换为中文',{exact:true}).click();await expect(panel).toContainText('两份已付款成果均已保存');await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);await page.screenshot({path:'outputs/workflow-browser-proof.png',fullPage:true});
+});

@@ -2,6 +2,7 @@ import type { Command, Event, Receipt, Task, TaskInput, Workspace } from './type
 import { SKILLS } from './types.ts';
 import { DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS, taskIsOverdue } from './lifecycle.ts';
 import {assertSourceInput,sourceSummary} from './transfer-source.ts';
+import {acceptedMemoryRecords} from '../../cre/workflow/verify.ts';
 
 export class DomainError extends Error { code: string; constructor(message: string, code = 'INVALID_COMMAND') { super(message); this.code = code; } }
 // Public, deterministic fixture. Never represented as live blockchain data.
@@ -86,7 +87,7 @@ export function normalizeInput(input?: TaskInput): TaskInput {
   if (!input || !['eth-shenzhen-fixture-v1','custom-transfers-v1'].includes(input.dataset) || !Number.isSafeInteger(input.blockFrom) || !Number.isSafeInteger(input.blockTo) || input.blockFrom < 0 || input.blockTo < input.blockFrom) throw new DomainError('Invalid input dataset or block range.');
   const normalized: TaskInput = {dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo};
   if (input.dataset === 'eth-shenzhen-fixture-v1') {
-    if (input.records !== undefined||input.source!==undefined) throw new DomainError('Fixture input cannot override records or source.');
+    if (input.records !== undefined||input.source!==undefined||input.memory!==undefined) throw new DomainError('Fixture input cannot override records or source.');
     return normalized;
   }
   if (!Array.isArray(input.records) || input.records.length < 1 || input.records.length > 100) throw new DomainError('Custom input requires 1–100 transfer records.');
@@ -98,6 +99,7 @@ export function normalizeInput(input?: TaskInput): TaskInput {
     return {block:row.block,from:row.from.trim(),to:row.to.trim(),cents:row.cents};
   });
   if(input.source!==undefined){try{normalized.source=assertSourceInput(input.source,normalized);}catch{throw new DomainError('Transfer records do not match their source provenance.');}}
+  if(input.memory!==undefined){try{if(input.source||input.blockFrom!==0||input.blockTo!==0||canonical(acceptedMemoryRecords(input.memory))!==canonical(normalized.records))throw new Error();normalized.memory=structuredClone(input.memory);}catch{throw new DomainError('Transfer records do not match the accepted artifact memory.');}}
   if (canonical(normalized).length > 32768) throw new DomainError('Custom input is too large.');
   return normalized;
 }

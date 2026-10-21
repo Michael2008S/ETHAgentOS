@@ -179,3 +179,5 @@ console.log(result.status, result.receipt);
 真实业务数据：钱包页可选择「以太坊 USDC · 真实来源」，导入指定地址的已最终确认事件。保留原始金额、区块和交易证据，并在创建任务前重新复核。`npm run demo:data` 实跑真实主网读取 → HTTP/D1 资金流报告 → 独立临时链完整成果付款；费用网络与数据来源网络分别标明，见 [REAL-DATA](docs/REAL-DATA.md)。
 
 Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/链上每日额度并签名会话，随后选择该会话创建自动注资订单，后续采购无需逐单签名。撤销阻止新注资，已注资订单保留原结算条件，退款回到 Vault 且不补回已用额度。配置与边界见 [VAULT](docs/VAULT.md)。`npm run demo:isolated` 使用 5187/8555/7471 和独立数据库，不覆盖已有环境；运行 `npm run demo:vault` 验证采购与退款。最终完整演示使用启用身份的隔离实例及 `npm run demo:full -- --runtime .sites-runtime/isolated-demo/current.json`；Vault 专项的跳过身份模式不算完整演示。
+
+两步工作流：钱包页可选择 Vault 会话，先采购资金分配报告，再采购基于已验收分配明细的汇总。两步报价、预算和成果引用固定，支持丢失响应、刷新、并发恢复与取消。运行 `npm run demo:workflow`，实现与信任边界见 [WORKFLOWS](docs/WORKFLOWS.md)。公共网络与最终完整演示仍按路线图单独验收。

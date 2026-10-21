@@ -62,7 +62,7 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
       }
       if(path==='/drafts'){
         if(!/^0x[0-9a-f]{64}$/.test(body.id)||typeof body.datasetText!=='string')throw new Error('Invalid local input commitment.');
-        const decoded=JSON.parse(body.datasetText),records=Array.isArray(decoded)?decoded:decoded.records;if(!Array.isArray(records))throw new Error('Invalid input.');if(records.length)normalizeInput({dataset:'custom-transfers-v1',blockFrom:decoded.source?body.verification.blockFrom:0,blockTo:decoded.source?body.verification.blockTo:Number.MAX_SAFE_INTEGER,records,...(decoded.source?{source:decoded.source}:{})});
+        const decoded=JSON.parse(body.datasetText),records=Array.isArray(decoded)?decoded:decoded.records;if(!Array.isArray(records))throw new Error('Invalid input.');if(records.length)normalizeInput({dataset:'custom-transfers-v1',blockFrom:decoded.source||decoded.memory?body.verification.blockFrom:0,blockTo:decoded.source||decoded.memory?body.verification.blockTo:Number.MAX_SAFE_INTEGER,records,...(decoded.source?{source:decoded.source}:{}),...(decoded.memory?{memory:decoded.memory}:{})});
         validateVerification(body.verification);
         const existing=deliveries.get(body.id);if(existing&&(existing.datasetText!==body.datasetText||JSON.stringify(existing.spec.verification)!==JSON.stringify(body.verification)))throw new Error('This input commitment already exists.');
         const spec={datasetUrl:base+'/dataset/'+body.id,datasetHash:keccak256(stringToHex(body.datasetText)),artifactUrl:base+'/artifact/'+body.id,verification:body.verification};
@@ -93,7 +93,7 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
       }
       if(path==='/deliveries'){
         if(!/^0x[0-9a-f]{64}$/.test(body.id)||typeof body.datasetText!=='string'||typeof body.artifactText!=='string')throw new Error('Invalid local delivery.');
-        const decoded=JSON.parse(body.datasetText),records=Array.isArray(decoded)?decoded:decoded.records;if(!Array.isArray(records))throw new Error('Invalid local dataset.');if(records.length)normalizeInput({dataset:'custom-transfers-v1',blockFrom:decoded.source?body.verification.blockFrom:0,blockTo:decoded.source?body.verification.blockTo:Number.MAX_SAFE_INTEGER,records,...(decoded.source?{source:decoded.source}:{})});
+        const decoded=JSON.parse(body.datasetText),records=Array.isArray(decoded)?decoded:decoded.records;if(!Array.isArray(records))throw new Error('Invalid local dataset.');if(records.length)normalizeInput({dataset:'custom-transfers-v1',blockFrom:decoded.source||decoded.memory?body.verification.blockFrom:0,blockTo:decoded.source||decoded.memory?body.verification.blockTo:Number.MAX_SAFE_INTEGER,records,...(decoded.source?{source:decoded.source}:{}),...(decoded.memory?{memory:decoded.memory}:{})});
         validateVerification(body.verification);
         const artifact=JSON.parse(body.artifactText);if(artifact.taskId!==body.id||!artifact.output||typeof artifact.outputHash!=='string')throw new Error('Invalid local artifact.');
         const spec={datasetUrl:base+'/dataset/'+body.id,datasetHash:keccak256(stringToHex(body.datasetText)),artifactUrl:base+'/artifact/'+body.id,verification:body.verification};

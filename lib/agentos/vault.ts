@@ -1,3 +1,4 @@
+import {futureWorkflowSteps} from './workflow-state.ts';
 import {parseAbi,type Address,type Hex,type PublicClient} from 'viem';
 import {canonical} from '../../cre/workflow/verify.ts';
 import {centsToToken,tokenABI} from '../../sdk/chain.ts';
@@ -55,6 +56,7 @@ export function vaultAllowance(state:Workspace,sessionId:string,buyer:Address,sk
  if(!session?.signature||session.revokedAt||!same(session.owner,buyer)||!session.skills.includes(skill)||BigInt(session.expires)<=BigInt(Math.floor(Date.parse(now)/1000))||budget>session.perTaskCents)throw new DomainError('No active Vault session authorizes this purchase.','FORBIDDEN');
  // Reserve immutable quotes before any RPC. Refunds consume session allowance.
  const used=(state.chainOrders??[]).filter(o=>o.id!==excludeOrder&&o.vault?.sessionId===sessionId&&(o.funding||o.status!=='cancelled')).reduce((sum,o)=>sum+o.quote,0);
- if(used+quote>session.totalCents)throw new DomainError('Vault session total allowance would be exceeded.','FORBIDDEN');
+ const future=futureWorkflowSteps(state).filter(({workflow})=>workflow.vaultSessionId===sessionId).reduce((sum,{step})=>sum+step.quote,0);
+ if(used+future+quote>session.totalCents)throw new DomainError('Vault session total allowance would be exceeded.','FORBIDDEN');
  return session;
 }

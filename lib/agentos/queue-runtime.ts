@@ -4,6 +4,8 @@ import { claimJob, acknowledgeJob, queueSummary, workItems } from './queue';
 import { runTask } from './runner';
 import { runOrder } from './order-runner';
 import { configuredOrderChain } from './order-runtime';
+import {workflowPublisher} from './workflow-runtime';
+import {runWorkflow} from './workflow-runner';
 
 /** Durable checkpoints and expiring claims survive a killed request or consumer. */
 export async function drainQueue(request: Request, ownerId?: string) {
@@ -28,6 +30,10 @@ export async function drainQueue(request: Request, ownerId?: string) {
         const {chain,planner,supplier,supplierAuthority,vaultFunder}=await configuredOrderChain(request);
         const result=await runOrder(store,job.owner_id,job.task_id,chain,{maxSteps:3,planner,supplier,supplierAuthority,vaultFunder});
         failed=result.status==='retryable' && !!result.error;
+      } else if(job.kind==='workflow'){
+        const configured=await configuredOrderChain(request);
+        const result=await runWorkflow(store,job.owner_id,job.task_id,configured.chain,workflowPublisher(configured),{...configured,maxSteps:3});
+        failed=result.status==='retryable'&&!!result.error;
       } else failed=true;
     } catch { failed=true; }
     // A read/ack failure leaves the lease for crash recovery; never claim completion.

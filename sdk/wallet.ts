@@ -25,7 +25,7 @@ export function walletDeployment(value: unknown): WalletDeployment {
 }
 export const walletNamespace=(buyer:Address)=>'wallet:'+buyer.toLowerCase();
 export function inputEvidence(task:Pick<Task,'id'|'input'> & Partial<Pick<Task,'skill'>>,buyer:Address){
-  const id=chainTaskId(walletNamespace(buyer),task.id),rows=(task.input.records??DATASET).filter(row=>row.block>=task.input.blockFrom&&row.block<=task.input.blockTo),datasetText=JSON.stringify(task.input.source?{version:'agentos.transfer-evidence.v1',source:task.input.source,records:rows}:rows);
+  const id=chainTaskId(walletNamespace(buyer),task.id),rows=(task.input.records??DATASET).filter(row=>row.block>=task.input.blockFrom&&row.block<=task.input.blockTo),datasetText=JSON.stringify(task.input.memory?{version:'agentos.memory-evidence.v1',memory:task.input.memory,records:rows}:task.input.source?{version:'agentos.transfer-evidence.v1',source:task.input.source,records:rows}:rows);
   return {id,datasetText,datasetHash:keccak256(stringToHex(datasetText)),...(task.skill?{verification:deliveryVerification(task.skill,task.input)}:{})};
 }
 export function deliveryBytes(task: Task, buyer: Address) {
