@@ -7,12 +7,16 @@ import { startLocalChain } from './local-chain.mjs';
 import { AgentWalletSession,deliveryBytes } from '../sdk/wallet.ts';
 import { seed,transition } from '../lib/agentos/engine.ts';
 import { verifyDelivery,resultHash } from '../cre/workflow/verify.ts';
+import {temporaryEvidence} from './temporary-evidence.mjs';
+import {publishCREFixture} from './cre-evidence-fixture.mjs';
 
 const id=crypto.randomUUID(),root=resolve('.sites-runtime/cre-simulation/'+id);
 await mkdir(root+'/workflow',{recursive:true});
-const local=await startLocalChain({port:0});
-const report={mode:'CRE CLI dry-run against local EVM RPC',startedAt:new Date().toISOString(),id,cases:[]};
+let local,evidence;
+const report={mode:'CRE CLI dry-run against local EVM RPC and owned temporary HTTPS/workerd/R2 synthetic evidence; Sepolia selector alias only; no broadcast, registration or DON attestation',startedAt:new Date().toISOString(),id,cases:[]};
 try{
+ local=await startLocalChain({port:0});evidence=await temporaryEvidence(local.config.escrow,root);
+ report.evidence={kind:'owned temporary HTTPS/workerd/R2',origin:evidence.origin,syntheticOnly:true,namespaceChainId:11155111,transactionChainId:local.config.chainId};
  const session=await AgentWalletSession.connect(local.provider,local.config,false);
  await writeFile(root+'/project.yaml','staging-settings:\n  rpcs:\n    - chain-name: ethereum-testnet-sepolia\n      url: '+local.base+'/rpc\n');
  await writeFile(root+'/workflow/workflow.yaml','staging-settings:\n  user-workflow:\n    workflow-name: agentos-local-simulation\n  workflow-artifacts:\n    workflow-path: '+JSON.stringify(resolve('cre/workflow/main.ts'))+'\n    config-path: ./config.json\n    secrets-path: ""\n');
@@ -45,10 +49,7 @@ try{
   const artifact=JSON.parse(bytes.artifactText);if(scenario==='invalid-delivery')artifact.output.totalCents++;
   if(scenario==='treasury-detail-tamper'){artifact.output.allocations={'builder.eth':579};artifact.outputHash=resultHash(artifact.output);}
   const artifactText=JSON.stringify(artifact);
-  // Only public synthetic test bytes are embedded in these HTTPS endpoint URLs.
-  const endpoint=text=>'https://httpbin.org/base64/'+encodeURIComponent(Buffer.from(text).toString('base64'));
-  const spec={datasetUrl:endpoint(bytes.datasetText),datasetHash:bytes.datasetHash,artifactUrl:endpoint(artifactText),verification:bytes.verification};
-  for(const [url,expected] of [[spec.datasetUrl,bytes.datasetText],[spec.artifactUrl,artifactText]]){const response=await fetch(url,{signal:AbortSignal.timeout(30000)});assert.equal(response.ok,true,'Public synthetic HTTPS evidence unavailable');assert.equal(await response.text(),expected);}
+  const published=await publishCREFixture(evidence,local.config.escrow,bytes,artifactText),spec=published.spec;
   const funding=await session.fund(task,spec),config={schedule:'*/30 * * * * *',chainName:'ethereum-testnet-sepolia',escrowAddress:local.config.escrow,taskId:bytes.id,gasLimit:'500000',spec};
   console.log('CRE dry-run: '+scenario+' (local RPC, synthetic HTTPS, no broadcast).');
   const result=await simulate(config),expected=verifyDelivery(bytes.datasetText,artifactText,bytes.id,spec);
@@ -56,7 +57,7 @@ try{
   assert.ok(result.output.includes('Delivery consensus: accepted='+expected.accepted+' outputHash='+expected.outputHash));
   assert.match(result.output,/CRE report generated/);assert.match(result.output,/Workflow Simulation Result/);
   const chainStatus=(await session.task(task,spec)).status;assert.equal(chainStatus,'funded','Dry run must not be reported as mined settlement');
-  report.cases.push({scenario,config,funding,expected,cli:result,chainStatus,passed:true});
+  report.cases.push({scenario,config,funding,evidenceRequests:published.requests,expected,cli:result,chainStatus,passed:true});
   if(scenario==='invalid-delivery'){
    const mismatch={...config,spec:{...spec,artifactUrl:spec.datasetUrl}},rejected=await simulate(mismatch);
    assert.notEqual(rejected.code,0);assert.match(rejected.output,/Configured specification differs from escrow commitment/);
@@ -66,5 +67,5 @@ try{
  }
  report.status='passed';
 }catch(error){report.status='failed';report.error=error instanceof Error?error.message:String(error);console.error(report.error);process.exitCode=1;}
-finally{await local.close();}
+finally{if(evidence)await evidence.close();if(local)await local.close();}
 report.finishedAt=new Date().toISOString();await mkdir('outputs',{recursive:true});const path='outputs/cre-demo-'+id+'.json';await writeFile(path,JSON.stringify(report,null,2));console.log('CRE simulation evidence: '+path);

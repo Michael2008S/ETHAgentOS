@@ -29,7 +29,7 @@ YAML 结构来自[官方模板](https://github.com/smartcontractkit/cre-template
 
 用户已在本机终端完成登录，`cre whoami` 返回成功。账户凭证不提交到仓库或聊天。
 
-`npm run demo:cre` 会先构建最新 WASM，再在临时 Ganache 上注资四个任务，以公开合成数据的 HTTPS 端点运行官方 CLI dry-run。事件分析和资金库报告正确交付生成接受报告；错误总额、总额不变但分配明细被篡改（且重算成果哈希）生成拒绝报告；承诺不匹配在生成报告前拒绝。真实执行了 HTTP、最终区块读取、节点共识、报告生成和 EVM write capability，但没有 `--broadcast`。链上状态保持 Funded；本地 RPC 借用 Sepolia selector 名称用于模拟，不是公共 Sepolia。不得将结果称为已部署 DON 或已上链结算。
+`npm run demo:cre` 会先构建最新 WASM，再在临时 Ganache 上注资四个任务，并通过本轮自己的临时 HTTPS/workerd/R2 服务发布公开合成数据，运行官方 CLI dry-run。使用与分发器演示相同的 cloudflared 启动路径；不再请求 httpbin 的 base64 端点。发布先固定输入和成果，再匿名读回精确字节，暂时性传输故障最多重试三次，冲突/重定向/字节不符立即停止；报告保留分阶段尝试结果，不包含写凭证。事件分析和资金库报告正确交付生成接受报告；错误总额、总额不变但分配明细被篡改（且重算成果哈希）生成拒绝报告；承诺不匹配在生成报告前拒绝。真实执行了 HTTP、最终区块读取、节点共识、报告生成和 EVM write capability，但没有 `--broadcast`。链上状态保持 Funded；本地 RPC 借用 Sepolia selector 名称用于模拟，不是公共 Sepolia。不得将结果称为已部署 DON 或已上链结算。临时服务只承载脚本内合成数据，退出后关闭；仍依赖隧道网络、HTTPS 和 CRE 账户服务，不提供离线或公网服务 SLA。
 
 ## 公共网络启用步骤（尚未完成）
 

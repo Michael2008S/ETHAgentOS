@@ -76,11 +76,11 @@ CRE 构建使用已安装的 `@chainlink/cre-sdk` 编译器。安装 Bun 并加�
 
 ## CRE CLI 模拟
 
-先安装官方 CRE CLI 并执行 `cre login`；脚本支持 PATH 中的 `cre`、本地 `.sites-runtime/cre-bin/cre` 或 `AGENTOS_CRE_BIN`。运行 `npm run cre:prepare` 后，可使用 `npm run demo:cre` 验证正确交付、错误交付和承诺不匹配三个场景。
+先安装官方 CRE CLI 并执行 `cre login`；脚本支持 PATH 中的 `cre`、本地 `.sites-runtime/cre-bin/cre` 或 `AGENTOS_CRE_BIN`。运行 `npm run cre:prepare` 后，可使用 `npm run demo:cre` 验证事件接受、错误总额拒绝、承诺不匹配拒绝、资金库报告接受和分配明细篡改拒绝五个场景。临时 HTTPS 服务还需要官方 cloudflared，可通过 PATH、`AGENTOS_CLOUDFLARED_BIN` 或本地 `.sites-runtime/cre-tools/cloudflared/cloudflared` 提供。
 
 该演示启动临时 Ganache、部署真实托管合约并注资，将 Sepolia selector 映射到本地 RPC，仅用于模拟。工作流从公共 HTTPS 读取脚本内的合成测试数据，在 CRE runtime 内检查链上承诺、运行共识、生成报告并调用 EVM write capability。正确/错误交付分别得到接受/拒绝；配置篡改在报告前失败。不会使用 `--broadcast`，完成后链上任务仍为 Funded，不能将 dry-run 日志称为已上链付款或 DON attestation。
 
-临时链私钥只传给子进程环境，不写文件；HTTPS URL 只嵌入公开合成数据，不应替换成私人记录或密钥。结果与已脱敏 CLI 日志保存在忽略的 `outputs/cre-demo-*.json`。公共网络部署需要另行配置真实 forwarder、workflow metadata、RPC 与凭证。
+临时链私钥只传给子进程环境，不写文件；脚本创建仅承载公开合成数据的临时 HTTPS/workerd/R2 服务，使用哈希路径，匿名读回精确字节，不再依赖 httpbin 的 base64 URL。丢响应及临时 HTTP/网络故障最多重试三次，同一任务始终使用相同字节；冲突、重定向和字节不符立即失败。写凭证不进入公开读请求或报告。退出时关闭本轮临时服务，结果与已脱敏 CLI 日志保存在忽略的 `outputs/cre-demo-*.json`。临时隧道、HTTPS 和 CRE 账户 API 仍需要网络；这不是离线模拟。公共网络部署需要另行配置真实 forwarder、workflow metadata、RPC 与凭证。
 
 ## 本地 EVM 联调
 
