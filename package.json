@@ -63,7 +63,8 @@
     "demo:workflow-suppliers": "node scripts/demo-supplier-workflows.mjs",
     "demo:workflow-planning": "node scripts/demo-workflow-plans.mjs",
     "model:setup:planning": "node scripts/model-planning-setup.mjs",
-    "model:planning": "node scripts/model-planning-local.mjs"
+    "model:planning": "node scripts/model-planning-local.mjs",
+    "demo:workflow-templates": "node scripts/demo-workflow-templates.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

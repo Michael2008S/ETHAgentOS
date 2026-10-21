@@ -10,7 +10,7 @@ User request: complete improvements in the review order, test and commit each it
 | 4 | Two-step workflow and memory references | Persisted dependencies, previous accepted artifact as next input, recovery without duplicate payment | Implemented; item validation below |
 | 5 | Public testnet and CRE settlement | Real wallet, registered workflow execution, actual forwarder payment/refund transactions; account access verified rather than assumed | In progress; receiver/publisher/reconciliation/reusable dispatcher implemented; public acceptance pending |
 | 6 | Third-party onboarding and hosted operation | New skill onboarding with integration acceptance; authenticated deployed consumer, monitoring and failure recovery | In progress; new skill and scoped consumer operations locally accepted; actual hosted operation remains open |
-| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 30-step HTTP/D1/EVM/model/supplier/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical 23-stage pass at aae3f7e remains scoped to that source. |
+| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 31-step HTTP/D1/EVM/model/supplier/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical 23-stage pass at aae3f7e remains scoped to that source. |
 
 The complete demo is a final gate after the individual changes. Public workflow deployment depends on actual account capabilities and configured infrastructure; local simulation does not satisfy item 5. No unattended schedule is enabled merely to represent deployment.
 
@@ -220,3 +220,17 @@ The complete demo is a final gate after the individual changes. Public workflow 
 保留小模型条件错误/步骤顺序错误及 3B 首次标题截断末尾空格导致 SDK 比较失败的证据。标题生成与验证现使用一致的 trim 规则，完整真实模型验收已在修复后通过。此前原生 CLI/浏览器启动曾因自动权限审核超时未运行，本轮重新启动并取得上述完整通过结果，不将超时记为执行失败或测试通过。
 
 原始日志、失败/成功报告、模型配置与启动日志、移动截图及逐文件 SHA-256 保存于 `outputs/validation-workflow-plans-2026-10-22/`。协议及限制见 [WORKFLOW-PLANNING.md](WORKFLOW-PLANNING.md)。本项完成初始目标拆解，运行中失败后的动态重规划仍未实现；并行/多输入合并、模板、语义记忆、通用插件、开放市场/信誉路由、独立钱包/细链上授权及公网外部验收仍待继续。当前完整 demo 为 30 步，其最终整套验收待剩余功能全部完成后执行；没有发布站点、启用托管调度或公共链广播。
+
+## 后续能力完善：工作流模板复用（2026-10-22，香港时间）
+
+- [x] 工作区持久化、不可覆盖的名称/版本、2–8 步技能槽位、技能版本/扩展定义摘要、费用上限、输入依赖和条件；支持幂等保存、可移植导出/跨工作区导入、归档/恢复与显式服务绑定。
+- [x] 模板不复制业务输入、钱包、部署、会话、签名、收款方、端点或凭证。套用只更新编辑器，保留当前输入并清空会话选择；选择当前服务/供应商及有效会话后，显式启动新的工作流。实例化与导入均不创建订单、作业或资金预留。
+- [x] 中英文界面、刷新恢复、受限 JSON/API/SDK、摘要与工作区绑定校验；服务/价格/技能策略变化拒绝复用，供应商精确报价和链上授权仍由原执行器重新检查。模板是可编辑起点，不是已签名采购指令或全局发布注册表。
+
+真实 HTTP/D1/SDK/队列/Vault/本地 EVM 三组最终验收通过：`outputs/workflow-template-demo-722699b3-bffb-48b8-b03b-6ea5bdc8875e.json`。保存丢响应后只有一份模板；跨工作区导入后显式绑定服务且没有采购；同一模板在两份新输入上分别完成两步采购，四笔付款合计 1200 分，一次买方会话签名；余额增量、唯一 Opened 事件、前序成果血缘均吻合，六个队列作业完成且 pending/leased/dead 为零。首次三组通过报告也保留，最终报告在后续隔离/只读修复之后重新运行。
+
+当前源码 169/169 Node 回归、15/15 Chromium 回归、5/5 CRE SDK 测试（80 assertions）、网站/CRE 类型检查及生产构建通过。模板浏览器用例核验丢响应重试、刷新保留、导出边界、显式绑定、套用清空已选会话/保留输入、未重选会话不能启动、两步付款、归档/恢复、中英文与移动宽度。实际移动截图已人工查看。
+
+保留集成失败证据：测试只在进程起始补币，连续用例中余额不足导致存款回退；模板测试拦截器遗漏隔离头，使一份测试模板写入默认本地工作区，已按固定 ID/摘要核对并归档，未删除历史或产生采购；供应商恢复遇到订单执行租约竞争，诊断 API 记录 `executing/running`。补币现按每个用例实际缺额补足，拦截器保留隔离头，SDK 可额外绑定预期工作区。发现的 GET 执行副作用单独提交为 `40e3c89`，见 [READ-ONLY-OBSERVATION](READ-ONLY-OBSERVATION.md)；移除后供应商恢复实际返回订单/工作流均 completed、pending 为零，完整 15 项通过。
+
+原始成功/失败日志、报告、截图、测试隔离清理记录及逐文件 SHA-256 保存在 `outputs/validation-workflow-templates-2026-10-22/`，只读专项证据另存于 `outputs/validation-workspace-read-only-2026-10-22/`。协议及使用方法见 [WORKFLOW-TEMPLATES.md](WORKFLOW-TEMPLATES.md)。本项加入完整演示后现为 31 步，最终整套测试仍待其余功能完成；运行中重规划、并行/多输入合并、语义记忆、通用插件、开放市场/信誉路由、独立钱包/细链上授权及公网外部验收继续保留为未完成项。未发布站点、启用托管调度或公共链广播。
