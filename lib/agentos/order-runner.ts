@@ -24,6 +24,13 @@ export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:O
   for(let step=0;step<(options.maxSteps??16);step++){
     try{
       const {state}=await store.read(ownerId),order=findOrder(state,id),now=options.now?.()??new Date().toISOString();
+      if(order.evidencePendingAck&&order.settlement){
+        if(order.evidenceAckAfter&&order.evidenceAckAfter>now)return {orderId:id,status:'awaiting-finality'};
+        const complete=await chain.completeEvidence(order);
+        await store.updateWorkspace(ownerId,current=>{const existing=findOrder(current,id);if(!existing.evidencePendingAck||existing.settlement?.transactionHash!==order.settlement?.transactionHash)return current;const next=structuredClone(current),updated=findOrder(next,id);if(!complete)updated.evidenceAckAfter=new Date(Date.parse(now)+60000).toISOString();else{delete updated.evidencePendingAck;delete updated.evidenceAckAfter;}return next;});
+        if(!complete)return {orderId:id,status:'awaiting-finality'};
+        return {orderId:id,status:order.status};
+      }
       if(!pendingOrders(state).some(o=>o.id===id))return {orderId:id,status:order.status};
       const view=await chain.inspect(order);
       if(order.status==='funding'&&!order.funding){

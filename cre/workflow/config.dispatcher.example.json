@@ -1,0 +1,8 @@
+{
+  "mode": "dispatcher",
+  "schedule": "*/30 * * * * *",
+  "chainName": "ethereum-testnet-sepolia",
+  "escrowAddress": "REPLACE_WITH_DEPLOYED_CRE_RECEIVER",
+  "gasLimit": "500000",
+  "evidenceOrigin": "https://YOUR_EVIDENCE_SERVICE.example"
+}

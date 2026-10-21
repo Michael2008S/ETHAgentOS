@@ -9,7 +9,7 @@ import {scanSettledTask} from '../../sdk/settlements.ts';
 import type {EvidenceService} from './evidence-publisher.ts';
 
 export type LocalOrderCall=(path:string,body:unknown)=>Promise<{hash:Hex}>;
-export function orderChain(client:PublicClient,deployment:WalletDeployment,localCall?:LocalOrderCall,publishArtifact?:EvidenceService['publish']){
+export function orderChain(client:PublicClient,deployment:WalletDeployment,localCall?:LocalOrderCall,publishArtifact?:EvidenceService['publish'],completeEvidence?:EvidenceService['complete']){
   const chain=new AgentChainClient(client,deployment);
   async function inspect(order:ChainOrder){
     if(!matchingDeployment(order.deployment,deployment))throw new DomainError('Order deployment differs from the server configuration.','CONFLICT');
@@ -19,14 +19,22 @@ export function orderChain(client:PublicClient,deployment:WalletDeployment,local
     if(task[5]!==0&&(task[0].toLowerCase()!==intent.buyer.toLowerCase()||task[1].toLowerCase()!==intent.seller.toLowerCase()||task[2]!==intent.amount||task[4]!==intent.specHash))throw new DomainError('Order escrow does not match its frozen commitment.','CONFLICT');
     return {intent,status:task[5],timestamp:block.timestamp,outputHash:task[6]};
   }
+  async function verifySettlement(order:ChainOrder,hash:Hex){
+    const current=await inspect(order),evidence=await chain.verifyEvidence(current.intent,hash,'settlement');
+    if(evidence.status==='paid'&&(!order.output||order.failure||evidence.outputHash!==keccak256(stringToHex(canonical(JSON.parse(orderArtifact(order,current.intent.id)))))))throw new DomainError('Paid escrow does not match an authorized, verified order output.','CONFLICT');
+    return evidence;
+  }
   return {
     inspect,
     verifySignature:(order:ChainOrder,message:string,signature:Hex)=>client.verifyMessage({address:order.buyer,message,signature}),
     async funding(order:ChainOrder,hash:Hex){const current=await inspect(order);if(![1,3].includes(current.status))throw new DomainError('A funded or refunded escrow is required for confirmation.');return {evidence:await chain.verifyEvidence(current.intent,hash,'funding'),deadline:current.intent.deadline,chainNow:current.timestamp,currentStatus:current.status};},
-    async settlement(order:ChainOrder,hash:Hex){
-      const current=await inspect(order),evidence=await chain.verifyEvidence(current.intent,hash,'settlement');
-      if(evidence.status==='paid'&&(!order.output||order.failure||evidence.outputHash!==keccak256(stringToHex(canonical(JSON.parse(orderArtifact(order,current.intent.id)))))))throw new DomainError('Paid escrow does not match an authorized, verified order output.','CONFLICT');
-      return evidence;
+    settlement:verifySettlement,
+    async completeEvidence(order:ChainOrder){
+      if(!completeEvidence)return true;
+      if(!order.settlement)throw new DomainError('A verified settlement is required before ready queue acknowledgement.','CONFLICT');
+      const evidence=await verifySettlement(order,order.settlement.transactionHash);
+      if(deployment.mode==='testnet'&&BigInt(evidence.blockNumber)>(await client.getBlock({blockTag:'finalized'})).number)return false;
+      await completeEvidence(inputEvidence(order,order.buyer).id,order.spec);return true;
     },
     async settle(order:ChainOrder){
       const current=await inspect(order);

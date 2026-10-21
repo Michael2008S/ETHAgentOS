@@ -50,6 +50,8 @@
     ".sites-runtime",
     "outputs",
     ".wrangler",
-    "work"
+    "work",
+    "cre/workflow/handler.ts",
+    "cre/tests"
   ]
 }

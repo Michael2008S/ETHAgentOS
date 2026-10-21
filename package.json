@@ -48,7 +48,9 @@
     "demo:data": "node scripts/demo-data.mjs",
     "demo:isolated": "node scripts/demo-isolated.mjs",
     "demo:vault": "node scripts/demo-vault.mjs",
-    "demo:workflow": "node scripts/demo-workflow.mjs"
+    "demo:workflow": "node scripts/demo-workflow.mjs",
+    "test:cre": "node scripts/test-cre.mjs",
+    "demo:cre-dispatcher": "node scripts/cre-cli.mjs build && node scripts/test-cre.mjs && node scripts/demo-cre-dispatcher.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

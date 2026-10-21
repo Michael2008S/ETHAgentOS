@@ -23,7 +23,7 @@ export async function configuredOrderChain(request:Request){
   const supplierAuthority=async(order:ChainOrder)=>{if(!order.agentIdentity||!order.supplier)throw new DomainError('Supplier execution requires an identity-bound order.','SUPPLIER_REJECTED');await authorizeSupplier(client,deployment,order.agentIdentity,order.supplier);};
   const funder=deployment.vault?vaultFunder(client,deployment,localCall?async(order)=>{const result=await localCall('/vault-fund',{order});return result.hash;}:env.AGENTOS_VAULT_EXECUTOR_PRIVATE_KEY?async(order,data)=>privateVaultSender(client,deployment,rpcUrl,env.AGENTOS_VAULT_EXECUTOR_PRIVATE_KEY!)(order,data):async()=>{throw new DomainError('Vault executor is not configured.','UNAVAILABLE');}):undefined;
   const evidence=deployment.mode==='testnet'&&env.AGENTOS_EVIDENCE_CONFIGURATION?createEvidenceService(env.AGENTOS_EVIDENCE_CONFIGURATION,env.AGENTOS_EVIDENCE_WRITE_TOKEN,deployment):undefined;
-  return {evidence,vaultFunder:funder,supplierAuthority,client,chain:orderChain(client,deployment,localCall,evidence?.publish),deployment,localCall,planner:await configuredPlanner(request).catch(()=>undefined),supplier:await configuredSupplier(request,client,deployment).catch(()=>undefined)};
+  return {evidence,vaultFunder:funder,supplierAuthority,client,chain:orderChain(client,deployment,localCall,evidence?.publish,evidence?.complete),deployment,localCall,planner:await configuredPlanner(request).catch(()=>undefined),supplier:await configuredSupplier(request,client,deployment).catch(()=>undefined)};
 }
 export function scheduleOrders(ownerId:string,state:Workspace,request:Request){
   const orders=pendingOrders(state).slice(0,8);if(!orders.length)return;

@@ -3,7 +3,7 @@ import type {WalletDeployment} from '../../sdk/wallet.ts';
 import type {EvidencePublisher} from './workflows.ts';
 import {DomainError} from './engine.ts';
 
-export type EvidenceService={prepare:EvidencePublisher;publish:(id:`0x${string}`,spec:DeliverySpec,artifactText:string)=>Promise<void>};
+export type EvidenceService={prepare:EvidencePublisher;publish:(id:`0x${string}`,spec:DeliverySpec,artifactText:string)=>Promise<void>;complete:(id:`0x${string}`,spec:DeliverySpec)=>Promise<void>};
 async function responseText(response:Response,limit:number){
  const reader=response.body?.getReader();if(!reader)throw new DomainError('Evidence service response is empty.','UNAVAILABLE');let text='',size=0;const decoder=new TextDecoder();
  try{for(;;){const {value,done}=await reader.read();if(done)break;if((size+=value.length)>limit){await reader.cancel();throw new DomainError('Evidence service response exceeds its size limit.','UNAVAILABLE');}text+=decoder.decode(value,{stream:true});}text+=decoder.decode();}finally{reader.releaseLock();}return text;
@@ -32,6 +32,10 @@ export function createEvidenceService(configuration:string,token:string|undefine
   async publish(id,spec,artifactText){
    if(spec.datasetUrl!==origin+namespace+'/dataset/'+spec.datasetHash||spec.artifactUrl!==origin+namespace+'/artifact/'+id)throw new DomainError('Order evidence differs from the configured publisher.','CONFLICT');
    const result=await call('/v1/artifacts',{id,specHash:specHash(spec),artifactText});if(canonical(result)!==canonical({stored:true}))throw new DomainError('Artifact publication could not be confirmed.','UNAVAILABLE');await publicRead(spec.artifactUrl,artifactText);
+  },
+  async complete(id,spec){
+   if(spec.datasetUrl!==origin+namespace+'/dataset/'+spec.datasetHash||spec.artifactUrl!==origin+namespace+'/artifact/'+id)return;
+   const result=await call('/v1/complete',{id,specHash:specHash(spec)});if(canonical(result)!==canonical({archived:true}))throw new DomainError('Ready queue acknowledgement could not be confirmed.','UNAVAILABLE');
   },
  };
 }

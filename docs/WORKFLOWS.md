@@ -46,4 +46,4 @@ The runtime publishes workflow evidence through the local service or a configure
 
 The Chromium regression loses a successful create response, reloads and restores its draft/session, retries the same request, then recovers both steps without another signature. It also checks Chinese/English and a 390px viewport. The initial async-selector restoration failure was retained and fixed with a controlled session selection.
 
-The final complete demo includes demo:workflow and now has 20 steps. Its final execution remains a separate gate after the remaining roadmap work.
+The final complete demo includes demo:workflow and the reusable CRE dispatcher check and now has 21 steps. Its final execution remains a separate gate after the remaining roadmap work.

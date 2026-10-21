@@ -182,4 +182,4 @@ Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/
 
 两步工作流：钱包页可选择 Vault 会话，先采购资金分配报告，再采购基于已验收分配明细的汇总。两步报价、预算和成果引用固定，支持丢失响应、刷新、并发恢复与取消。运行 `npm run demo:workflow`，实现与信任边界见 [WORKFLOWS](docs/WORKFLOWS.md)。公共网络与最终完整演示仍按路线图单独验收。
 
-公共 CRE 接入准备：新增符合 ERC165/生产 metadata 布局的 AgentEscrowReceiver、一次性工作流绑定、独立 R2 证据发布和自动结算事件发现。实际公网部署、可复用 DON 工作流与真实钱包验收仍待完成；实现和配置边界见 [PUBLIC-CRE](docs/PUBLIC-CRE.md)。
+公共 CRE 接入准备：新增符合 ERC165/生产 metadata 布局的 AgentEscrowReceiver、一次性工作流绑定、独立 R2 证据发布、自动结算事件发现与可复用分发器。同一份配置可发现新增订单；最终确认后的证据归档有持久恢复检查点。`npm run test:cre` 执行实际处理器的 SDK 专项测试，`npm run demo:cre-dispatcher` 验证临时 HTTPS/R2 与本地 EVM 的官方 CLI dry-run。实际公网部署、登记后的 DON 执行与真实钱包验收仍待完成；见 [PUBLIC-CRE](docs/PUBLIC-CRE.md) 和 [CRE-DISPATCHER](docs/CRE-DISPATCHER.md)。

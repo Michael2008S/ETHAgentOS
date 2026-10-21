@@ -2,7 +2,7 @@
 
 ## 当前选型
 
-核心采用 **CRE：定时读取链上任务 → 获取已承诺的证据和交付 → 多节点相同结果共识 → 签名 report → EVM 托管结算**。源码：`cre/workflow/main.ts`。它使用 SDK 的 CronCapability、HTTPClient、EVMClient、runInNodeMode、runtime.report、writeReport，而不是将普通 fetch 命名为 CRE。[官方 onchain write 示例](https://docs.chain.link/cre/getting-started/part-4-writing-onchain-ts)。
+核心采用 **CRE：定时读取链上任务 → 获取已承诺的证据和交付 → 多节点相同结果共识 → 签名 report → EVM 托管结算**。入口为 `cre/workflow/main.ts`，处理逻辑为 `handler.ts`。它使用 SDK 的 CronCapability、HTTPClient、EVMClient、runInNodeMode、runtime.report、writeReport。[官方 onchain write 示例](https://docs.chain.link/cre/getting-started/part-4-writing-onchain-ts)。
 
 Functions 不作为新项目依赖；当前官方文档已提示弃用。Data Feeds 可在以后对非稳定币预算换算时接入；CCIP 可在单链闭环完成后扩展跨链任务消息与资金路由。两者当前均未实现，不作为已完成的赛道集成声称。
 
@@ -10,9 +10,9 @@ Functions 不作为新项目依赖；当前官方文档已提示弃用。Data Fe
 
 买方固定 `DeliverySpec`：datasetUrl、datasetHash（原始 JSON 文本 keccak256）、artifactUrl。`specHash` 是对规范排序 JSON 的 keccak256；由合约在 openTask 时锁定。工作流从最终确认区块读取该承诺，仅处理 Funded 的任务；下载固定 URL，检查证据字节 hash，新订单还固定 verification（技能、技能版本、数据集与区块范围）。工作流独立复算完整结果，包括 uniqueRecipients 或每个收款方的 allocations，并要求完整 v2 成果信封精确匹配；报告 outputHash 绑定整个成果信封。详见 [完整成果验收](FULL-DELIVERY.md)。
 
-报告 ABI：`(bytes32 taskId, bytes32 specHash, bytes32 outputHash, bool accepted)`。合约不信任网页传入的 pass 标记，只接受不可变 forwarder 且 `keccak256(metadata)` 匹配配置的报告。认证失败、错任务、重复 report 均失败。超时后任何人可触发退款，但资金只能回原买方。
+报告 ABI：`(bytes32 taskId, bytes32 specHash, bytes32 outputHash, bool accepted)`。合约不信任网页传入的 pass 标记。历史 AgentEscrow 固定 forwarder 和完整 metadata 哈希；公共 AgentEscrowReceiver 固定真实 forwarder、workflow ID、编码名称和 owner，并接受变化的 report ID。认证失败、错任务、重复 report 均失败。超时后任何人可触发退款，但资金只能回原买方。
 
-网络故障、hash 不一致或解析失败会中止工作流，不误付款；待合约 deadline 后退款。一个 workflow 配置演示一个 task，扩展队列/日志触发尚未实现。
+网络故障、hash 不一致或解析失败不产生付款报告。保留历史单任务模式，并新增可复用 dispatcher：固定 receiver 和证据服务，通过有限 ready 队列发现新订单、轮转处理每批最多两个任务；单个任务暂不可用不会阻塞同批其他任务。结算最终确认后由持久任务重试归档 ready 项。详见 [CRE-DISPATCHER](CRE-DISPATCHER.md)。
 
 ## 本地构建
 
@@ -44,4 +44,4 @@ YAML 结构来自[官方模板](https://github.com/smartcontractkit/cre-template
 
 ERC-8004 身份适配器位于 `sdk/identity.ts` 与 `sdk/agent-identity.ts`。已完成官方注册表的本地 EVM 注册、补齐 registrations、工作区签名绑定、订单身份快照、已付款反馈及撤销；公共测试网待验收。详见 `IDENTITY.md`。身份协议本身不承担付款。[ERC-8004 规范](https://ercs.ethereum.org/ERCS/erc-8004)。
 
-公共接收合约、R2 不可变证据发布适配器和已确认结算事件发现已实现，实际公网部署/DON 验收仍未完成。当前单任务 CRE 配置尚需改为复用的订单分发入口，详见 [PUBLIC-CRE](PUBLIC-CRE.md)。
+公共接收合约、R2 不可变证据发布、结算事件发现和可复用分发入口已实现。分发器已通过实际临时 HTTPS/workerd/R2 与本地 EVM 的官方 CLI dry-run，尚未完成实际公网部署/DON 验收，详见 [PUBLIC-CRE](PUBLIC-CRE.md)。
