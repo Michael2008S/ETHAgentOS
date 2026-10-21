@@ -59,4 +59,6 @@ Unit tests additionally exercise actual SQLite issuance races, active limits, di
 
 Current acceptance evidence: outputs/consumer-demo-f210d6d3-d1e0-4202-9cfc-603573466a03.json. Final checks passed 115 Node tests, nine Chromium regressions, four SDK CRE tests, type checks and production build. The browser proof shows revoked metadata with no displayed token.
 
-Actual externally deployed consumer, unattended occurrences, production monitoring/alerts, public gateway behavior and real public-chain recovery remain unverified. No hosted schedule has been enabled. The complete local runner includes demo:consumer and now has 23 steps; passing it does not satisfy those public gates.
+The complete 23-step local sequence passed at aae3f7e, including demo:consumer: outputs/full-demo-eaf0c4f4-310b-42cc-9e63-34363da15c55/report.json. Its retained verification manifest and child artifacts are in that run directory.
+
+Actual externally deployed consumer, unattended occurrences, production monitoring/alerts, public gateway behavior and real public-chain recovery remain unverified. No hosted schedule has been enabled. The local full-demo pass does not satisfy those public gates.
