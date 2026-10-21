@@ -180,3 +180,10 @@ The complete demo is a final gate after the individual changes. Public workflow 
 集成期间的零金额预检错误、旧测试占位身份、浏览器异步会话恢复/就绪失败均已修复并保留证据。旧供应商测试改用真实注册表/委托，还核验 SDK 拒绝付款时 token 余额及 Opened 事件均未变化。失败记录、最终原始日志、七组报告和移动端截图保留在 `outputs/validation-purchase-routes-2026-10-21/`；代码摘要为 `4d3aaaff2b6b6c8a4b562fbbabdd4eb5a0200c09fa1ce59227afe9498d3b8530`。
 
 完整演示已加入 `demo:purchase-routes`，现为 28 步，新整套验收仍需另跑。既有 27 步网络失败报告不证明本版本完整通过。剩余目标仍包括动态目标拆解、供应商组合工作流、并行/多输入合并、通用插件、开放市场与信誉路由、独立钱包/更细链上授权及公网/实际 DON/托管运维验收；本项不替代这些功能。仍以本地 demo 交付，未发布站点或启用托管调度。
+
+## 28 步完整演示验收记录（2026-10-22，香港时间）
+
+- 使用已提交版本 `00802ba8082666570fbc882d7a014fdf3da39b3b`，代码摘要保持 `4d3aaaff2b6b6c8a4b562fbbabdd4eb5a0200c09fa1ce59227afe9498d3b8530`。运行时间为 2026-10-21 16:11:21–16:17:20 UTC，即香港时间 10 月 22 日 00:11:21–00:17:20；本次没有续跑。
+- 前 25 步通过，包括自动改购七组验收、新建展示订单和证据检查。第 26 步官方 CLI/Javy WASM 编译成功，首个 accepted-delivery dry-run 成功且托管仍为 Funded；随后准备下一个场景的 httpbin.org 合成 HTTPS 证据预检报 `fetch failed`，整步退出码为 1。它与上次模拟器内部 10 秒 HTTP 超时是不同失败位置，不能合并称为本次模拟器超时。
+- 第 27 步可复用 CRE dispatcher 与第 28 步最终 doctor 未运行，完整演示未通过。报告：`outputs/full-demo-effa8791-ab91-460f-92ec-7fc8e0932411/report.json`。保留全部 26 步日志和 23 份子报告副本，`verification.json` 记录源码版本、报告、日志和子报告 SHA-256，包括可变的 showcase 输出快照。
+- 结束后另行运行本地 doctor，结果保留为同目录 `post-run-doctor.log`；这项独立检查不替代完整序列中未运行的最终 doctor。供应商组合工作流、其他平台能力和公网验收仍待继续；本次未发布站点、启用托管调度或向公共链广播交易。
