@@ -10,7 +10,7 @@ export function parseModelConfiguration(raw:unknown,allowLocal=false):ModelConfi
   const v=raw as Record<string,unknown>;
   if(Object.keys(v).some(k=>!['url','model','revision','timeoutMs','maxTokens'].includes(k))||typeof v.url!=='string'||typeof v.model!=='string'||!v.model.trim()||v.model.length>128||typeof v.revision!=='string'||!v.revision||v.revision.length>128)throw new DomainError('Invalid model configuration.','UNAVAILABLE');
   let url:URL;try{url=new URL(v.url);}catch{throw new DomainError('Invalid model endpoint.','UNAVAILABLE');}
-  if(url.username||url.password||url.search||url.hash||!(url.protocol==='https:'||allowLocal&&url.origin==='http://127.0.0.1:11435')||!url.pathname.endsWith('/chat/completions'))throw new DomainError('Model endpoint requires configured HTTPS or the development loopback service.','UNAVAILABLE');
+  if(url.username||url.password||url.search||url.hash||!(url.protocol==='https:'||allowLocal&&['http://127.0.0.1:11435','http://127.0.0.1:11436'].includes(url.origin))||!url.pathname.endsWith('/chat/completions'))throw new DomainError('Model endpoint requires configured HTTPS or the development loopback service.','UNAVAILABLE');
   const timeoutMs=v.timeoutMs??30000,maxTokens=v.maxTokens??128;
   if(!Number.isSafeInteger(timeoutMs)||Number(timeoutMs)<1000||Number(timeoutMs)>60000||!Number.isSafeInteger(maxTokens)||Number(maxTokens)<16||Number(maxTokens)>512)throw new DomainError('Invalid model resource limits.','UNAVAILABLE');
   return {url:url.href,model:v.model,revision:v.revision,timeoutMs:Number(timeoutMs),maxTokens:Number(maxTokens)};

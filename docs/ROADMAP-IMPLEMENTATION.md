@@ -10,7 +10,7 @@ User request: complete improvements in the review order, test and commit each it
 | 4 | Two-step workflow and memory references | Persisted dependencies, previous accepted artifact as next input, recovery without duplicate payment | Implemented; item validation below |
 | 5 | Public testnet and CRE settlement | Real wallet, registered workflow execution, actual forwarder payment/refund transactions; account access verified rather than assumed | In progress; receiver/publisher/reconciliation/reusable dispatcher implemented; public acceptance pending |
 | 6 | Third-party onboarding and hosted operation | New skill onboarding with integration acceptance; authenticated deployed consumer, monitoring and failure recovery | In progress; new skill and scoped consumer operations locally accepted; actual hosted operation remains open |
-| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 29-step HTTP/D1/EVM/model/supplier/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical 23-stage pass at aae3f7e remains scoped to that source. |
+| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 30-step HTTP/D1/EVM/model/supplier/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical 23-stage pass at aae3f7e remains scoped to that source. |
 
 The complete demo is a final gate after the individual changes. Public workflow deployment depends on actual account capabilities and configured infrastructure; local simulation does not satisfy item 5. No unattended schedule is enabled merely to represent deployment.
 
@@ -206,3 +206,17 @@ The complete demo is a final gate after the individual changes. Public workflow 
 原始日志、六组 HTTP 报告、混合 EVM 专项、完整回归、移动端截图及失败快照已留存；`verification.json` 记录逐文件 SHA-256 和证据范围。代码摘要为 `9d5b1c0763ab4f835ac474b69c5062e1758c9aa9d0a0ce4c717ecedc219a49f4`，测试源码摘要为 `74fa448ac0bf99075974769ca304f72e28dcb7797ad0b59129ee3661a7fc4979`。
 
 仍需完成动态目标拆解/重规划、并行与多输入合并、模板复用、语义记忆选择、通用插件、开放市场/信誉路由、独立钱包及细粒度链上授权，以及公网/实际 DON/托管运维的外部验收。仍按用户选择以本地 demo 交付，不发布站点或启用托管调度；总体目标尚未完成。
+
+## 后续能力完善：目标驱动多步规划（2026-10-22，香港时间）
+
+- [x] 真实语言模型根据目标从已授权目录生成 2–8 步方案，选择服务、原始/前序成果输入及可选条件；服务端独立验证依赖、权限、供应商身份、费用与累计额度，不以固定意图模板替代推理。
+- [x] 生成阶段只保存可审阅提案，不创建订单、作业或资金预留。提案固定目标、输入、目录、模型及提示/响应摘要、供应商绑定和费用上限，最多五分钟有效；显式批准后原子创建工作流、首单、持久作业与提案关联。丢响应重试复用同一工作流。
+- [x] 中英文规划/审阅界面、按钱包与工作区隔离的表单恢复、批准丢响应后的历史恢复、移动端展示；原有单步小模型保留，新增独立官方 Qwen 2.5 3B 服务及固定文件校验。独立模型配置不继承其他提供商密钥。
+
+真实模型 HTTP/D1/SDK/持久队列/Vault/本地 EVM 四组验收通过：`outputs/workflow-plan-demo-31bcb83e-a639-4909-bdd8-0f67f4d4efac.json`。两种目标分别形成不同的两步、三步程序，批准前零订单；批准丢响应、跨工作区/摘要篡改、价格变更与撤销提案均按预期处理。五笔实际付款合计 1440 分，一次买方会话签名；Vault 与收款方余额增量吻合，七个队列作业完成，pending/leased/dead 均为零。存款、授权等链上交易与会话签名分开计数。
+
+最终 163/163 Node 回归、14/14 Chromium 回归、5/5 CRE SDK 测试（80 assertions）、网站/CRE 类型检查及生产构建通过。浏览器实际核验刷新后提案保留、批准响应丢失后只生成一个工作流、两步付款/成果血缘、中英文与移动宽度。实际进程内 EVM 专项另外覆盖不可变发布后 CAS 失败、并发批准、三笔付款和条件跳过；该专项的模型响应受控，不冒充真实推理。
+
+保留小模型条件错误/步骤顺序错误及 3B 首次标题截断末尾空格导致 SDK 比较失败的证据。标题生成与验证现使用一致的 trim 规则，完整真实模型验收已在修复后通过。此前原生 CLI/浏览器启动曾因自动权限审核超时未运行，本轮重新启动并取得上述完整通过结果，不将超时记为执行失败或测试通过。
+
+原始日志、失败/成功报告、模型配置与启动日志、移动截图及逐文件 SHA-256 保存于 `outputs/validation-workflow-plans-2026-10-22/`。协议及限制见 [WORKFLOW-PLANNING.md](WORKFLOW-PLANNING.md)。本项完成初始目标拆解，运行中失败后的动态重规划仍未实现；并行/多输入合并、模板、语义记忆、通用插件、开放市场/信誉路由、独立钱包/细链上授权及公网外部验收仍待继续。当前完整 demo 为 30 步，其最终整套验收待剩余功能全部完成后执行；没有发布站点、启用托管调度或公共链广播。

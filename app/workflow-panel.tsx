@@ -9,6 +9,7 @@ import type {SupplierDescriptor} from '@/lib/agentos/supplier';
 import type {Agent,TaskInput} from '@/lib/agentos/types';
 import {submissionIntent} from '@/lib/agentos/client-intent';
 import {useLanguage} from '@/lib/i18n/context';
+import {WorkflowPlanningPanel} from './workflow-planning-panel';
 const sample:TaskInput={dataset:'custom-transfers-v1',blockFrom:1,blockTo:3,records:[{block:1,from:'treasury',to:'research',cents:123},{block:2,from:'treasury',to:'operations',cents:456},{block:3,from:'treasury',to:'research',cents:100}]};
 type EditorStep={supplierId?:string;agentId:string;budget:string;source:string;condition:string;field:WorkflowCondition['field'];operator:WorkflowCondition['operator'];value:string};
 type Editor={title:string;sessionId:string;input:string;steps:EditorStep[]};
@@ -26,6 +27,7 @@ export function WorkflowPanel({scope,session,agents,sessions,busy,perform,onChan
  return <details className="panel workflow-panel" id="workflow-panel"><summary>{tr('Configurable workflow · accepted artifact memory')}</summary><p>{tr('Compose installed skills, reuse accepted results and run purchases only when earlier results match your conditions.')}</p>
   {session.deployment.mode==='testnet'&&<p className="form-note">{tr('Committed input and delivery artifacts will be published to the configured public HTTPS evidence service. Submit only data you intend to make public. Confirmed settlement receipts are discovered automatically.')}</p>}
   {error&&<p role="alert">{tr(error)}</p>}
+  <WorkflowPlanningPanel scope={scope} session={session} sessions={sessions} input={editor.input} inputReady={loaded===draftKey} busy={busy} perform={perform} onAccepted={refresh}/>
   <form onSubmit={event=>{event.preventDefault();void perform(async()=>{
    const steps:WorkflowStepDraft[]=editor.steps.map(s=>({agentId:s.agentId,...(s.supplierId?{supplierId:s.supplierId}:{}),budget:Math.round(Number(s.budget)*100),input:s.source==='original'?{from:'original'}:{from:'step',step:Number(s.source)},...(s.condition==='always'?{}:{when:{step:Number(s.condition),field:s.field,operator:s.operator,value:s.field==='concentrated'?s.value==='true':Number(s.value)}})}));
    const payload={...(supplierMode?{supplierPricing:'signed-at-execution-under-cap' as const}:{}),title:editor.title,vaultSessionId:editor.sessionId,steps,timeoutSeconds:300,input:JSON.parse(editor.input) as TaskInput},intent=await submissionIntent(scope,'workflow',payload,sessionStorage);

@@ -11,6 +11,7 @@ import {workflowInput,type AgentWorkflow,type WorkflowStep,type WorkflowStepDraf
 import {workflowDraftSchema} from './workflow-schema.ts';
 import {vaultAllowance,assertVaultSeller} from './vault.ts';
 import {makeSupplierQuoteRequest,verifySupplierQuote} from './supplier-quote.ts';
+import {validateWorkflowCondition} from './workflow-constraints.ts';
 import type {WorkflowSupplierAccess} from './workflow-suppliers.ts';
 
 type WorkflowBase={requestId:string;title:string;buyer:Address;vaultSessionId:string;input?:TaskInput;timeoutSeconds:number};
@@ -38,10 +39,6 @@ async function addStepOrder(state:Workspace,w:AgentWorkflow,index:number,input:T
  if(spec.datasetHash!==bytes.datasetHash||canonical(spec.verification)!==canonical(bytes.verification))throw new DomainError('Workflow evidence publication differs from its frozen input.','CONFLICT');
  return createOrder(state,{workflowId:w.id,requestId:step.requestId,title:w.title+' · '+(w.version==='agentos.workflow.v1'?(index===0?'1. Allocation report':'2. Accepted allocation summary'):`${index+1}. ${step.skill}`),buyer:w.buyer,agentId:step.agentId,budget:step.budget,vaultSessionId:w.vaultSessionId,input:resolved,...(signedQuote?{executor:'supplier' as const,supplier:step.supplierBinding!.supplier,agentIdentity:step.supplierBinding!.identity,supplierQuote:signedQuote}:{}),spec,scenario:'success',timeoutSeconds:w.timeoutSeconds},w.deployment,now,signedQuote?{now:await supplierAccess!.chainTime(),workspaceHash:w.workspaceHash}:{});
 }
-function validateCondition(when:WorkflowCondition,steps:WorkflowStepDraft[],state:Workspace,index:number){
- const skill=state.agents.find(a=>a.id===steps[when.step]?.agentId)?.skill;
- if(when.step>=index||!skill||when.field==='concentrated'&&(typeof when.value!=='boolean'||when.operator!=='eq'||!skill.startsWith('ext:'))||when.field!=='concentrated'&&typeof when.value!=='number'||when.field==='accountCount'&&!skill.startsWith('ext:')||when.field==='uniqueRecipients'&&skill!=='event-analysis')throw new DomainError('Workflow condition must reference a supported field of an earlier accepted step.');
-}
 export async function createWorkflow(state:Workspace,raw:WorkflowDraft,deployment:WalletDeployment,publish:EvidencePublisher,now=new Date().toISOString(),supplierAccess?:WorkflowSupplierAccess){
  const parsed=workflowDraftSchema.safeParse(raw);if(!parsed.success)throw new DomainError('Invalid workflow definition.');
  const draft=parsed.data as WorkflowDraft,input=normalizeInput(draft.input),parameters={...draft,input},prior=state.workflows?.find(w=>w.requestId===draft.requestId);
@@ -59,7 +56,7 @@ export async function createWorkflow(state:Workspace,raw:WorkflowDraft,deploymen
   if(!agent?.enabled||legacy&&agent.skill!==(index===0?'treasury-report':'event-analysis')||!state.policy.allowedSkills.includes(agent.skill)||!session.skills.includes(agent.skill)||(!definition.supplierId&&budget<agent.price)||budget>session.perTaskCents||budget>state.policy.maxTaskBudget)throw new DomainError(legacy?'Workflow needs an authorized treasury service followed by an event service within each budget.':'Every workflow service requires an installed skill, policy and Vault authorization within its budget.','FORBIDDEN');
   resolveSkillInput(state,agent.skill,input);
   if(definition.input.from==='step'&&definition.input.step>=index)throw new DomainError('Workflow input must reference an earlier step.');
-  if(definition.when)validateCondition(definition.when,definitions,state,index);
+  if(definition.when)validateWorkflowCondition(definition.when,definitions.map(s=>state.agents.find(a=>a.id===s.agentId)?.skill),index);
   let supplierBinding;
   if(definition.supplierId){supplierBinding=await supplierAccess!.bind(state,agentId,definition.supplierId);if(supplierBinding.supplier.id!==definition.supplierId||supplierBinding.identity.agentId!==agentId||!supplierBinding.supplier.skills.includes(agent.skill))throw new DomainError('Workflow supplier does not support the selected registered service.','SUPPLIER_REJECTED');assertVaultSeller(session,supplierBinding.identity.wallet);await supplierAccess!.authorize(supplierBinding);}
   return {requestId:await stepRequestId(draft.requestId,index),agentId,skill:agent.skill,quote:definition.supplierId?budget:agent.price,budget,...(definition.supplierId?{supplierId:definition.supplierId,supplierBinding}:{}),...(!legacy?{input:definition.input,...(definition.when?{when:definition.when}:{})}:{})} as WorkflowStep;

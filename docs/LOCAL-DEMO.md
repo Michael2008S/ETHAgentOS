@@ -7,6 +7,7 @@
 - 网页：<http://127.0.0.1:5177/>，支持中英文；默认工作区保留已完成任务、身份、评价及链上凭证。
 - 本地 EVM：`127.0.0.1:8545`。此链是临时链，重启会重建部署；旧 D1 记录仍保留原部署信息，需要重新注册/绑定身份和新建订单。
 - Qwen：`127.0.0.1:11435`，真实 llama.cpp CPU 推理。
+- 工作流规划模型：`127.0.0.1:11436`，独立的固定版本 Qwen 3B；默认 macOS GPU offload，可切换 CPU。
 - 独立技能供应商：`127.0.0.1:7461`，签名交付与幂等日志。
 - 本地恢复 worker：独立于浏览器轮询 D1 持久化队列。
 
@@ -21,6 +22,7 @@ npm ci
 npm run build
 npm run db:local # 仅全新数据库；旧版本升级见 RUNTIME-QUEUE.md
 npm run model:setup # 首次下载固定版本及校验模型
+npm run model:setup:planning # 首次下载并校验独立规划模型，约 2.1 GB
 ```
 
 安装完成后，推荐使用一个前台启动器：
@@ -34,7 +36,7 @@ npm run demo:showcase -- --fresh
 npm run demo:evidence
 ```
 
-启动器复用健康服务，拒绝覆盖未知端口，退出仅停止自己启动的子进程；日志在 `.sites-runtime/demo/`。`demo:prepare` 只补不足的测试代币、注册/绑定 Atlas 并授权供应商，不重置历史或重新启用撤销策略。也可继续分别运行 chain:local、model:local、supplier:local、dev、worker。
+启动器复用健康服务，拒绝覆盖未知端口，退出仅停止自己启动的子进程；日志在 `.sites-runtime/demo/`。`demo:prepare` 只补不足的测试代币、注册/绑定 Atlas 并授权供应商，不重置历史或重新启用撤销策略。也可继续分别运行 chain:local、model:local、model:planning、supplier:local、dev、worker。
 
 旧数据库升级还需应用 `drizzle/0002_dazzling_lady_bullseye.sql`，新增消费者联系状态表；不要对已有数据库重复运行全量 db:local。
 

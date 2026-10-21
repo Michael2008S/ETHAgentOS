@@ -19,6 +19,7 @@ test('model protocol is bounded, hashes evidence and never persists provider cre
 test('model endpoint and resource configuration is server controlled',()=>{
  for(const patch of [{url:'http://model.example/v1/chat/completions'},{url:'https://secret@model.example/v1/chat/completions'},{url:'https://model.example/v1/chat/completions?api_key=secret'},{timeoutMs:999999},{maxTokens:999999},{apiKey:'secret'}])assert.throws(()=>parseModelConfiguration({...config,...patch}));
  assert.throws(()=>parseModelConfiguration({...config,url:'http://127.0.0.1:11435/v1/chat/completions'}));assert.equal(parseModelConfiguration({...config,url:'http://127.0.0.1:11435/v1/chat/completions'},true).model,'test-model');
+ assert.equal(parseModelConfiguration({...config,url:'http://127.0.0.1:11436/v1/chat/completions'},true).model,'test-model');assert.throws(()=>parseModelConfiguration({...config,url:'http://127.0.0.1:11437/v1/chat/completions'},true));
 });
 test('model leases reject stale workers, cancelled results and permission changes',async()=>{
  const planner=await createModelPlanner(config,undefined,async()=>envelope('{"operations":["dataset.read","artifact.write"]}'));

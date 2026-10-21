@@ -57,6 +57,8 @@ npm run demo:deadline     # 自动超时、预留释放、已付款跨期限恢�
 npm run demo:chain        # 网页成果 → 本地校验器 → 真实本地 EVM 托管与退款
 npm run model:setup       # 官方 llama.cpp / Qwen 固定版本、SHA-256 校验，macOS arm64
 npm run model:local       # 独立终端保持运行，127.0.0.1:11435
+npm run model:setup:planning # 独立的官方 3B 规划模型，约 2.1 GB，固定校验值
+npm run model:planning    # 独立终端保持运行，127.0.0.1:11436；demo:start 可代为启动
 npm run demo:model        # 真实本地 Qwen + HTTP/D1/EVM，3 场景
 npm run demo:identity     # 官方 ERC-8004 + HTTP/D1/EVM，6 组身份与评价场景
 npm run supplier:local    # 独立技能服务与签名交付日志，127.0.0.1:7461
@@ -184,6 +186,8 @@ Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/
 可配置工作流：钱包页可组合 2–8 步已安装技能，引用前序已验收成果并根据结果决定是否采购；支持条件跳过、预算释放、嵌套成果复核、丢失响应与并发恢复。保留原两步 API。运行 `npm run demo:workflow-configurable`，协议与信任边界见 [WORKFLOWS](docs/WORKFLOWS.md)。公共网络仍按路线图单独验收。
 
 供应商组合工作流：每步可选独立供应商，固定注册身份、签名配置和收款方；在批准的单步费用上限内，待前序已付款成果确定后获取并验证签名报价。超额或撤权阻止新采购，报价丢响应保留持久检查点。运行 `npm run demo:workflow-suppliers`，协议与边界见 [SUPPLIER-WORKFLOWS](docs/SUPPLIER-WORKFLOWS.md)。
+
+目标驱动规划：模型从已授权服务目录生成 2–8 步计划，可引用前序成果并在明确启用后添加结果条件。规划只保存审核记录，批准摘要后才创建对应工作流和订单；价格或供应商身份变更会拒绝沿用旧计划。运行 `npm run demo:workflow-planning`，协议及模型配置见 [WORKFLOW-PLANNING](docs/WORKFLOW-PLANNING.md)。
 
 新技能接入：智能体页可安装带版本的受限技能定义，注册服务并在权限页明确授权。示例“资金集中度分析”由独立供应商计算，完整规则及成果经 CRE 独立复算后付款或退款。运行 `npm run demo:skill`；协议、SDK、参考供应商及边界见 [SKILL-ONBOARDING](docs/SKILL-ONBOARDING.md)。定义不加载任意代码，也不会自动扩大已有 Vault 会话权限。
 
