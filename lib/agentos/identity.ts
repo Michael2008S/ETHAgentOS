@@ -39,7 +39,7 @@ export async function inspectIdentity(client:PublicClient,deployment:WalletDeplo
  if(identity.chainId!==deployment.chainId||!same(identity.registry,addresses.registry)||!same(identity.reputationRegistry,addresses.reputationRegistry))throw new DomainError('Identity network differs from configuration.','CONFLICT');
  const block=await client.getBlock(),args=[BigInt(identity.registryAgentId)] as const,base={address:identity.registry,abi:identityABI,args,blockNumber:block.number};
  const [owner,wallet,uri,registration]=await Promise.all([client.readContract({...base,functionName:'ownerOf'}),client.readContract({...base,functionName:'getAgentWallet'}),client.readContract({...base,functionName:'tokenURI'}),client.getBlock({blockNumber:BigInt(identity.registrationBlock)})]);
- if(registration.hash!==identity.registrationBlockHash||!same(owner,identity.owner)||!same(wallet,identity.wallet)||!same(wallet,deployment.seller)||uri!==identity.agentURI)throw new DomainError('Identity ownership, payment wallet or registration document changed. Rebind before new orders.','CONFLICT');
+ if(registration.hash!==identity.registrationBlockHash||!same(owner,identity.owner)||!same(wallet,identity.wallet)||/^0x0{40}$/.test(wallet)||uri!==identity.agentURI)throw new DomainError('Identity ownership, payment wallet or registration document changed. Rebind before new orders.','CONFLICT');
  return {...identity,status:'verified' as const,checkedAt:new Date().toISOString(),checkedBlock:block.number.toString(),checkedBlockHash:block.hash!};
 }
 export async function verifyRegistration(state:Workspace,ownerId:string,agentId:string,registryAgentId:string,transactionHash:Hex,origin:string,client:PublicClient,deployment:WalletDeployment):Promise<AgentIdentity>{
@@ -47,8 +47,8 @@ export async function verifyRegistration(state:Workspace,ownerId:string,agentId:
  const agentURI=dataJSON(completeRegistrationDocument(draft.document,deployment.chainId,registry,registryAgentId));
  const event=receipt.logs.filter(l=>same(l.address,registry)).map(l=>{try{return decodeEventLog({abi:identityABI,eventName:'Registered',data:l.data,topics:l.topics}).args;}catch{return null;}}).find(e=>e?.agentId===BigInt(registryAgentId)&&e.agentURI===draft.agentURI);
  if(!event)throw new DomainError('Registration transaction does not bind this workspace profile.','CONFLICT');
- const owner=await client.readContract({address:registry,abi:identityABI,functionName:'ownerOf',args:[BigInt(registryAgentId)]});
- const identity:AgentIdentity={agentId,chainId:deployment.chainId,registry,reputationRegistry,registryAgentId,owner,wallet:deployment.seller,agentURI,documentHash:keccak256(stringToHex(agentURI)),registrationTx:transactionHash,registrationBlock:receipt.blockNumber.toString(),registrationBlockHash:receipt.blockHash,checkedBlock:receipt.blockNumber.toString(),checkedBlockHash:receipt.blockHash,checkedAt:new Date().toISOString(),status:'verified'};
+ const [owner,wallet]=await Promise.all([client.readContract({address:registry,abi:identityABI,functionName:'ownerOf',args:[BigInt(registryAgentId)]}),client.readContract({address:registry,abi:identityABI,functionName:'getAgentWallet',args:[BigInt(registryAgentId)]})]);
+ const identity:AgentIdentity={agentId,chainId:deployment.chainId,registry,reputationRegistry,registryAgentId,owner,wallet,agentURI,documentHash:keccak256(stringToHex(agentURI)),registrationTx:transactionHash,registrationBlock:receipt.blockNumber.toString(),registrationBlockHash:receipt.blockHash,checkedBlock:receipt.blockNumber.toString(),checkedBlockHash:receipt.blockHash,checkedAt:new Date().toISOString(),status:'verified'};
  return inspectIdentity(client,deployment,identity);
 }
 export async function createIdentityChallenge(state:Workspace,ownerId:string,identity:AgentIdentity,nonce:string,now=new Date().toISOString()){

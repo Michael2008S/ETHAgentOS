@@ -17,7 +17,7 @@ export class AgentIdentityClient {
  }
  async register(agentId:string){
   const prepared=await this.post<{document:Record<string,unknown>;agentURI:string;deployment:WalletDeployment}>({action:'prepare',agentId});this.deployment(prepared.deployment);
-  if(!prepared.deployment.identityRegistry||this.session.account.toLowerCase()!==prepared.deployment.seller.toLowerCase())throw new Error('Connect the configured provider wallet to register its identity.');
+  if(!prepared.deployment.identityRegistry)throw new Error('Identity registries are not configured.');
   const prior=await this.session.client.getContractEvents({address:prepared.deployment.identityRegistry,abi:identityABI,eventName:'Registered',args:{owner:this.session.account},fromBlock:BigInt(prepared.deployment.deployedBlock)});
   let found;
   for(const candidate of prior.filter(l=>l.args.agentURI===prepared.agentURI).reverse())if(candidate.args.agentId!==undefined&&(await this.session.client.readContract({address:prepared.deployment.identityRegistry,abi:identityABI,functionName:'ownerOf',args:[candidate.args.agentId]})).toLowerCase()===this.session.account.toLowerCase()){found=candidate;break;}

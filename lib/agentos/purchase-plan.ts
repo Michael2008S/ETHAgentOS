@@ -1,10 +1,11 @@
+import type {SupplierDescriptor} from './supplier.ts';
 import { digest,DomainError } from './engine.ts';
 import { modelDescriptor,type ModelConfiguration } from './model.ts';
 import type { Workspace,Skill } from './types.ts';
-export type PurchaseChoice={id:string;agentId:string;skill:Skill;price:number;executor:'builtin'|'supplier'};
-export function purchaseChoices(state:Workspace,budget:number,supplierAgents:ReadonlySet<string>=new Set()):PurchaseChoice[]{
+export type PurchaseChoice={id:string;agentId:string;skill:Skill;price:number;executor:'builtin'|'supplier';supplierId?:string;supplierConfigHash?:string};
+export function purchaseChoices(state:Workspace,budget:number,supplierAgents:ReadonlySet<string>|ReadonlyMap<string,SupplierDescriptor[]>=new Set()):PurchaseChoice[]{
  if(!state.policy.active||budget>state.policy.maxTaskBudget)return [];
- return state.agents.filter(a=>a.enabled&&state.policy.allowedSkills.includes(a.skill)&&a.price<=budget).flatMap(a=>['builtin',...(supplierAgents.has(a.id)?['supplier']:[])].map(executor=>({id:a.id+':'+executor,agentId:a.id,skill:a.skill,price:a.price,executor:executor as 'builtin'|'supplier'})));
+ return state.agents.filter(a=>a.enabled&&state.policy.allowedSkills.includes(a.skill)&&a.price<=budget).flatMap(a=>{const base={agentId:a.id,skill:a.skill,price:a.price},builtIn:PurchaseChoice={...base,id:a.id+':builtin',executor:'builtin'};if('get' in supplierAgents)return [builtIn,...(supplierAgents.get(a.id)??[]).filter(s=>s.skills.includes(a.skill)).map(s=>({...base,id:a.id+':supplier:'+s.id,executor:'supplier' as const,supplierId:s.id,supplierConfigHash:s.configHash}))];return [builtIn,...(supplierAgents.has(a.id)?[{...base,id:a.id+':supplier',executor:'supplier' as const}]:[])];});
 }
 export function validatePurchasePlan(raw:unknown,choices:PurchaseChoice[]){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new DomainError('Invalid purchase suggestion.');

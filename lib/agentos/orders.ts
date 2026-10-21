@@ -1,3 +1,4 @@
+import {orderSeller} from './order-parties.ts';
 import type { Address, Hex } from 'viem';
 import type { WalletDeployment } from '../../sdk/wallet.ts';
 import type { ChainEvidence } from '../../sdk/chain.ts';
@@ -9,7 +10,7 @@ import type { AgentIdentity } from './identity.ts';
 import { supplierRequest,supplierJobId,verifySupplierDelivery,type SupplierDescriptor,type SupplierDelivery } from './supplier.ts';
 import {memoryParent} from './artifact-memory.ts';
 import {futureWorkflowSteps} from './workflow-state.ts';
-import {vaultAllowance,sessionBinding,type VaultBinding} from './vault.ts';
+import {vaultAllowance,sessionBinding,assertVaultSeller,type VaultBinding} from './vault.ts';
 export type OrderStatus='awaiting-funding'|'funding'|'queued'|'running'|'awaiting-settlement'|'paused'|'completed'|'refunded'|'cancelled';
 export type ChainOrder={evidencePendingAck?:boolean;evidenceAckAfter?:string;settlementScan?:import('../../sdk/settlements.ts').SettlementCursor;workflowId?:string;vault?:VaultBinding;vaultSessionId?:string;vaultFunding?:{deadline:string;token:string;leaseUntil:string};executor?:'builtin'|'supplier';supplier?:SupplierDescriptor;supplierDelivery?:SupplierDelivery;supplierLease?:{token:string;expiresAt:string;requestHash:string};supplierAttempts?:number;agentIdentity?:AgentIdentity;id:string;requestId:string;title:string;agentId:string;skill:Skill;quote:number;budget:number;buyer:Address;deployment:WalletDeployment;spec:DeliverySpec;input:TaskInput;inputHash:string;scenario:Scenario;timeoutSeconds:number;status:OrderStatus;step:number;createdAt:string;updatedAt:string;deadlineAt?:string;chainDeadline?:string;settledAt?:string;lastError?:string;planner?:'deterministic'|'llm';model?:ModelDescriptor;modelPlan?:ModelPlan;modelLease?:{token:string;expiresAt:string};output:Record<string,unknown>|null;outputHash:string|null;failure:string|null;funding:ChainEvidence|null;settlement:ChainEvidence|null;policySnapshot:Policy|null;events:Event[];authorization?:{nonce:string;message:string;expiresAt:string;transactionHash:Hex};settlementAuthorization?:{artifactText:string;authorizedAt:string;policyHash:string}};
 export type OrderDraft={workflowId?:string;vaultSessionId?:string;executor?:'builtin'|'supplier';supplier?:SupplierDescriptor;agentIdentity?:AgentIdentity;planner?:'deterministic'|'llm';model?:ModelDescriptor;requestId:string;title:string;agentId:string;budget:number;buyer:Address;spec:DeliverySpec;input?:TaskInput;scenario:Scenario;timeoutSeconds:number};
@@ -47,6 +48,7 @@ export async function createOrder(state:Workspace,draft:OrderDraft,deployment:Wa
   if(draft.executor==='supplier'&&(!draft.supplier||!draft.agentIdentity||!draft.supplier.skills.includes(agent.skill)))throw new DomainError('An authorized identity and supplier skill are required.');
   const vault=draft.vaultSessionId?sessionBinding(vaultAllowance(state,draft.vaultSessionId,draft.buyer,agent.skill,draft.budget,agent.price,now)):undefined;
   const order:ChainOrder={...draft,...(vault?{vault}:{}),executor:draft.executor??'builtin',planner:draft.planner??'deterministic',id:'chain-'+draft.requestId,title:draft.title.trim(),skill:agent.skill,quote:agent.price,deployment:{...deployment},input,inputHash:await digest(input),status:vault?'funding':'awaiting-funding',step:0,createdAt:now,updatedAt:now,output:null,outputHash:null,failure:null,funding:null,settlement:null,policySnapshot:null,events:[]};
+  if(vault)assertVaultSeller(vault,orderSeller(order));
   memoryParent(state,order);
   const violation=orderPolicy(state,order,now);if(violation)throw new DomainError(violation);
   orderEvent(order,'Awaiting escrow funding','Input and service quote are frozen. No adapter has executed and no sandbox funds were used.',now);

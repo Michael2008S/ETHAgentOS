@@ -178,12 +178,15 @@ console.log(result.status, result.receipt);
 
 真实业务数据：钱包页可选择「以太坊 USDC · 真实来源」，导入指定地址的已最终确认事件。保留原始金额、区块和交易证据，并在创建任务前重新复核。`npm run demo:data` 实跑真实主网读取 → HTTP/D1 资金流报告 → 独立临时链完整成果付款；费用网络与数据来源网络分别标明，见 [REAL-DATA](docs/REAL-DATA.md)。
 
-Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/链上每日额度并签名会话，随后选择该会话创建自动注资订单，后续采购无需逐单签名。撤销阻止新注资，已注资订单保留原结算条件，退款回到 Vault 且不补回已用额度。配置与边界见 [VAULT](docs/VAULT.md)。`npm run demo:isolated` 使用 5187/8555/7471 和独立数据库，不覆盖已有环境；运行 `npm run demo:vault` 验证采购与退款。最终完整演示使用启用身份的隔离实例及 `npm run demo:full -- --runtime .sites-runtime/isolated-demo/current.json`；Vault 专项的跳过身份模式不算完整演示。
+Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/链上每日额度并签名会话，随后选择该会话创建自动注资订单，后续采购无需逐单签名。撤销阻止新注资，已注资订单保留原结算条件，退款回到 Vault 且不补回已用额度。配置与边界见 [VAULT](docs/VAULT.md)。`npm run demo:isolated` 使用 5187/8555/7471/7472 和独立数据库、双供应商进程，不覆盖已有环境；运行 `npm run demo:vault` 验证采购与退款。最终完整演示使用启用身份的隔离实例及 `npm run demo:full -- --runtime .sites-runtime/isolated-demo/current.json`；Vault 专项的跳过身份模式不算完整演示。
 
-两步工作流：钱包页可选择 Vault 会话，先采购资金分配报告，再采购基于已验收分配明细的汇总。两步报价、预算和成果引用固定，支持丢失响应、刷新、并发恢复与取消。运行 `npm run demo:workflow`，实现与信任边界见 [WORKFLOWS](docs/WORKFLOWS.md)。公共网络与最终完整演示仍按路线图单独验收。
+可配置工作流：钱包页可组合 2–8 步已安装技能，引用前序已验收成果并根据结果决定是否采购；支持条件跳过、预算释放、嵌套成果复核、丢失响应与并发恢复。保留原两步 API。运行 `npm run demo:workflow-configurable`，协议与信任边界见 [WORKFLOWS](docs/WORKFLOWS.md)。公共网络仍按路线图单独验收。
 
 新技能接入：智能体页可安装带版本的受限技能定义，注册服务并在权限页明确授权。示例“资金集中度分析”由独立供应商计算，完整规则及成果经 CRE 独立复算后付款或退款。运行 `npm run demo:skill`；协议、SDK、参考供应商及边界见 [SKILL-ONBOARDING](docs/SKILL-ONBOARDING.md)。定义不加载任意代码，也不会自动扩大已有 Vault 会话权限。
 
 消费者运行：任务总览的运行状态面板可签发仅绑定当前工作区、可过期和撤销的消费者凭证。`npm run consumer` 提供独立重试进程及本地健康接口，`npm run demo:consumer` 验证断网、响应丢失、进程重启与撤销；配置和数据库升级见 [CONSUMER-OPERATIONS](docs/CONSUMER-OPERATIONS.md)。代码和本地验收不代表已部署托管消费者；未开启调度。
 
 公共 CRE 接入准备：新增符合 ERC165/生产 metadata 布局的 AgentEscrowReceiver、一次性工作流绑定、独立 R2 证据发布、自动结算事件发现与可复用分发器。同一份配置可发现新增订单；最终确认后的证据归档有持久恢复检查点。`npm run test:cre` 执行实际处理器的 SDK 专项测试，`npm run demo:cre-dispatcher` 验证临时 HTTPS/R2 与本地 EVM 的官方 CLI dry-run。实际公网部署、登记后的 DON 执行与真实钱包验收仍待完成；见 [PUBLIC-CRE](docs/PUBLIC-CRE.md) 和 [CRE-DISPATCHER](docs/CRE-DISPATCHER.md)。
+
+
+多供应商目录与独立收款：支持 1–8 家配置、按订单固定供应商、不同注册身份收款钱包，以及显式批准的多收款方 Vault 会话。运行 `npm run demo:multi-supplier`；配置、认证、SDK 和边界见 [MULTI-SUPPLIERS](docs/MULTI-SUPPLIERS.md)。当前按原供应商恢复，供应商签名报价与退款后自动改购仍待完善。完整本地演示现为 25 步，并记录仅限本地 MockToken 的测试资金预检。

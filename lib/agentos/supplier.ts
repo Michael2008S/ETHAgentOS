@@ -1,3 +1,4 @@
+import {orderSeller} from './order-parties.ts';
 import {skillIdSchema,skillDefinitionSchema,deliveryVerificationSchema} from './skill-schema.ts';
 import {acceptedArtifactSchema} from './artifact-memory.ts';
 import {transferSourceSchema,sourceSummarySchema} from './transfer-source.ts';
@@ -29,7 +30,7 @@ export type SupplierRequest=z.infer<typeof supplierRequestSchema>;
 export const supplierJobId=(request:SupplierRequest)=>keccak256(stringToHex(canonical({version:1,chainId:request.chainId,escrow:request.escrow,taskId:request.taskId,supplier:request.supplier.configHash})));
 export async function supplierRequest(order:ChainOrder):Promise<SupplierRequest>{
  if(!order.funding||!order.supplier||!order.agentIdentity||!order.chainDeadline)throw new DomainError('Supplier execution requires verified funding and an authorized identity.','SUPPLIER_REJECTED');
- const identity=order.agentIdentity,request=supplierRequestSchema.parse({version:'agentos.skill-request.v1',orderId:order.id,taskId:inputEvidence(order,order.buyer).id,chainId:order.deployment.chainId,escrow:order.deployment.escrow,buyer:order.buyer,...(order.vault?{paymentBuyer:order.vault.vault}:{}),seller:order.deployment.seller,quoteCents:order.quote,chainDeadline:order.chainDeadline,fundingTransactionHash:order.funding.transactionHash,scenario:order.scenario,skill:order.skill,input:order.input,inputHash:order.inputHash,spec:order.spec,identity:{registry:identity.registry,registryAgentId:identity.registryAgentId,owner:identity.owner,wallet:identity.wallet,documentHash:identity.documentHash},operations:['dataset.read','artifact.write'],supplier:order.supplier});
+ const identity=order.agentIdentity,request=supplierRequestSchema.parse({version:'agentos.skill-request.v1',orderId:order.id,taskId:inputEvidence(order,order.buyer).id,chainId:order.deployment.chainId,escrow:order.deployment.escrow,buyer:order.buyer,...(order.vault?{paymentBuyer:order.vault.vault}:{}),seller:orderSeller(order),quoteCents:order.quote,chainDeadline:order.chainDeadline,fundingTransactionHash:order.funding.transactionHash,scenario:order.scenario,skill:order.skill,input:order.input,inputHash:order.inputHash,spec:order.spec,identity:{registry:identity.registry,registryAgentId:identity.registryAgentId,owner:identity.owner,wallet:identity.wallet,documentHash:identity.documentHash},operations:['dataset.read','artifact.write'],supplier:order.supplier});
  if(await digest(normalizeInput(request.input))!==request.inputHash)throw new DomainError('Supplier input commitment differs.','SUPPLIER_REJECTED');return request;
 }
 const outputBase={source:sourceSummarySchema.optional(),dataset:z.string().max(64),blockFrom:integer,blockTo:integer,transferCount:integer,totalCents:integer};

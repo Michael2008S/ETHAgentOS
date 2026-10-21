@@ -1,3 +1,4 @@
+import {orderSeller} from '../lib/agentos/order-parties.ts';
 import { createPublicClient, createWalletClient, custom, defineChain, keccak256, stringToHex, type Address, type EIP1193Provider, type Hex,type PublicClient } from 'viem';
 import { AgentChainClient, centsToToken, chainTaskId, tokenABI, escrowABI, validateChainDeployment, type ChainDeployment, type ChainEvidence, type ChainIntent, type TransactionIntent } from './chain.ts';
 import { DATASET, verifyReceipt } from '../lib/agentos/engine.ts';
@@ -5,11 +6,11 @@ import { canonical,specHash,deliveryVerification,deliveryArtifact, type Delivery
 import type { Task } from '../lib/agentos/types.ts';
 
 export type WalletDeployment = ChainDeployment & {mode:'local'|'testnet';seller:Address;deployedBlock:string;identityRegistry?:Address;reputationRegistry?:Address;vault?:Address;vaultExecutor?:Address};
-export function localWalletProvider(base:string,role:'buyer'|'seller'='buyer'):EIP1193Provider {
+export function localWalletProvider(base:string,role:'buyer'|'seller'|'seller2'='buyer'):EIP1193Provider {
   const url=new URL(base);
   if(url.protocol!=='http:'||url.hostname!=='127.0.0.1'||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw new Error('Local test wallet requires a plain loopback endpoint.');
   return {request:async({method,params}: {method:string;params?:unknown})=>{
-    const response=await fetch(url.origin+(role==='seller'?'/seller-rpc':'/rpc'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:crypto.randomUUID(),method,params}),signal:AbortSignal.timeout(20000)});
+    const response=await fetch(url.origin+(role==='buyer'?'/rpc':role==='seller'?'/seller-rpc':'/seller2-rpc'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:crypto.randomUUID(),method,params}),signal:AbortSignal.timeout(20000)});
     const result=await response.json() as {result:unknown;error?:{message?:string;code?:number}|string};
     const fault=typeof result.error==='string'?{message:result.error}:result.error;
     if(!response.ok||fault)throw Object.assign(new Error(fault?.message??'Local wallet RPC failed.'),{code:fault?.code});return result.result;
@@ -96,7 +97,8 @@ export class AgentWalletSession {
     if(order.status!=='awaiting-funding'||order.funding||order.output||order.buyer.toLowerCase()!==this.account.toLowerCase()||canonical(order.deployment).toLowerCase()!==canonical(this.deployment).toLowerCase())throw new Error('Only the configured buyer may fund this unexecuted order.');
     if(!Number.isSafeInteger(windowSeconds)||windowSeconds<30||windowSeconds>604800)throw new Error('Order escrow window must be 30–604800 seconds.');
     const bytes=inputEvidence(order,this.account);if(bytes.datasetHash!==order.spec.datasetHash||canonical(order.spec.verification)!==canonical(bytes.verification))throw new Error('Order input commitment or verification differs.');
-    const {intent,transactions}=await this.chain.prepareFunding({workspace:walletNamespace(this.account),taskId:order.id,buyer:this.account,seller:this.deployment.seller,quoteCents:order.quote,deadline:(await this.client.getBlock()).timestamp+BigInt(windowSeconds),spec:order.spec});
+    if(order.executor==='supplier'&&orderSeller(order).toLowerCase()!==this.deployment.seller.toLowerCase()){if(!order.agentIdentity||!order.supplier)throw new Error('A verified supplier identity is required.');await(await import('../lib/agentos/supplier-chain.ts')).authorizeSupplier(this.client,this.deployment,order.agentIdentity,order.supplier);}
+    const {intent,transactions}=await this.chain.prepareFunding({workspace:walletNamespace(this.account),taskId:order.id,buyer:this.account,seller:orderSeller(order),quoteCents:order.quote,deadline:(await this.client.getBlock()).timestamp+BigInt(windowSeconds),spec:order.spec});
     let hash:Hex|undefined;for(const transaction of transactions)hash=await this.send(transaction,onSubmitted);
     return this.chain.verifyEvidence(intent,hash!,'funding');
   }

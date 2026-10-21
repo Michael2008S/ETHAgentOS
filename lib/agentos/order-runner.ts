@@ -1,3 +1,4 @@
+import {supplierForOrder} from './supplier-pool.ts';
 import type { Workspace } from './types.ts';
 import { advanceOrder,authorizeSettlement,claimModelLease,commitModelPlan,claimSupplierLease,commitSupplierDelivery,orderPolicy,findOrder,finishOrder,orderEvent,pendingOrders } from './orders.ts';
 import type { OrderChain } from './order-chain.ts';
@@ -85,7 +86,7 @@ export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:O
         const token=crypto.randomUUID(),claimed=await store.updateWorkspace(ownerId,current=>claimSupplierLease(current,id,token,now)),leased=findOrder(claimed.state,id);
         if(leased.status!=='running')continue;if(leased.supplierLease?.token!==token)return {orderId:id,status:'executing'};
         let result:{delivery?:SupplierDelivery;error?:string;retryable?:boolean};
-        try{if(!options.supplier)throw new DomainError('Supplier is temporarily unavailable. The execution checkpoint is retained.','SUPPLIER_UNAVAILABLE');if(canonical(options.supplier.descriptor)!==canonical(leased.supplier))throw new DomainError('Supplier configuration differs from the authorized order.','SUPPLIER_REJECTED');await options.supplier.authorize(leased);const delivery=await options.supplier.execute(await supplierRequest(leased));await options.supplier.authorize(leased);result={delivery};}
+        try{const supplier=supplierForOrder(options.supplier,leased.supplier);await supplier.authorize(leased);const delivery=await supplier.execute(await supplierRequest(leased));await supplier.authorize(leased);result={delivery};}
         catch(error){result={error:error instanceof DomainError?error.message:'Supplier request failed. The execution checkpoint is retained.',retryable:!(error instanceof DomainError)||error.code==='SUPPLIER_UNAVAILABLE'};}
         await store.updateWorkspace(ownerId,current=>commitSupplierDelivery(current,id,token,result,options.now?.()??new Date().toISOString()));
         if(result.retryable)throw new DomainError(result.error!,'SUPPLIER_UNAVAILABLE');continue;

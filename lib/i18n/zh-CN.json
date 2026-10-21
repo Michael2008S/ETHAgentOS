@@ -795,5 +795,20 @@
   "Workflow input must reference an earlier step.": "输入只能引用当前步骤之前的成果。",
   "Workflow condition must reference a supported field of an earlier accepted step.": "执行条件只能引用前序已验收成果所支持的字段。",
   "Invalid workflow definition.": "工作流定义无效。",
-  "Paid output does not pass complete acceptance.": "已付款成果未通过完整验收。"
+  "Paid output does not pass complete acceptance.": "已付款成果未通过完整验收。",
+  "Execution supplier": "执行供应商",
+  "Payment recipient": "收款地址",
+  "Default seller": "默认收款方",
+  "Additional permitted sellers": "额外允许的收款方",
+  "Connect second local provider wallet": "连接第二个本地供应商钱包",
+  "Execution provider directory": "执行供应商目录",
+  "Supplier directory is unavailable.": "供应商目录暂不可用。",
+  "Supported skills": "支持的技能",
+  "Configured execution providers. Registry delegation is checked before each purchase.": "已配置的执行供应商。每次采购前都会检查链上身份委托。",
+  "Each service has its own registry identity and payment wallet. Select and authorize a provider in Agents, then choose it in Wallet & escrow. Directory entries do not grant spending permission.": "每项服务均绑定独立的注册身份及收款钱包。请在智能体页面选择并授权供应商，再于钱包与托管页面选择采购。目录配置不会授予支出权限。",
+  "Supplier execution uses this provider only. Its signer, configuration and registry payment wallet are frozen before funding.": "独立执行仅使用所选供应商。付款前会固定其签名方、配置及链上身份收款钱包。",
+  "Optional wallet addresses separated by commas or spaces. The default seller remains included; every selected address is approved onchain and committed in the signed session.": "可选填钱包地址，以逗号或空格分隔。默认收款方始终包含在内；每个所选地址均须链上批准，并写入签名会话。",
+  "The grant is limited to this workspace, current allowed skills and the selected sellers. Onchain daily limits also apply.": "授权仅限当前工作区、已允许的技能和所选收款方，同时受链上每日限额约束。",
+  "The signed Vault session does not permit this seller.": "已签名的 Vault 会话不允许向此收款方付款。",
+  "The selected supplier is not configured.": "所选供应商尚未配置。"
 }

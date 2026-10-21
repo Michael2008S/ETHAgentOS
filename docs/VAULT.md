@@ -2,9 +2,9 @@
 
 ## Authorization and money movement
 
-The configured Vault is owned by the buyer. The owner deposits tokens, allows the configured seller, and grants the configured executor a per-purchase limit, UTC daily limit and expiry. Each grant or revocation increments `grantEpochs`; re-granting identical limits cannot revive an old session.
+The configured Vault is owned by the buyer. The owner deposits tokens, allows the default seller and any explicitly selected additional sellers, and grants the configured executor a per-purchase limit, UTC daily limit and expiry. Each grant or revocation increments `grantEpochs`; re-granting identical limits cannot revive an old session.
 
-The owner then signs one workspace session. The signature binds chain, escrow, token, seller, owner, Vault, executor, epoch, skills, limits, expiry and workspace scope. Sessions last at most 24 hours. These setup transactions and the session signature are distinct wallet actions; this is not a claim of a single transaction or account-abstraction batching. Subsequent purchases reuse the bound session without an owner signature for each order.
+The owner then signs one workspace session. The signature binds chain, escrow, token, seller (and an optional bounded seller set), owner, Vault, executor, epoch, skills, limits, expiry and workspace scope. Sessions last at most 24 hours. These setup transactions and the session signature are distinct wallet actions; this is not a claim of a single transaction or account-abstraction batching. Subsequent purchases reuse the bound session without an owner signature for each order.
 
 Orders keep the human buyer and Vault payer separately. `Opened.buyer` and refunds identify the Vault; the immutable Vault owner identifies the authorized human. Signature-bound supplier requests can also distinguish the payment buyer from the task namespace owner. Identity feedback remains attached to the original human buyer with the actual Vault payment proof.
 
@@ -43,3 +43,5 @@ For the Vault-specific API/browser check only, `AGENTOS_DEMO_SKIP_IDENTITY=1 npm
 The script records the existing Vault balance and daily spend before depositing its test amount. Repeated runs preserve both histories and compare balance deltas; they do not reset the chain. Browser regression targets the same environment with `AGENTOS_TEST_URL=http://127.0.0.1:5187 AGENTOS_CHAIN_URL=http://127.0.0.1:8555 npm run test:browser`. For the final full demo, use identity-enabled services and `npm run demo:full -- --runtime .sites-runtime/isolated-demo/current.json`.
 
 Current acceptance: 91 automated tests, six Chromium regressions, TypeScript checks and production build passed. Actual HTTP/D1/queue/SDK/EVM acceptance is recorded in `outputs/vault-demo-2cf1fc72-aa6c-49fe-ba10-068b4bfec741.json`, including prior daily spend and nonzero starting Vault balance. `outputs/validation-vault-2026-10-21/` retains raw logs and summary. Public deployment and the final complete demo remain separate gates; see ROADMAP-IMPLEMENTATION.md.
+
+Multi-supplier sessions now support an explicit set of up to eight payees, including the default. Historical single-seller sessions retain their original restriction. The session subset is application-enforced in addition to the contract whitelist. See [MULTI-SUPPLIERS](MULTI-SUPPLIERS.md) for selection, revocation and verification.

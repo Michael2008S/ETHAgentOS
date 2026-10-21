@@ -5,7 +5,7 @@ import {prepareVaultSession,inspectVault,checkVaultBinding} from '@/lib/agentos/
 import {DomainError,digest} from '@/lib/agentos/engine';
 import {apiFailure} from '@/lib/agentos/api-failure';
 const schema=z.discriminatedUnion('action',[
- z.object({action:z.literal('prepare'),buyer:z.string().regex(/^0x[0-9a-fA-F]{40}$/),perTaskCents:z.number().int().positive().max(1000000),totalCents:z.number().int().positive().max(1000000),dailyCents:z.number().int().positive().max(1000000).optional()}).strict(),
+ z.object({action:z.literal('prepare'),buyer:z.string().regex(/^0x[0-9a-fA-F]{40}$/),perTaskCents:z.number().int().positive().max(1000000),totalCents:z.number().int().positive().max(1000000),dailyCents:z.number().int().positive().max(1000000).optional(),sellers:z.array(z.string().regex(/^0x[0-9a-fA-F]{40}$/).transform(a=>a as `0x${string}`)).min(1).max(8).optional()}).strict(),
  z.object({action:z.literal('bind'),sessionId:z.string().uuid(),signature:z.string().regex(/^0x[0-9a-fA-F]+$/).min(130).max(8194)}).strict(),
  z.object({action:z.literal('revoke'),sessionId:z.string().uuid()}).strict(),
 ]);

@@ -1,3 +1,4 @@
+import {orderSeller} from './order-parties.ts';
 import {createWalletClient,http,defineChain,type Hex,type PublicClient} from 'viem';
 import {privateKeyToAccount} from 'viem/accounts';
 import {encodeFunctionData} from 'viem';
@@ -5,7 +6,7 @@ import type {WalletDeployment} from '../../sdk/wallet.ts';
 import {centsToToken,escrowABI} from '../../sdk/chain.ts';
 import {inputEvidence} from '../../sdk/wallet.ts';
 import {specHash} from '../../cre/workflow/verify.ts';
-import {checkVaultBinding,vaultABI} from './vault.ts';
+import {checkVaultBinding,assertVaultSeller,vaultABI} from './vault.ts';
 import {DomainError} from './engine.ts';
 import type {ChainOrder} from './orders.ts';
 export type VaultFunder=(order:ChainOrder)=>Promise<Hex>;
@@ -15,13 +16,14 @@ export function vaultFunder(client:PublicClient,deployment:WalletDeployment,send
   if(!order.vault||!order.vaultFunding)throw new DomainError('A committed Vault funding intent is required.','FORBIDDEN');
   const bytes=inputEvidence(order,order.buyer),task=await client.readContract({address:deployment.escrow,abi:escrowABI,functionName:'tasks',args:[bytes.id]});
   if(task[5]!==0){
-   if(task[0].toLowerCase()!==order.vault.vault.toLowerCase()||task[1].toLowerCase()!==deployment.seller.toLowerCase()||task[4]!==specHash(order.spec)||task[3].toString()!==order.vaultFunding.deadline)throw new DomainError('Existing Vault escrow differs from its intent.','CONFLICT');
+   if(task[0].toLowerCase()!==order.vault.vault.toLowerCase()||task[1].toLowerCase()!==orderSeller(order).toLowerCase()||task[4]!==specHash(order.spec)||task[3].toString()!==order.vaultFunding.deadline)throw new DomainError('Existing Vault escrow differs from its intent.','CONFLICT');
    const events=await client.getContractEvents({address:deployment.escrow,abi:escrowABI,eventName:'Opened',args:{id:bytes.id},fromBlock:BigInt(deployment.deployedBlock)});
    if(events.length!==1)throw new DomainError('Vault funding event is unavailable.','UNAVAILABLE');return events[0].transactionHash;
   }
+  assertVaultSeller(order.vault,orderSeller(order));
   const view=await checkVaultBinding(client,deployment,order.vault),amount=centsToToken(order.quote,view.decimals),deadline=BigInt(order.vaultFunding.deadline);
   if(deadline<=view.now||deadline>view.now+86400n||view.balance<amount||view.spent+amount>view.grant[1])throw new DomainError('Vault balance, deadline or daily allowance does not permit funding.','FORBIDDEN');
-  return send(order,encodeFunctionData({abi:vaultABI,functionName:'execute',args:[bytes.id,deployment.seller,amount,deadline,specHash(order.spec)]}));
+  return send(order,encodeFunctionData({abi:vaultABI,functionName:'execute',args:[bytes.id,orderSeller(order),amount,deadline,specHash(order.spec)]}));
  };
 }
 /** Key is server-only; neither the SDK nor a model receives it. */

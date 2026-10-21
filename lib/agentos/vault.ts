@@ -15,9 +15,18 @@ export const vaultABI=parseAbi([
  'function allowSeller(address seller,bool allowed)','function revoke(address executor)','function withdraw(uint256 amount)',
  'function execute(bytes32 id,address seller,uint256 amount,uint64 deadline,bytes32 specHash)',
 ]);
-export type VaultBinding={sessionId:string;chainId:number;escrow:Address;token:Address;seller:Address;vault:Address;executor:Address;owner:Address;epoch:string;perTaskCents:number;totalCents:number;dailyCents:number;expires:string;skills:Skill[];scope:string};
+export type VaultBinding={sessionId:string;chainId:number;escrow:Address;token:Address;seller:Address;sellers?:Address[];vault:Address;executor:Address;owner:Address;epoch:string;perTaskCents:number;totalCents:number;dailyCents:number;expires:string;skills:Skill[];scope:string};
 export type VaultSession=VaultBinding&{message:string;challengeExpiresAt:string;signature?:Hex;revokedAt?:string};
 const same=(a:string,b:string)=>a.toLowerCase()===b.toLowerCase();
+export function normalizedVaultSellers(defaultSeller:Address,input?:Address[]):Address[]{
+ const values=input??[];
+ if(!Array.isArray(values)||values.length>8||values.some(a=>typeof a!=='string'||!/^0x[0-9a-fA-F]{40}$/.test(a)||/^0x0{40}$/.test(a))||new Set(values.map(a=>a.toLowerCase())).size!==values.length)throw new DomainError('Vault sellers must be unique nonzero addresses.','FORBIDDEN');
+ const sellers=[...new Set([defaultSeller.toLowerCase(),...values.map(a=>a.toLowerCase())])].sort() as Address[];
+ if(sellers.length>8)throw new DomainError('Vault sessions support at most eight sellers.','FORBIDDEN');return sellers;
+}
+export function assertVaultSeller(binding:Pick<VaultBinding,'seller'|'sellers'>,seller:Address){
+ if(!(binding.sellers??[binding.seller]).some(a=>same(a,seller)))throw new DomainError('The signed Vault session does not permit this seller.','FORBIDDEN');
+}
 export async function inspectVault(client:PublicClient,deployment:WalletDeployment){
  if(!deployment.vault||!deployment.vaultExecutor)throw new DomainError('AgentVault is not configured.','UNAVAILABLE');
  if(await client.getChainId()!==deployment.chainId)throw new DomainError('Vault RPC has the wrong chain.','FORBIDDEN');
@@ -34,14 +43,17 @@ export async function inspectVault(client:PublicClient,deployment:WalletDeployme
 }
 export async function checkVaultBinding(client:PublicClient,deployment:WalletDeployment,binding:VaultBinding){
  const view=await inspectVault(client,deployment);
+ if(binding.sellers&&(canonical(binding.sellers)!==canonical(normalizedVaultSellers(deployment.seller,binding.sellers))))throw new DomainError('Vault seller authorization differs from its signed session.','FORBIDDEN');
  if(binding.chainId!==deployment.chainId||!same(binding.escrow,deployment.escrow)||!same(binding.token,deployment.token)||!same(binding.seller,deployment.seller)||!same(binding.vault,view.vault)||!same(binding.executor,view.executor)||!same(binding.owner,view.owner)||binding.epoch!==view.epoch.toString()||binding.expires!==view.grant[2].toString()||!view.seller||view.grant[2]<=view.now||view.grant[0]!==centsToToken(binding.perTaskCents,view.decimals)||view.grant[1]!==centsToToken(binding.dailyCents,view.decimals))throw new DomainError('Vault grant has expired, changed or been revoked.','FORBIDDEN');
+ const sellers=binding.sellers??[binding.seller];
+ if(!(await Promise.all(sellers.map(seller=>client.readContract({address:view.vault,abi:vaultABI,functionName:'sellers',args:[seller]})))).every(Boolean))throw new DomainError('A permitted Vault seller has been revoked.','FORBIDDEN');
  return view;
 }
-export async function prepareVaultSession(state:Workspace,ownerId:string,deployment:WalletDeployment,client:PublicClient,input:{buyer:Address;perTaskCents:number;totalCents:number;dailyCents?:number},id:string,now=new Date().toISOString()){
+export async function prepareVaultSession(state:Workspace,ownerId:string,deployment:WalletDeployment,client:PublicClient,input:{buyer:Address;perTaskCents:number;totalCents:number;dailyCents?:number;sellers?:Address[]},id:string,now=new Date().toISOString()){
  const view=await inspectVault(client,deployment);
  const dailyCents=input.dailyCents??input.totalCents;
  if(!same(input.buyer,view.owner)||!state.policy.active||!Number.isSafeInteger(input.perTaskCents)||!Number.isSafeInteger(input.totalCents)||!Number.isSafeInteger(dailyCents)||input.perTaskCents<1||input.totalCents<input.perTaskCents||dailyCents<input.totalCents||dailyCents>1000000)throw new DomainError('Vault limits or owner do not match.','FORBIDDEN');
- const binding:VaultBinding={sessionId:id,chainId:deployment.chainId,escrow:deployment.escrow,token:deployment.token,seller:deployment.seller,vault:view.vault,executor:view.executor,owner:view.owner,epoch:view.epoch.toString(),perTaskCents:input.perTaskCents,totalCents:input.totalCents,dailyCents,expires:view.grant[2].toString(),skills:[...state.policy.allowedSkills],scope:await digest({workspace:ownerId})};
+ const binding:VaultBinding={sessionId:id,chainId:deployment.chainId,escrow:deployment.escrow,token:deployment.token,seller:deployment.seller,...(input.sellers?{sellers:normalizedVaultSellers(deployment.seller,input.sellers)}:{}),vault:view.vault,executor:view.executor,owner:view.owner,epoch:view.epoch.toString(),perTaskCents:input.perTaskCents,totalCents:input.totalCents,dailyCents,expires:view.grant[2].toString(),skills:[...state.policy.allowedSkills],scope:await digest({workspace:ownerId})};
  if(view.grant[2]>view.now+86400n)throw new DomainError('Vault sessions may last at most 24 hours.');
  await checkVaultBinding(client,deployment,binding);
  const challengeExpiresAt=new Date(Date.parse(now)+300000).toISOString();

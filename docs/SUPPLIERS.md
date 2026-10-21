@@ -57,3 +57,6 @@ HTTPS 端点固定在服务端配置中，不接收买方自定义 URL。拒绝�
 `GET /api/suppliers` 仅向当前 owner 返回公开供应商描述；`sdk/agent-identity.ts` 提供授权/撤销与链上读回；`sdk/orders.ts` 使用 `executor: 'supplier'` 选择已配置供应商。改变密钥、地址或配置后需要身份持有者重新授权，新订单会固定新的描述。
 
 本地服务只监听 `127.0.0.1:7461`，拒绝浏览器 Origin 请求。`/testing` 与 `/stats` 仅用于此本地示例的故障注入和验收，不应暴露公网。公开部署仍需真实 RPC、注册表、HTTPS 供应商配置和相应服务认证；当前私有站点保持未配置状态。MCP/A2A 发现、通用第三方代码沙箱和生产 SLA 仍是扩展。
+
+
+The runtime also supports 1–8 configured suppliers, exact per-order descriptor routing, per-provider authentication and independent registry payment wallets. The historical default descriptor remains available. See [MULTI-SUPPLIERS](MULTI-SUPPLIERS.md) for the current directory/API/SDK, multi-payee Vault sessions and the separate pending automatic-fallback work.

@@ -16,7 +16,7 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
   const origin=new URL(appOrigin);if(!['127.0.0.1','localhost','[::1]'].includes(origin.hostname))throw new Error('Local chain requires a loopback app origin.');
   const provider=ganache.provider({logging:{quiet:true},chain:{hardfork:'shanghai',chainId:31337}});
   const client=createPublicClient({transport:custom(provider),cacheTime:0}),wallet=createWalletClient({transport:custom(provider),chain:null});
-  const [buyer,seller,forwarder,executor]=await wallet.getAddresses(),artifacts=compile();
+  const [buyer,seller,forwarder,executor,seller2]=await wallet.getAddresses(),artifacts=compile();
   async function deploy(name,args=[]){const hash=await wallet.deployContract({...artifacts[name],account:buyer,args,gas:6000000n});return(await client.waitForTransactionReceipt({hash})).contractAddress;}
   const token=await deploy('MockToken'),metadata=stringToHex('agentos-local-verifier:v1'),metadataHash=keccak256(metadata),escrow=await deploy('AgentEscrow',[token,forwarder,metadataHash]);
   await client.waitForTransactionReceipt({hash:await wallet.writeContract({address:token,abi:artifacts.MockToken.abi,functionName:'mint',args:[buyer,100000000n],account:buyer,gas:6000000n})});
@@ -38,18 +38,18 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
       if(req.method==='GET'&&match){const record=deliveries.get(match[2]);if(!record||match[1]==='artifact'&&!record.artifactText)return json(404,{error:'Delivery not ready.'});res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(match[1]==='dataset'?record.datasetText:record.artifactText);return;}
       if(req.method!=='POST')return json(404,{error:'Route not found.'});
       let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>65536)throw new Error('Local request too large.');}const body=JSON.parse(raw);
-      if(path==='/rpc'||path==='/seller-rpc'){
+      if(path==='/rpc'||path==='/seller-rpc'||path==='/seller2-rpc'){
         const {id,method,params=[]}=body;
-        const actor=path==='/seller-rpc'?seller:buyer;
+        const actor=path==='/rpc'?buyer:path==='/seller-rpc'?seller:seller2;
         if(!rpcMethods.has(method))return json(200,{jsonrpc:'2.0',id,error:{code:-32601,message:'Method is not enabled in the local test wallet.'}});
         if(method==='eth_accounts')return json(200,{jsonrpc:'2.0',id,result:[actor]});
         if(method==='personal_sign'){
-          const prefix=actor===seller?'AgentOS identity binding v1\n':'AgentOS chain reconciliation v1\n';
+          const prefix=actor!==buyer?'AgentOS identity binding v1\n':'AgentOS chain reconciliation v1\n';
           if(params[1]?.toLowerCase()!==actor.toLowerCase()||typeof params[0]!=='string'||!/^0x[0-9a-fA-F]+$/.test(params[0])||params[0].length>32770||!Buffer.from(params[0].slice(2),'hex').toString().startsWith(prefix))return json(200,{jsonrpc:'2.0',id,error:{code:-32602,message:'Local wallet only signs its AgentOS scoped challenge.'}});
           const account=privateKeyToAccount(provider.getInitialAccounts()[actor.toLowerCase()].secretKey);
           return json(200,{jsonrpc:'2.0',id,result:await account.signMessage({message:{raw:params[0]}})});
         }
-        const targets=(actor===seller?[registries.identityRegistry]:[token,escrow,vault,registries.reputationRegistry]).filter(address=>typeof address==='string');
+        const targets=(actor!==buyer?[registries.identityRegistry]:[token,escrow,vault,registries.reputationRegistry]).filter(address=>typeof address==='string');
         if(method==='eth_sendTransaction'&&(params[0]?.from?.toLowerCase()!==actor.toLowerCase()||!targets.some(address=>address.toLowerCase()===params[0]?.to?.toLowerCase())))return json(200,{jsonrpc:'2.0',id,error:{code:-32602,message:'Local wallet only signs its role-specific test contracts.'}});
         try{return json(200,{jsonrpc:'2.0',id,result:await provider.request({method,params})});}catch(error){return json(200,{jsonrpc:'2.0',id,error:{code:error.code??-32000,message:error.message}});}
       }

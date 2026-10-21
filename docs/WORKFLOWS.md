@@ -73,4 +73,4 @@ Use a freshly launched isolated local chain for changes to verifier formats: the
 
 ## Remaining scope
 
-This is bounded sequential composition with conditional skipping and earlier-step references. Parallel execution, multi-input merges, generic workflow template distribution, dynamic model replanning, multi-supplier routing and arbitrary plugin code remain separate work. All skills still use the supported transfer/result contracts. Public Sepolia/browser-wallet/DON acceptance and hosted deployment are separate gates; local success does not satisfy them.
+This is bounded sequential composition with conditional skipping and earlier-step references. Parallel execution, multi-input merges, generic workflow template distribution, dynamic model replanning, supplier-backed composed steps and arbitrary plugin code remain separate work. All skills still use the supported transfer/result contracts. Public Sepolia/browser-wallet/DON acceptance and hosted deployment are separate gates; local success does not satisfy them.

@@ -19,7 +19,7 @@ const input=z.object({skillDefinition:skillDefinitionSchema.optional(),dataset:z
 const https=z.string().url().max(4096).refine(s=>{const u=new URL(s);return u.protocol==='https:'&&!u.username&&!u.password&&!u.hash;});
 const verification=deliveryVerificationSchema;
 const schema=z.discriminatedUnion('action',[
-  z.object({action:z.literal('create'),vaultSessionId:z.string().uuid().optional(),executor:z.enum(['builtin','supplier']).default('builtin'),planner:z.enum(['deterministic','llm']).default('deterministic'),requestId:z.string().uuid(),title:z.string().trim().min(1).max(160),agentId:id,budget:z.number().int().positive().max(1000000),buyer:address,input:input.optional(),scenario:z.enum(['success','injection','interruption','invalid-delivery']).default('success'),timeoutSeconds:z.number().int().min(1).max(86400).default(300),spec:z.object({datasetUrl:https,artifactUrl:https,datasetHash:hash,verification:verification.optional()}).strict().optional()}).strict(),
+  z.object({action:z.literal('create'),vaultSessionId:z.string().uuid().optional(),executor:z.enum(['builtin','supplier']).default('builtin'),supplierId:z.string().regex(/^[a-z0-9-]{1,64}$/).optional(),planner:z.enum(['deterministic','llm']).default('deterministic'),requestId:z.string().uuid(),title:z.string().trim().min(1).max(160),agentId:id,budget:z.number().int().positive().max(1000000),buyer:address,input:input.optional(),scenario:z.enum(['success','injection','interruption','invalid-delivery']).default('success'),timeoutSeconds:z.number().int().min(1).max(86400).default(300),spec:z.object({datasetUrl:https,artifactUrl:https,datasetHash:hash,verification:verification.optional()}).strict().optional()}).strict(),
   z.object({action:z.literal('challenge'),orderId:id,transactionHash:hash}).strict(),
   z.object({action:z.literal('activate'),orderId:id,nonce:z.string().uuid(),signature:z.string().regex(/^0x[0-9a-fA-F]+$/).min(130).max(8194)}).strict(),
   z.object({action:z.literal('sync'),orderId:id,transactionHash:hash.optional()}).strict(),
@@ -42,8 +42,11 @@ export async function POST(request:Request){
    if(body.planner==='llm'&&!planner)throw new DomainError('Model service is not configured.','UNAVAILABLE');
    const bound=prior?prior.agentIdentity:snapshot.state.agentIdentities?.find(i=>i.agentId===body.agentId);
    const identity=bound?(prior?bound:await inspectIdentity(client,deployment,bound)):undefined;
-   if(body.executor==='supplier'){if(!supplier)throw new DomainError('Skill supplier is not configured.','UNAVAILABLE');if(!identity)throw new DomainError('Supplier execution requires an identity-bound order.');await authorizeSupplier(client,deployment,identity,supplier.descriptor);}
-   const {action:_,...fields}=body,draft={...fields,spec,input:normalized,...(body.planner==='llm'?{model:planner!.descriptor}:{}),...(identity?{agentIdentity:identity}:{}),...(body.executor==='supplier'?{supplier:supplier!.descriptor}:{})} as OrderDraft;
+   if(body.supplierId&&body.executor!=='supplier')throw new DomainError('Supplier selection requires supplier execution.');
+   const chosenSupplier=body.executor==='supplier'?prior?.supplier??supplier?.selectById(body.supplierId).descriptor:undefined;
+   if(prior&&body.supplierId!==undefined&&body.supplierId!==prior.supplier?.id)throw new DomainError('Request ID was already used with a different supplier.','IDEMPOTENCY_CONFLICT');
+   if(body.executor==='supplier'){if(!chosenSupplier)throw new DomainError('Skill supplier is not configured.','UNAVAILABLE');if(!identity)throw new DomainError('Supplier execution requires an identity-bound order.');await authorizeSupplier(client,deployment,identity,chosenSupplier);}
+   const {action:_,supplierId:__,...fields}=body,draft={...fields,spec,input:normalized,...(body.planner==='llm'?{model:planner!.descriptor}:{}),...(identity?{agentIdentity:identity}:{}),...(body.executor==='supplier'?{supplier:chosenSupplier!}:{})} as OrderDraft;
    const result=await updateWorkspace(ownerId,state=>createOrder(state,draft,deployment));if(draft.vaultSessionId&&!deferInline(request))scheduleOrders(ownerId,result.state,request);return Response.json({...result,order:findOrder(result.state,'chain-'+body.requestId)},{headers:{'Cache-Control':'no-store'}});
   }
   const {state}=await read(ownerId),order=findOrder(state,body.orderId);
