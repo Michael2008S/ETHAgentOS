@@ -1,0 +1,12 @@
+import {readFileSync,createReadStream} from 'node:fs';
+import {stat,writeFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {createConnection} from 'node:net';
+import {spawn} from 'node:child_process';
+import {resolve} from 'node:path';
+import {MEMORY_MODEL_ARTIFACT,LOCAL_MEMORY_MODEL} from '../lib/agentos/memory-model-artifact.ts';
+const manifest=JSON.parse(readFileSync('.sites-runtime/memory-model/runtime.json','utf8')),model=resolve(manifest.modelPath),hash=createHash('sha256');
+if(manifest.artifact?.sha256!==MEMORY_MODEL_ARTIFACT.sha256||(await stat(model)).size!==MEMORY_MODEL_ARTIFACT.bytes)throw Error('Memory model manifest differs from the pinned artifact.');for await(const bytes of createReadStream(model))hash.update(bytes);if(hash.digest('hex')!==MEMORY_MODEL_ARTIFACT.sha256)throw Error('Memory model SHA-256 mismatch.');
+const occupied=await new Promise(done=>{const socket=createConnection({host:'127.0.0.1',port:11437});socket.once('connect',()=>{socket.destroy();done(true);});socket.once('error',()=>done(false));});if(occupied)throw Error('Memory model port 11437 is occupied; inspect the existing service.');
+const child=spawn(resolve(process.env.AGENTOS_LLAMA_BIN||manifest.llamaBin),['--model',model,'--alias',LOCAL_MEMORY_MODEL.model,'--host','127.0.0.1','--port','11437','--embedding','--pooling','last','--ctx-size','8192','--batch-size','8192','--ubatch-size','8192','--n-gpu-layers',process.env.AGENTOS_MEMORY_GPU_LAYERS??(process.platform==='darwin'?'99':'0'),'--threads','4','--parallel','1','--no-ui'],{stdio:'inherit'});
+child.once('spawn',()=>{void writeFile('.sites-runtime/memory-model/process.json',JSON.stringify({parentPID:process.pid,childPID:child.pid,startedAt:new Date().toISOString(),alias:LOCAL_MEMORY_MODEL.model,revision:LOCAL_MEMORY_MODEL.revision,model},null,2));});for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>child.kill(signal));child.once('error',()=>{console.error('Memory model could not start.');process.exitCode=1;});child.once('exit',code=>{process.exitCode=code??1;});

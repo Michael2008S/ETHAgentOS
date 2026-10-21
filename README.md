@@ -145,7 +145,7 @@ SDK 的 `createTask` 支持 `input: { dataset: 'custom-transfers-v1', blockFrom:
 
 `GET /api/memory` 支持 `q`、`agentId`、`status`、`artifactsOnly`、`offset`、`limit`（1–50，默认 20）。搜索范围包含任务名、原输入、成果、执行事件和哈希；结果按创建时间倒序分页。`format=export` 导出全部匹配上下文，保留原输入、输出、事件和付款凭证，不受当前分页限制。只读取当前认证工作区，不会触发任务执行。
 
-SDK：`await os.memory({agentId:'sage',status:'completed',q:'research.eth'})`。这是持久任务记忆检索；尚未接入向量库或模型长期记忆。
+SDK：`await os.memory({agentId:'sage',status:'completed',q:'research.eth'})` 保留关键词检索。新增真实 Qwen3 向量语义检索、私有笔记与已付款成果审阅式采用；模型和来源版本变化会使旧索引失效，采用后清空工作流会话选择。运行 `npm run model:setup:memory`、`npm run model:memory` 和 `npm run demo:memory`，协议、迁移与隐私边界见 [SEMANTIC-MEMORY](docs/SEMANTIC-MEMORY.md)。
 
 ## 独立技能供应商
 
@@ -202,7 +202,7 @@ Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/
 公共 CRE 接入准备：新增符合 ERC165/生产 metadata 布局的 AgentEscrowReceiver、一次性工作流绑定、独立 R2 证据发布、自动结算事件发现与可复用分发器。同一份配置可发现新增订单；最终确认后的证据归档有持久恢复检查点。`npm run test:cre` 执行实际处理器的 SDK 专项测试，`npm run demo:cre-dispatcher` 验证临时 HTTPS/R2 与本地 EVM 的官方 CLI dry-run。实际公网部署、登记后的 DON 执行与真实钱包验收仍待完成；见 [PUBLIC-CRE](docs/PUBLIC-CRE.md) 和 [CRE-DISPATCHER](docs/CRE-DISPATCHER.md)。
 
 
-多供应商目录与独立收款：支持 1–8 家配置、按订单固定供应商、不同注册身份收款钱包，以及显式批准的多收款方 Vault 会话。运行 `npm run demo:multi-supplier`；配置、认证、SDK 和边界见 [MULTI-SUPPLIERS](docs/MULTI-SUPPLIERS.md)。当前按原供应商恢复；新供应商订单已有[签名报价](docs/SUPPLIER-QUOTES.md)，退款后自动改购仍待完善。完整本地演示现为 26 步，并记录仅限本地 MockToken 的测试资金预检。
+多供应商目录与独立收款：支持 1–8 家配置、按订单固定供应商、不同注册身份收款钱包，以及显式批准的多收款方 Vault 会话。运行 `npm run demo:multi-supplier`；配置、认证、SDK 和边界见 [MULTI-SUPPLIERS](docs/MULTI-SUPPLIERS.md)。新供应商订单已有[签名报价](docs/SUPPLIER-QUOTES.md)和[确认退款后的自动改购](docs/PURCHASE-ROUTES.md)。当前完整本地演示序列见 `scripts/demo-full.mjs`，包含仅限本地 MockToken 的测试资金预检。
 
 供应商签名报价：钱包页先查看签名价、收款方和有效期，再提交采购；修改草稿需重新报价。SDK 支持独立报价与显式采用，创建新供应商订单也会自动验证报价。运行 `npm run demo:quotes` 验证持久化重放、篡改拒绝和付款有效期。
 

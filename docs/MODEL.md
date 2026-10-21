@@ -48,4 +48,4 @@ npm run model:local
 
 建议不创建订单、不执行技能、不签名或转账；点击采用后仍需用户创建、注资和授权，运行时会再次检查价格、身份及能力。小模型分类可能不准确，用户需审核建议。`npm run demo:planning` 验证真实模型的两个不同目标、工作区无副作用以及 URL 注入拒绝。建议日志中的摘要不等同于模型提供商签名或链上证明。
 
-真实签名报价比较与采用协议、故障排除及 Vault 约束见 [PURCHASE-COMPARISON.md](PURCHASE-COMPARISON.md)。模型仍只做受限意图分类，动态目标拆解与自动故障改购尚未实现。
+真实签名报价比较与采用协议、故障排除及 Vault 约束见 [PURCHASE-COMPARISON.md](PURCHASE-COMPARISON.md)。此入口仍只做受限意图分类。多步目标规划、重规划和自动改购分别见 WORKFLOW-PLANNING.md、WORKFLOW-REPLANNING.md 和 PURCHASE-ROUTES.md。语义检索使用独立嵌入模型，见 SEMANTIC-MEMORY.md。

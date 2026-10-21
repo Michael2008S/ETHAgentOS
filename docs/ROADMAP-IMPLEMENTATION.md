@@ -10,7 +10,7 @@ User request: complete improvements in the review order, test and commit each it
 | 4 | Two-step workflow and memory references | Persisted dependencies, previous accepted artifact as next input, recovery without duplicate payment | Implemented; item validation below |
 | 5 | Public testnet and CRE settlement | Real wallet, registered workflow execution, actual forwarder payment/refund transactions; account access verified rather than assumed | In progress; receiver/publisher/reconciliation/reusable dispatcher implemented; public acceptance pending |
 | 6 | Third-party onboarding and hosted operation | New skill onboarding with integration acceptance; authenticated deployed consumer, monitoring and failure recovery | In progress; new skill and scoped consumer operations locally accepted; actual hosted operation remains open |
-| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 34-step HTTP/D1/EVM/model/supplier/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical 23-stage pass at aae3f7e remains scoped to that source. |
+| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 35-step HTTP/D1/EVM/model/supplier/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical 23-stage pass at aae3f7e remains scoped to that source. |
 
 The complete demo is a final gate after the individual changes. Public workflow deployment depends on actual account capabilities and configured infrastructure; local simulation does not satisfy item 5. No unattended schedule is enabled merely to represent deployment.
 
@@ -288,3 +288,21 @@ The complete demo is a final gate after the individual changes. Public workflow 
 旧链进程加载的验证器不因网页源代码同步而升级，故新建 5887/9255/8171/8172 的隔离环境；旧 5787/9155/8071/8072 服务、部署、D1 和签名历史均保留。当前环境见 `.sites-runtime/isolated-demo/current.json`。原始报告、类型检查修正前/后的日志、最终回归、CRE/WASM、启动记录与移动截图及逐文件 SHA-256 清单保存在 `outputs/validation-parallel-workflows-2026-10-22/`。
 
 协议见 [PARALLEL-WORKFLOWS.md](PARALLEL-WORKFLOWS.md)。本项已加入完整演示，现为 34 步，最终整套验收仍待其余功能完成后执行；增量回归不替代该关卡。语义记忆选择、通用插件、开放市场/信誉路由、独立钱包/细粒度链上授权与公网/实际 DON/托管运维验收仍在剩余范围；新 HTTPS 证据路径的官方 CLI 实测也保留为待网络恢复后的验收。继续按用户选择本地交付，不发布站点、启用托管调度或公共链广播，总体目标保持进行中。
+
+
+## 后续能力完善：真实多语言语义记忆与审阅式成果采用（2026-10-22，香港时间）
+
+- [x] 固定官方 Qwen3-Embedding-0.6B Q8_0 工件、文件大小及 SHA-256，独立本地模型端口 11437；查询使用固定指令，1024 维输出投影并归一化为 256 维向量。模型设置、版本和指令绑定配置摘要，独立服务密钥，拒绝无效输出，不以关键词替代推理失败。启动器、doctor 和运行状态已接通。
+- [x] 对工作区任务快照、已付款成果汇总和私有笔记显式建立索引，摘要批次与字符数受限；原转账明细、分配列表、钱包签名及密钥不会自动进入模型。D1 独立存储向量、修订笔记和请求，不扩大主工作区 JSON。当前精确扫描上限 700 份，笔记上限 100，非无限向量数据库。
+- [x] 严格 owner API/SDK、模型及来源版本失效、部分覆盖展示、持久查询凭证、丢响应同编号重试、90 秒 fencing 租约、推理后 CAS 与原子写入、清除在途请求后迟到结果拒绝写入。笔记 CAS 修改使旧向量失效，删除原子移除关联向量与包含正文的已存查询，不删除无关历史。
+- [x] 中英文记忆页与钱包工作流入口接通；跨页只传递查询审阅游标。采用必须在 15 分钟内核验当前买方、部署、规范付款和完整成果血缘；采用只更新输入且清空已选 Vault 会话，不采购或扩大授权。后续创建与执行继续重新核验原付款根。
+
+迁移 0004 先通过 SQLite 在线备份，再只升级当前隔离数据库；原工作区及作业快照摘要完全一致，记录在 outputs/validation-semantic-memory-2026-10-22/migration.json。旧运行环境和历史均保留。
+
+真实模型 HTTP/D1/SDK、两个独立签名供应商、官方 ERC-8004/Vault/本地 EVM 四组验收通过：outputs/semantic-memory-demo-ec070b24-b583-4dc3-b75b-d82d447dfbb8.json。中文检索将英文科研资助付款报告排在无关库存付款成果之前，实际相似度为 0.791099 与 0.468512；查询丢响应复用同一保存结果。另验证跨工作区、错买方、笔记冒充付款成果、模型漂移、同源及消费者限制；笔记修改失效和定向删除。采用原成果后只新购后续两步，共四笔唯一注资及付款、1160 分、一次买方会话签名，原付款 hash、余额与沙盒账本吻合，五个作业完成且 pending/leased/dead 为零。
+
+首次浏览器专项因快速轮询未等待队列再次可用而过早读取空 settlement；改为有界状态等待，并将同一原订单继续推进至 completed，保留失败截图、日志和恢复记录。后续专项通过笔记修订、真实跨语言查询、丢响应后刷新同编号重试、跨页审阅、采用清空会话、刷新保持输入、显式重新授权选择后两步付款，以及中英文和移动宽度。
+
+本项独立协议见 [SEMANTIC-MEMORY](SEMANTIC-MEMORY.md)。语义检索是显式审阅工具，不代表自动将任意历史注入所有规划、模型推理证明或加密记忆。当前完整演示新增 demo:memory，现为 35 步，最终整套验收仍在其余功能完成后执行。通用插件、开放市场/信誉路由、独立钱包/细粒度链上授权与公网/真实 DON/托管运维仍待继续；此前新 HTTPS 证据入口的官方 CLI 网络验收也保持待完成。继续本地交付，不发布站点、启用托管调度或公共链广播，总体目标保持进行中。
+
+本项最终回归：198/198 Node、19/19 Chromium、6/6 CRE SDK 测试（92 assertions）、网站/CRE 类型检查和生产构建通过；六项语义协议/SQLite 测试包含任务摘要不发送明细及 SDK 拒绝畸形/越界响应。首轮完整浏览器 17/19，通过项保留；两项旧测试因新增折叠区导致 summary 选择器不唯一，在采购前停止。收紧为面板自身展开按钮后完整 19 项通过。doctor 新增嵌入模型探测通过，默认工作区暂无身份的提醒保留，不影响隔离测试工作区已验证的身份/订单。原始日志、模型工件描述、真实报告、迁移备份记录、失败/通过截图和逐文件 SHA-256 见 outputs/validation-semantic-memory-2026-10-22/verification.json。

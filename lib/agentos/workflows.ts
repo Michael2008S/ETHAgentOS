@@ -57,6 +57,7 @@ export async function createWorkflow(state:Workspace,raw:WorkflowDraft,deploymen
  const session=state.vaultSessions?.find(s=>s.sessionId===draft.vaultSessionId);
  if(!session?.signature||session.revokedAt||session.owner.toLowerCase()!==draft.buyer.toLowerCase())throw new DomainError('An active owner Vault session is required.','FORBIDDEN');
  if(!state.policy.active)throw new DomainError('Execution permission has been revoked.','FORBIDDEN');
+ memoryParent(state,{input,buyer:draft.buyer,deployment});
  const legacy=!draft.steps,definitions:WorkflowStepDraft[]=draft.steps??draft.agentIds.map((agentId,index)=>({agentId,budget:draft.budgets[index],input:index===0?{from:'original'}:{from:'step',step:0}}));
  if(definitions.length<2&&!replan)throw new DomainError('Initial workflows require at least two steps.');
  const supplierMode=definitions.some(s=>s.supplierId);

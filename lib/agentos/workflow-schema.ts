@@ -1,8 +1,9 @@
 import {z} from 'zod';
 import {transferSourceSchema} from './transfer-source.ts';
 import {MAX_WORKFLOW_STEPS} from './workflow-state.ts';
+import {acceptedArtifactSchema} from './artifact-memory.ts';
 const id=z.string().min(1).max(128),integer=z.number().int().nonnegative().safe(),budget=integer.positive().max(1000000);
-export const workflowInputSchema=z.object({dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:integer,blockTo:integer,source:transferSourceSchema.optional(),records:z.array(z.object({block:integer,from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:integer}).strict()).min(1).max(100).optional()}).strict();
+export const workflowInputSchema=z.object({dataset:z.enum(['eth-shenzhen-fixture-v1','custom-transfers-v1']),blockFrom:integer,blockTo:integer,source:transferSourceSchema.optional(),memory:z.lazy(()=>acceptedArtifactSchema).optional(),records:z.array(z.object({block:integer,from:z.string().min(1).max(128),to:z.string().min(1).max(128),cents:integer}).strict()).min(1).max(100).optional()}).strict();
 const stepIndex=z.number().int().min(0).max(MAX_WORKFLOW_STEPS-1);
 export const workflowConditionSchema=z.object({step:stepIndex,field:z.enum(['concentrated','totalCents','transferCount','uniqueRecipients','accountCount']),operator:z.enum(['eq','gte','lte']),value:z.union([integer,z.boolean()])}).strict();
 export const parallelismSchema=z.number().int().min(2).max(4);

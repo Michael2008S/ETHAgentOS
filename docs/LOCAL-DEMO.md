@@ -8,6 +8,7 @@
 - 本地 EVM：`127.0.0.1:8545`。此链是临时链，重启会重建部署；旧 D1 记录仍保留原部署信息，需要重新注册/绑定身份和新建订单。
 - Qwen：`127.0.0.1:11435`，真实 llama.cpp CPU 推理。
 - 工作流规划模型：`127.0.0.1:11436`，独立的固定版本 Qwen 3B；默认 macOS GPU offload，可切换 CPU。
+- 语义记忆嵌入模型：`127.0.0.1:11437`，固定版本 Qwen3-Embedding-0.6B，独立于规划模型。
 - 独立技能供应商：`127.0.0.1:7461`，签名交付与幂等日志。
 - 本地恢复 worker：独立于浏览器轮询 D1 持久化队列。
 
@@ -23,6 +24,7 @@ npm run build
 npm run db:local # 仅全新数据库；旧版本升级见 RUNTIME-QUEUE.md
 npm run model:setup # 首次下载固定版本及校验模型
 npm run model:setup:planning # 首次下载并校验独立规划模型，约 2.1 GB
+npm run model:setup:memory # 首次下载并校验语义嵌入模型，约 639 MB
 ```
 
 安装完成后，推荐使用一个前台启动器：
@@ -36,13 +38,15 @@ npm run demo:showcase -- --fresh
 npm run demo:evidence
 ```
 
-启动器复用健康服务，拒绝覆盖未知端口，退出仅停止自己启动的子进程；日志在 `.sites-runtime/demo/`。`demo:prepare` 只补不足的测试代币、注册/绑定 Atlas 并授权供应商，不重置历史或重新启用撤销策略。也可继续分别运行 chain:local、model:local、model:planning、supplier:local、dev、worker。
+启动器复用健康服务，拒绝覆盖未知端口，退出仅停止自己启动的子进程；日志在 `.sites-runtime/demo/`。`demo:prepare` 只补不足的测试代币、注册/绑定 Atlas 并授权供应商，不重置历史或重新启用撤销策略。也可继续分别运行 chain:local、model:local、model:planning、model:memory、supplier:local、dev、worker。
 
 旧数据库升级还需应用 `drizzle/0002_dazzling_lady_bullseye.sql`，新增消费者联系状态表；不要对已有数据库重复运行全量 db:local。
 
 不要为重试一个失败请求而重启或重置整条链。SQLite/D1、模型与签名日志的持久化目录也应保留。
 
 ## 演示路线
+
+任务记忆页可保存私有知识笔记并显式建立索引，再用中文或英文按语义检索。已付款成果可跳转钱包审阅并填入工作流输入，采用会清空已选会话，重新审阅并选择授权后才采购；不会重复购买原成果。`npm run demo:memory` 的真实模型、D1 和本地链验收见 [SEMANTIC-MEMORY](SEMANTIC-MEMORY.md)。旧数据库升级到 0003 后需备份并单独应用 0004，不要重放全量建库。
 
 工作流可先保存为版本化模板，再导出/导入并显式绑定服务。套用只更新编辑器，保留当前输入并清空 Vault 会话选择；重新审阅并选择会话后启动。`npm run demo:workflow-templates` 实跑同一模板在两份输入上的独立采购，详见 [WORKFLOW-TEMPLATES](WORKFLOW-TEMPLATES.md)。
 

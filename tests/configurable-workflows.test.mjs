@@ -19,6 +19,8 @@ import {specHash,verifyDelivery,resultHash,acceptedMemoryRecords} from '../cre/w
 import {prepareVaultSession,vaultABI,vaultAllowance} from '../lib/agentos/vault.ts';
 import {vaultFunder} from '../lib/agentos/vault-executor.ts';
 import {workItems} from '../lib/agentos/queue.ts';
+import {memoryDocuments,adoptMemorySearch} from '../lib/agentos/semantic-memory.ts';
+import {digest} from '../lib/agentos/engine.ts';
 
 const definition=JSON.parse(readFileSync('examples/skills/treasury-concentration.json','utf8'));
 const input={dataset:'custom-transfers-v1',blockFrom:1,blockTo:3,records:[{block:1,from:'treasury',to:'a',cents:123},{block:2,from:'treasury',to:'b',cents:456},{block:3,from:'treasury',to:'a',cents:100}]};
@@ -42,6 +44,15 @@ async function fixture(){
  return {provider,client,wallet,seller,write,buyer,deployment,session,store,publish,chain,fund,draft,run,get state(){return state;},get counts(){return {fundCalls,publishes};}};
 }
 const step=(agentId,source='original',when)=>({agentId,budget:400,input:source==='original'?{from:'original'}:{from:'step',step:source},...(when?{when}:{})});
+
+test('reviewed semantic selection rechecks canonical ownership before reusing a paid result as a new workflow input',async()=>{
+ const f=await fixture();try{
+  await f.store.updateWorkspace('owner',s=>createWorkflow(s,f.draft([step('sage'),step('atlas',0)]),f.deployment,f.publish));await f.run(f.state.workflows[0].id);const parentId=f.state.workflows[0].steps[0].orderId,documents=await memoryDocuments(f.state,[]),hit=documents.find(d=>d.orderId===parentId),stamp=Date.now(),terms={version:'agentos.semantic-search.v1',id:crypto.randomUUID(),scope:f.session.scope,model:{provider:'embeddings',model:'controlled-selector',revision:'1',inputDimensions:32,dimensions:32,configHash:f.session.scope},query:'reuse the accepted allocation result',filters:{kind:'paid-order',agentId:'',buyer:f.buyer},limit:1,minScore:0.35,createdAt:new Date(stamp).toISOString(),expiresAt:new Date(stamp+900000).toISOString(),coverage:{eligible:documents.length,indexed:documents.length,pending:0},items:[{...hit,score:0.9}]},search={...terms,digest:await digest(terms)},params={digest:search.digest,documentId:hit.documentId,buyer:f.buyer},before=f.state.chainOrders.length;
+  const selected=await adoptMemorySearch(f.state,[],search,params,f.session.scope,f.deployment,f.chain);assert.equal(selected.input.memory.orderId,parentId);assert.equal(f.state.chainOrders.length,before);await assert.rejects(adoptMemorySearch(f.state,[],search,{...params,buyer:f.seller},f.session.scope,f.deployment,f.chain),/owned by this wallet/);await assert.rejects(adoptMemorySearch(f.state,[],search,params,'0x'+'11'.repeat(32),f.deployment,f.chain),/another workspace/);
+  const settlement=f.chain.settlement;f.chain.settlement=async(o,h)=>o.id===parentId?{...o.settlement,status:'refunded'}:settlement(o,h);await assert.rejects(adoptMemorySearch(f.state,[],search,params,f.session.scope,f.deployment,f.chain),/canonical/);f.chain.settlement=settlement;
+  const draft={...f.draft([step('atlas'),step('sage',0)]),input:selected.input};await f.store.updateWorkspace('owner',s=>createWorkflow(s,draft,f.deployment,f.publish));await f.run('workflow-'+draft.requestId);assert.equal(f.state.workflows[0].status,'completed');assert.equal(f.state.chainOrders.length,4);assert.equal(f.counts.fundCalls,4);const child=findOrder(f.state,f.state.workflows[0].steps[0].orderId);assert.equal(child.input.memory.orderId,parentId);assert.equal(child.output.totalCents,679);
+ }finally{await f.provider.disconnect();}
+});
 
 test('parallel roots reserve all fees, share one durable scheduler and merge every canonical paid artifact exactly once',async()=>{
  const f=await fixture();try{

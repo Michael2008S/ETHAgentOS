@@ -10,6 +10,7 @@ import type {SupplierDescriptor} from '@/lib/agentos/supplier';
 import type {Agent,TaskInput} from '@/lib/agentos/types';
 import {submissionIntent} from '@/lib/agentos/client-intent';
 import {useLanguage} from '@/lib/i18n/context';
+import {SemanticMemoryPanel} from './semantic-memory-panel';
 import {WorkflowRepairPanel} from './workflow-repair-panel';
 import {WorkflowPlanningPanel} from './workflow-planning-panel';
 import {WorkflowTemplatePanel} from './workflow-template-panel';
@@ -33,6 +34,7 @@ export function WorkflowPanel({scope,session,agents,sessions,orders,busy,perform
   {error&&<p role="alert">{tr(error)}</p>}
   <WorkflowRepairPanel scope={scope} session={session} sessions={sessions} workflows={workflows} orders={orders} busy={busy} perform={perform}/>
   <WorkflowPlanningPanel workflows={workflows} orders={orders} scope={scope} session={session} sessions={sessions} input={editor.input} inputReady={loaded===draftKey} busy={busy} perform={perform} onAccepted={refresh}/>
+  <SemanticMemoryPanel scope={scope} agents={agents} session={session} busy={busy||loaded!==draftKey} onAdopt={input=>save({...editor,input:JSON.stringify(input,null,2),sessionId:''})}/>
   <WorkflowTemplatePanel scope={scope} agents={agents} suppliers={suppliers} busy={busy} ready={loaded===draftKey} perform={perform} source={()=>({steps:readSteps(),timeoutSeconds:Number(editor.timeout),...(editor.parallelism!=='sequential'?{parallelism:Number(editor.parallelism)}:{})})} onApply={draft=>save({...editor,parallelism:draft.parallelism?String(draft.parallelism):'sequential',title:draft.title,sessionId:'',timeout:String(draft.timeoutSeconds),steps:draft.steps.map(s=>({...newStep(s.agentId,(s.budget/100).toFixed(2),s.input.from==='step'?String(s.input.step):s.input.from==='merge'?'merge':'original'),...(s.input.from==='merge'?{mergeSteps:s.input.steps}:{}),...(s.supplierId?{supplierId:s.supplierId}:{}),...(s.when?{condition:String(s.when.step),field:s.when.field,operator:s.when.operator,value:String(s.when.value)}:{})}))})}/>
   <form onSubmit={event=>{event.preventDefault();void perform(async()=>{
    const steps=readSteps();
