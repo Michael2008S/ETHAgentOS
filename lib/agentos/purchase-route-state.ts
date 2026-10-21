@@ -1,0 +1,13 @@
+import type {Address} from 'viem';
+import type {Workspace,TaskInput,Skill} from './types.ts';
+import type {WalletDeployment} from '../../sdk/wallet.ts';
+import type {SupplierQuote} from './supplier-quote.ts';
+import type {SupplierDescriptor} from './supplier.ts';
+import type {AgentIdentity} from './identity.ts';
+export type RouteOfferDraft={agentId:string;supplierId:string;supplierQuote:SupplierQuote};
+export type PurchaseRouteDraft={requestId:string;title:string;buyer:Address;vaultSessionId:string;input?:TaskInput;totalBudget:number;timeoutSeconds:number;strategy:'priority'|'lowest-price';offers:RouteOfferDraft[]};
+export type RouteRefundProof={kind:'refunded'|'unsent';checkedAt:string;transactionHash?:string;blockNumber?:string;blockHash?:string;finalizedBlock?:string;finalizedBlockHash?:string};
+export type RouteOffer=RouteOfferDraft&{supplier:SupplierDescriptor;identity:AgentIdentity;orderId?:string;refundProof?:RouteRefundProof};
+export type PurchaseRoute=Omit<PurchaseRouteDraft,'offers'|'input'>&{version:'agentos.purchase-route.v1';id:string;workspaceHash:string;deployment:WalletDeployment;skill:Skill;input:TaskInput;offers:RouteOffer[];status:'running'|'blocked'|'completed'|'cancelled'|'exhausted';createdAt:string;updatedAt:string;lastError?:string;notBefore?:string;completedOrderId?:string};
+export const pendingPurchaseRoutes=(state:Workspace)=>(state.purchaseRoutes??[]).filter(r=>r.status==='running');
+export const futureRouteOffers=(state:Workspace)=>(state.purchaseRoutes??[]).filter(r=>['running','blocked'].includes(r.status)).flatMap(route=>route.offers.filter(offer=>!offer.orderId).map(offer=>({route,offer})));

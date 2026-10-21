@@ -4,6 +4,9 @@ import { apiFailure } from '@/lib/agentos/api-failure';
 import { pendingOrders } from '@/lib/agentos/orders';
 import { configuredOrderChain } from '@/lib/agentos/order-runtime';
 import { runOrder } from '@/lib/agentos/order-runner';
+import {pendingPurchaseRoutes} from '@/lib/agentos/purchase-route-state';
+import {runPurchaseRoute} from '@/lib/agentos/purchase-route-runner';
+import {purchaseRouteAccess} from '@/lib/agentos/purchase-route-runtime';
 import {pendingWorkflows} from '@/lib/agentos/workflows';
 import {workflowPublisher} from '@/lib/agentos/workflow-runtime';
 import {runWorkflow} from '@/lib/agentos/workflow-runner';
@@ -20,8 +23,10 @@ export async function POST(request: Request) {
     if(orders.length){const {chain,planner,supplier,supplierAuthority,vaultFunder}=await configuredOrderChain(request);for(const order of orders)orderResults.push(await runOrder({read,updateWorkspace},ownerId,order.id,chain,{planner,supplier,supplierAuthority,vaultFunder}));}
     const workflows=pendingWorkflows((await read(ownerId)).state).slice(0,4),workflowResults=[];
     if(workflows.length){const configured=await configuredOrderChain(request);for(const workflow of workflows)workflowResults.push(await runWorkflow({read,updateWorkspace},ownerId,workflow.id,configured.chain,workflowPublisher(configured),configured));}
+    const routes=pendingPurchaseRoutes((await read(ownerId)).state).slice(0,4),routeResults=[];
+    if(routes.length){const configured=await configuredOrderChain(request);for(const route of routes)routeResults.push(await runPurchaseRoute({read,updateWorkspace},ownerId,route.id,purchaseRouteAccess(configured),configured));}
     const current = await read(ownerId);
-    return Response.json({...current, runtime:{results,orderResults,workflowResults,pending:pendingTasks(current.state).length+pendingOrders(current.state).length+pendingWorkflows(current.state).length}}, {headers:{'Cache-Control':'no-store'}});
+    return Response.json({...current, runtime:{results,orderResults,workflowResults,routeResults,pending:pendingTasks(current.state).length+pendingOrders(current.state).length+pendingWorkflows(current.state).length+pendingPurchaseRoutes(current.state).length}}, {headers:{'Cache-Control':'no-store'}});
   } catch (error) {
     return apiFailure(error,'runtime');
   }

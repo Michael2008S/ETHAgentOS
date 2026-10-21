@@ -19,6 +19,7 @@
 - 可选 LLM 工具规划器：真实本地 Qwen 推理，模型计划经过 capability gate，失败退款；可导出模型描述、操作、哈希与 token 用量。
 - ERC-8004 身份与信誉：官方合约本地部署、注册文档与钱包绑定、持有者签名、开单时固定身份、只计已付款订单的评价与撤销。
 - 独立技能供应商：链上授权交付签名地址、预注资后 HTTP 执行、独立复算、签名成果日志与重启恢复。
+- 自动采购改购：审核多份供应商签名报价，预留全部尝试的累计额度；确认原订单退款后购买另一家服务，支持持久队列、取消、撤销及崩溃恢复。
 - 使用真实 `@chainlink/cre-sdk` 的工作流源码与 TypeScript 客户端 SDK。
 
 ## 状态边界
@@ -193,4 +194,6 @@ Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/
 
 供应商签名报价：钱包页先查看签名价、收款方和有效期，再提交采购；修改草稿需重新报价。SDK 支持独立报价与显式采用，创建新供应商订单也会自动验证报价。运行 `npm run demo:quotes` 验证持久化重放、篡改拒绝和付款有效期。
 
-付款前真实报价比较：`npm run demo:quote-planning` 验证双供应商独立签名价格、真实 Qwen 建议、原报价采用、失效拒绝与 Vault 付款。协议及限制见 [PURCHASE-COMPARISON.md](docs/PURCHASE-COMPARISON.md)。自动退款确认后改购仍待实现。
+付款前真实报价比较：`npm run demo:quote-planning` 验证双供应商独立签名价格、真实 Qwen 建议、原报价采用、失效拒绝与 Vault 付款。协议及限制见 [PURCHASE-COMPARISON.md](docs/PURCHASE-COMPARISON.md)。退款确认后的自动改购现已提供，见下方说明。
+
+自动改购：`npm run demo:purchase-routes` 验证审核多个签名报价后，确认原订单退款再购买另一家供应商服务；预留全部尝试的总额度，支持崩溃恢复、取消和撤销。SDK、界面与验证边界见 [PURCHASE-ROUTES.md](docs/PURCHASE-ROUTES.md)。

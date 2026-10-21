@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import ganache from 'ganache';
-import { createPublicClient,createWalletClient,custom,keccak256,parseAbi,stringToHex } from 'viem';
+import { createPublicClient,createWalletClient,custom,decodeEventLog,keccak256,parseAbi,stringToHex } from 'viem';
 import { compile } from '../scripts/compile-contracts.mjs';
+import {deployIdentityRegistries} from '../scripts/compile-identity.mjs';
+import {identityDocument,verifyRegistration} from '../lib/agentos/identity.ts';
+import {identityABI,completeRegistrationDocument,registrationDataURI} from '../sdk/identity.ts';
 import { AgentWalletSession,inputEvidence } from '../sdk/wallet.ts';
 import { encodeSettlementReport,escrowABI } from '../sdk/chain.ts';
 import { specHash,verifyDelivery } from '../cre/workflow/verify.ts';
@@ -23,7 +26,7 @@ test('pre-funded runtime executes only after escrow, pays once, refunds rejectio
  const specifications=new Map(),data=new Map(),artifacts=new Map(),transactions=new Map();
  try{
   const token=await deploy('MockToken'),metadata=stringToHex('order-test'),escrow=await deploy('AgentEscrow',[token,forwarder,keccak256(metadata)]),deployment={mode:'local',chainId:31337,token,escrow,forwarder,metadataHash:keccak256(metadata),confirmations:1,seller,deployedBlock:'0'};
-  await write(token,contracts.MockToken.abi,'mint',[buyer,100000000n]);const wallet=await AgentWalletSession.connect(provider,deployment,false),ledger=structuredClone(state.ledger);
+  await write(token,contracts.MockToken.abi,'mint',[buyer,100000000n]);let wallet=await AgentWalletSession.connect(provider,deployment,false);const ledger=structuredClone(state.ledger);
   const access=orderChain(client,deployment,async(path,body)=>{
    if(path==='/artifacts'){if(artifacts.has(body.id))assert.equal(artifacts.get(body.id),body.artifactText);artifacts.set(body.id,body.artifactText);return {};}
    if(!transactions.has(body.id))transactions.set(body.id,(async()=>{
@@ -34,9 +37,9 @@ test('pre-funded runtime executes only after escrow, pays once, refunds rejectio
    })());return transactions.get(body.id);
   });
   function specHashValue(id){return keccak256(stringToHex(data.get(id)));}
-  async function draft(scenario='success',model,supplier){
+  async function draft(scenario='success',model,supplier,identity){
    const requestId=crypto.randomUUID(),input={dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:[{block:0,from:'x',to:'ignored',cents:999},{block:1,from:'x',to:'a',cents:123},{block:2,from:'x',to:'b',cents:456}]},bytes=inputEvidence({id:'chain-'+requestId,input,skill:'event-analysis'},buyer),spec={datasetUrl:'https://data.example/'+bytes.id,artifactUrl:'https://artifact.example/'+bytes.id,datasetHash:bytes.datasetHash,verification:bytes.verification};
-   specifications.set(bytes.id,spec);data.set(bytes.id,bytes.datasetText);state=await createOrder(state,{requestId,title:'Pre-funded '+scenario,agentId:'atlas',budget:1000,buyer,input,spec,scenario,timeoutSeconds:300,...(model?{planner:'llm',model}:{} ),...(supplier?{executor:'supplier',supplier,agentIdentity:{registry:forwarder,registryAgentId:'0',owner:seller,wallet:seller,documentHash:keccak256(metadata)}}:{})},deployment);return state.chainOrders[0];
+   specifications.set(bytes.id,spec);data.set(bytes.id,bytes.datasetText);state=await createOrder(state,{requestId,title:'Pre-funded '+scenario,agentId:'atlas',budget:1000,buyer,input,spec,scenario,timeoutSeconds:300,...(model?{planner:'llm',model}:{} ),...(supplier?{executor:'supplier',supplier,agentIdentity:identity}:{})},deployment);return state.chainOrders[0];
   }
   async function fund(order){const evidence=await wallet.fundOrder(order,120);state=(await authorizeOrder(state,order.id,'owner',evidence.transactionHash,crypto.randomUUID())).state;const current=await access.funding(findOrder(state,order.id),evidence.transactionHash);state=activateOrder(state,order.id,findOrder(state,order.id).authorization.nonce,current);return evidence;}
   const first=await draft();await runOrder(store,'owner',first.id,access);assert.equal(findOrder(state,first.id).output,null);assert.equal(artifacts.size,0);assert.equal(findOrder(state,first.id).status,'awaiting-funding');
@@ -71,8 +74,12 @@ test('pre-funded runtime executes only after escrow, pays once, refunds rejectio
   const supplier=await createSupplier(supplierModule.parseSupplierConfiguration({url:'https://skills.example/v1/execute',id:'controlled',name:'Controlled supplier',revision:'1',signer:supplierAccount.address,skills:['event-analysis']}),authorize,undefined,async(_,init)=>{
    supplierCalls++;const request=JSON.parse(init.body),output={dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,transferCount:2,totalCents:579,uniqueRecipients:2},payload={version:'agentos.skill-delivery.v1',requestHash:await engine.digest(request),configHash:request.supplier.configHash,jobId:supplierModule.supplierJobId(request),outputHash:await engine.digest(output),output,issuedAt:new Date().toISOString()};return Response.json({payload,signature:await supplierAccount.signMessage({message:supplierModule.supplierReceiptMessage(payload)})});
   });
+  Object.assign(deployment,await deployIdentityRegistries(client,signer,buyer));wallet=await AgentWalletSession.connect(provider,deployment,false);
+  const identityDraft=await identityDocument(state,'owner','atlas','http://localhost'),registrationHash=await write(deployment.identityRegistry,identityABI,'register',[identityDraft.agentURI],seller),registrationReceipt=await client.getTransactionReceipt({hash:registrationHash}),registered=registrationReceipt.logs.map(log=>{try{return decodeEventLog({abi:identityABI,eventName:'Registered',data:log.data,topics:log.topics}).args;}catch{return null;}}).find(Boolean),registryAgentId=String(registered.agentId);
+  await write(deployment.identityRegistry,identityABI,'setAgentURI',[BigInt(registryAgentId),registrationDataURI(completeRegistrationDocument(identityDraft.document,31337,deployment.identityRegistry,registryAgentId))],seller);
+  const realIdentity=await verifyRegistration(state,'owner','atlas',registryAgentId,registrationHash,'http://localhost',client,deployment),setDelegation=value=>write(deployment.identityRegistry,identityABI,'setMetadata',[BigInt(registryAgentId),supplierModule.SUPPLIER_METADATA_KEY,value],seller);await setDelegation(supplierModule.supplierMetadata(supplier.descriptor));
   for(const revoked of [false,true]){
-   const external=await draft('success',undefined,supplier.descriptor);await fund(external);await runOrder(store,'owner',external.id,access,{supplier,maxSteps:3});assert.equal(findOrder(state,external.id).step,3);assert.ok(findOrder(state,external.id).supplierDelivery);const beforeCalls=supplierCalls;authority=!revoked;
+   const external=await draft('success',undefined,supplier.descriptor,realIdentity);if(!revoked){const balance=(await wallet.balances()).token;await setDelegation('0x');await assert.rejects(wallet.fundOrder(external),/not authorized/);assert.equal((await wallet.balances()).token,balance);const logs=await client.getContractEvents({address:escrow,abi:escrowABI,eventName:'Opened',args:{id:inputEvidence(external,buyer).id},fromBlock:0n});assert.equal(logs.length,0);await setDelegation(supplierModule.supplierMetadata(supplier.descriptor));}await fund(external);await runOrder(store,'owner',external.id,access,{supplier,maxSteps:3});assert.equal(findOrder(state,external.id).step,3);assert.ok(findOrder(state,external.id).supplierDelivery);const beforeCalls=supplierCalls;authority=!revoked;
    await runOrder(store,'owner',external.id,access,{supplierAuthority:authorize});assert.equal(supplierCalls,beforeCalls);assert.equal(findOrder(state,external.id).settlement.status,revoked?'refunded':'paid');authority=true;
   }
   assert.equal((await wallet.balances()).token,'88000000');

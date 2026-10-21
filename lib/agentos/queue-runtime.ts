@@ -5,6 +5,8 @@ import { runTask } from './runner';
 import { runOrder } from './order-runner';
 import { configuredOrderChain } from './order-runtime';
 import {workflowPublisher} from './workflow-runtime';
+import {runPurchaseRoute} from './purchase-route-runner';
+import {purchaseRouteAccess} from './purchase-route-runtime';
 import {runWorkflow} from './workflow-runner';
 
 /** Durable checkpoints and expiring claims survive a killed request or consumer. */
@@ -34,6 +36,8 @@ export async function drainQueue(request: Request, ownerId?: string, intervalMs=
         const configured=await configuredOrderChain(request);
         const result=await runWorkflow(store,job.owner_id,job.task_id,configured.chain,workflowPublisher(configured),{...configured,maxSteps:3});
         failed=result.status==='retryable'&&!!result.error;
+      } else if(job.kind==='purchase'){
+        const configured=await configuredOrderChain(request);const result=await runPurchaseRoute(store,job.owner_id,job.task_id,purchaseRouteAccess(configured),{...configured,maxSteps:3});failed=result.status==='retryable'&&!!result.error;
       } else failed=true;
     } catch { failed=true; }
     // A read/ack failure leaves the lease for crash recovery; never claim completion.

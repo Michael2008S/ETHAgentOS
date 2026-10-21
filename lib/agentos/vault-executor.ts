@@ -1,3 +1,4 @@
+import {authorizeSupplier} from './supplier-chain.ts';
 import {verifyOrderQuote} from './supplier-quote.ts';
 import {orderSeller} from './order-parties.ts';
 import {createWalletClient,http,defineChain,type Hex,type PublicClient} from 'viem';
@@ -24,6 +25,7 @@ export function vaultFunder(client:PublicClient,deployment:WalletDeployment,send
   assertVaultSeller(order.vault,orderSeller(order));
   const view=await checkVaultBinding(client,deployment,order.vault),amount=centsToToken(order.quote,view.decimals),deadline=BigInt(order.vaultFunding.deadline);
   await verifyOrderQuote(order,Number(view.now));
+  if(order.executor==='supplier'){if(!order.agentIdentity||!order.supplier)throw new DomainError('An authorized supplier is required.','FORBIDDEN');await authorizeSupplier(client,deployment,order.agentIdentity,order.supplier);}
   if(deadline<=view.now||deadline>view.now+86400n||view.balance<amount||view.spent+amount>view.grant[1])throw new DomainError('Vault balance, deadline or daily allowance does not permit funding.','FORBIDDEN');
   return send(order,encodeFunctionData({abi:vaultABI,functionName:'execute',args:[bytes.id,orderSeller(order),amount,deadline,specHash(order.spec)]}));
  };

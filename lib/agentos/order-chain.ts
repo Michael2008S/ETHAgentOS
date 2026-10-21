@@ -31,6 +31,16 @@ export function orderChain(client:PublicClient,deployment:WalletDeployment,local
     verifySignature:(order:ChainOrder,message:string,signature:Hex)=>client.verifyMessage({address:order.buyer,message,signature}),
     async funding(order:ChainOrder,hash:Hex){const current=await inspect(order);if(![1,3].includes(current.status))throw new DomainError('A funded or refunded escrow is required for confirmation.');const evidence=await chain.verifyEvidence(current.intent,hash,'funding');if(order.supplierQuote)await verifyOrderQuote(order,Number((await client.getBlock({blockNumber:BigInt(evidence.blockNumber)})).timestamp));return {evidence,deadline:current.intent.deadline,chainNow:current.timestamp,currentStatus:current.status};},
     settlement:verifySettlement,
+    async refundFinality(order:ChainOrder){
+      if(order.settlement?.status!=='refunded')throw new DomainError('A verified refund is required.','CONFLICT');
+      const evidence=await verifySettlement(order,order.settlement.transactionHash);
+      if(evidence.status!=='refunded')throw new DomainError('Order has not been refunded.','CONFLICT');
+      const finalized=await client.getBlock({blockTag:deployment.mode==='testnet'?'finalized':'latest'});
+      if(finalized.number<BigInt(evidence.blockNumber))return null;
+      const [anchor,receiptBlock]=await Promise.all([client.getBlock({blockNumber:finalized.number}),client.getBlock({blockNumber:BigInt(evidence.blockNumber)})]);
+      if(!finalized.hash||anchor.hash!==finalized.hash||receiptBlock.hash!==evidence.blockHash)throw new DomainError('Refund finality anchor changed. Retry canonical verification.','CONFLICT');
+      return {evidence,finalizedBlock:finalized.number.toString(),finalizedBlockHash:finalized.hash};
+    },
     async completeEvidence(order:ChainOrder){
       if(!completeEvidence)return true;
       if(!order.settlement)throw new DomainError('A verified settlement is required before ready queue acknowledgement.','CONFLICT');
@@ -53,4 +63,4 @@ export function orderChain(client:PublicClient,deployment:WalletDeployment,local
     },
   };
 }
-export type OrderChain=ReturnType<typeof orderChain>;
+export type OrderChain=Omit<ReturnType<typeof orderChain>,'refundFinality'>&{refundFinality?:ReturnType<typeof orderChain>['refundFinality']};

@@ -1,6 +1,6 @@
 # Compare supplier-signed purchase offers
 
-`POST /api/purchase-plan` can compare real signed offers before any order is created. It keeps the existing goal classifier, and replaces unsigned local supplier price hints with independently verified provider prices. The result is advisory: the owner reviews it and explicitly adopts an offer. This does not implement autonomous replanning or refund-confirmed fallback.
+`POST /api/purchase-plan` can compare real signed offers before any order is created. It keeps the existing goal classifier, and replaces unsigned local supplier price hints with independently verified provider prices. The result is advisory: the owner reviews it and explicitly adopts an offer. This endpoint does not itself start an autonomous purchase. Refund-confirmed automatic routes are a separate explicit review/start flow; see [PURCHASE-ROUTES](PURCHASE-ROUTES.md).
 
 ## Request and catalog
 
