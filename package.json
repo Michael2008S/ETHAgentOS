@@ -73,7 +73,8 @@
     "demo:memory": "node scripts/demo-semantic-memory.mjs",
     "mcp:local": "node scripts/plugins/mcp-fixture.mjs",
     "plugins:local": "node scripts/plugins/service.mjs",
-    "demo:plugins": "node scripts/demo-plugins.mjs"
+    "demo:plugins": "node scripts/demo-plugins.mjs",
+    "demo:cleanup": "node scripts/demo-cleanup.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

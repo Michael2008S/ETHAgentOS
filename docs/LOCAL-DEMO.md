@@ -93,3 +93,12 @@ HTTP demo 使用独立测试工作区。链上集成 demo 使用本地测试代�
 `docs/VALIDATION.md` 记录测试数量、实际场景、证据文件及尚未验收的边界。每个完整功能均有独立代码提交。已有私有站点 v11 保留队列验证成果；本轮最终 API 修复按本地交付范围保存在代码中，未继续发布新站点版本，也未创建托管调度。
 
 资源使用：完成一项验收后停止已不用的本项目隔离实例与模型启动器，保留 D1、交易历史、供应商日志和模型文件。仅在模型场景或完整回归前按需启动 model:local、model:planning、model:memory；已停止模型时 doctor 会如实显示未就绪。不要用 killall node 或 killall llama-server 清理其他项目。
+
+安全清理命令（macOS，需 ps/lsof 权限）：
+
+- npm run demo:cleanup：只预览本仓库旧隔离实例；保留 current.json 对应实例和模型。
+- npm run demo:cleanup -- --apply：停止上述旧实例，不删除数据。
+- npm run demo:cleanup -- --apply --models：同时停止本项目模型启动器和子进程；仅在模型相关验证结束后执行。
+- npm run demo:cleanup -- --apply --all --models：结束整项工作后停止当前实例和已识别辅助服务。下次需要重新启动本地 demo。
+
+清理器通过工作目录、限定启动命令、父子关系及进程启动时间/命令摘要核验归属，逐次重查 PID 后只发送 SIGTERM。运行浏览器、Node 测试或完整演示时拒绝清理；不会停止任意 Node、编辑器或其他仓库进程。模型权重、D1、交易证据与日志均保留，报告保存到 outputs/process-cleanup-*.json。
