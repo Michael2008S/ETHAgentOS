@@ -15,6 +15,14 @@ test.beforeEach(async({context,page},info)=>{
 });
 test.afterEach(async({},info)=>{if(info.errorsSeen)expect(info.errorsSeen).toEqual([]);});
 const headers=info=>({'x-agentos-sandbox':info.annotations.find(a=>a.type==='sandbox').description});
+test('consumer credential is shown once, stays owner scoped and can be revoked in both languages',async({page},info)=>{
+ await page.goto('/#overview');const runtime=page.locator('#runtime-status');await runtime.getByText('恢复消费者访问',{exact:true}).click();await runtime.getByLabel('消费者名称',{exact:true}).fill('Browser recovery consumer');await runtime.getByLabel('凭证有效期',{exact:true}).selectOption('3600');await runtime.getByRole('button',{name:'签发消费者凭证',exact:true}).click();
+ const secret=runtime.getByLabel('消费者令牌',{exact:true});await expect(secret).toHaveAttribute('type','password');await expect.poll(()=>secret.evaluate(element=>/^aos_rt_[0-9a-f-]{36}\.[0-9a-f]{64}$/.test(element.value))).toBe(true);
+ const listed=await(await page.request.get('/api/runtime/consumers',{headers:headers(info)})).json();expect(listed.credentials).toHaveLength(1);expect(Object.keys(listed.credentials[0])).not.toContain('token');expect(Object.keys(listed.credentials[0])).not.toContain('secret_hash');
+ const cross=await page.request.get('/api/runtime/consumers',{headers:{'x-agentos-sandbox':'other-consumer-'+crypto.randomUUID()}});expect((await cross.json()).credentials).toHaveLength(0);
+ await page.reload();await runtime.getByText('恢复消费者访问',{exact:true}).click();await expect(runtime.getByLabel('消费者令牌',{exact:true})).toHaveCount(0);await expect(runtime.getByText('Browser recovery consumer',{exact:true})).toBeVisible();await runtime.getByRole('button',{name:'撤销消费者凭证',exact:true}).click();await expect(runtime.getByText('消费者凭证已撤销。',{exact:true})).toBeVisible();
+ await page.getByLabel('Switch to English',{exact:true}).click();await expect(runtime.getByText('Recovery consumer access',{exact:true})).toBeVisible();await expect(runtime.getByText('Browser recovery consumer',{exact:true}).locator('..')).toContainText('Revoked');await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);await runtime.screenshot({path:'outputs/consumer-browser-proof.png'});
+});
 test('a new skill installs without a grant, persists across reload and executes only after explicit permission',async({page},info)=>{
  const definition=JSON.parse(await readFile(new URL('../../examples/skills/treasury-concentration.json',import.meta.url),'utf8'));
  await page.goto('/#agents');const panel=page.getByRole('region',{name:'安装版本化技能'});

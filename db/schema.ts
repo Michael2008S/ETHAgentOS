@@ -26,4 +26,17 @@ export const runtimeConsumers = sqliteTable('agentos_runtime_consumers', {
   scope: text('scope').primaryKey(),
   lastSeen: integer('last_seen').notNull(),
   status: text('status').notNull(),
+  intervalMs: integer('interval_ms').notNull().default(2000),
 });
+
+export const consumerCredentials = sqliteTable('agentos_consumer_credentials', {
+  id: text('id').primaryKey(),
+  ownerId: text('owner_id').notNull(),
+  name: text('name').notNull(),
+  secretHash: text('secret_hash').notNull(),
+  createdAt: integer('created_at').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+  revokedAt: integer('revoked_at'),
+  lastUsedAt: integer('last_used_at'),
+  intervalMs: integer('interval_ms').notNull(),
+}, table => [index('consumer_credentials_owner').on(table.ownerId, table.expiresAt)]);

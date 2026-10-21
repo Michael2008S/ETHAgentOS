@@ -1,5 +1,5 @@
 import { owner, read } from '@/lib/agentos/store';
-import { DomainError } from '@/lib/agentos/engine';
+import {apiFailure} from '@/lib/agentos/api-failure';
 import { scheduleTasks } from '@/lib/agentos/background';
 import { scheduleOrders } from '@/lib/agentos/order-runtime';
 import { deferInline } from '@/lib/agentos/auth';
@@ -12,5 +12,5 @@ export async function GET(request: Request) {
     }
     return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
   }
-  catch (e) { return Response.json({ error: e instanceof Error ? e.message : 'Workspace unavailable.' }, { status: e instanceof DomainError && e.code === 'UNAUTHORIZED' ? 401 : 500 }); }
+  catch (e) { return apiFailure(e,'runtime'); }
 }

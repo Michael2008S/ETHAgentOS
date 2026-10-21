@@ -4,7 +4,7 @@
 
 `agentos_runtime_jobs` lives in the same D1 database as workspaces. A workspace compare-and-swap and its newly runnable jobs are committed in one D1 batch transaction. A losing reducer cannot publish orphan work. The migration backfills automatic legacy tasks and funded orders; manual test tasks and unfunded drafts are excluded.
 
-Queue messages contain only owner, task/order ID, scheduling metadata and a generic retry error. Inputs, permissions, spending authority and checkpoints remain in the owner workspace. Consumers select their own jobs and use the existing runtime reducers. They cannot create orders, fund escrows, change permissions or select another caller-supplied workspace. Current permission, deadline, model and supplier gates still apply.
+Queue messages contain only owner, task/order ID, scheduling metadata and a generic retry error. Inputs, permissions, spending authority and checkpoints remain in the owner workspace. Consumers select their own jobs and use the existing runtime reducers. They cannot create orders, choose arbitrary funding, change permissions or select another caller-supplied workspace. Existing bounded Vault purchase intents may fund through their original grant/session checks. Current permission, deadline, model and supplier gates still apply.
 
 An atomic SQL claim has a two-minute lease and a unique token. Expired claims can be recovered after process/request loss. Acknowledgements require both the current token and the exact workspace revision, so a stale response cannot overwrite a replacement consumer or swallow a concurrent resume. Runtime and settlement idempotency also protect against overlapping workers. Temporary failures back off up to one minute. Twenty consecutive failures move work to `dead`; an authenticated owner may retry it. Terminal checkpoints become completed queue records without another payment.
 
@@ -33,6 +33,8 @@ node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1
 Do not replay table-creation migrations on an existing database. Publishing the saved Site version applies its new migration through Sites.
 
 ## Hosted consumer
+
+New scoped consumer credentials, a standalone retrying process and aggregate monitoring are implemented and locally accepted; see [CONSUMER-OPERATIONS](CONSUMER-OPERATIONS.md). They have not been deployed or scheduled. The following older owner-private gateway mode remains supported only under its original audience restriction.
 
 The owner-private Site may opt into a shared service drain by setting server-only `AGENTOS_RUNTIME_PRIVATE_ORIGIN` to its exact HTTPS origin. The platform must retain owner-private access. Sites dispatch authenticates service callers using a freshly obtained Site service bearer; it does not provide a visitor identity. This endpoint deliberately consumes already-authorized queued work and returns aggregate counts, without returning any workspace data. Keep this flag disabled for a public/shared audience until application-level service authorization is added.
 

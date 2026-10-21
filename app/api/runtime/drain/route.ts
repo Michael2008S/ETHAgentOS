@@ -2,13 +2,16 @@ import { env } from 'cloudflare:workers';
 import { drainScope } from '@/lib/agentos/auth';
 import { DomainError } from '@/lib/agentos/engine';
 import { drainQueue } from '@/lib/agentos/queue-runtime';
+import {CONSUMER_HEADER,authenticateConsumer} from '@/lib/agentos/consumer-auth';
 
 /** No owner, task, policy, or funding parameters are accepted. */
 export async function POST(request: Request) {
   try {
-    const scope=drainScope(request,env.AGENTOS_RUNTIME_PRIVATE_ORIGIN);
+    if(!env.DB)throw new Error('DB unavailable');
+    const consumer=request.headers.has(CONSUMER_HEADER)?await authenticateConsumer(request,env.DB):undefined;
+    const scope=consumer?.ownerId??drainScope(request,env.AGENTOS_RUNTIME_PRIVATE_ORIGIN);
     if(await request.text())throw new DomainError('Runtime drain takes no parameters.');
-    return Response.json(await drainQueue(request,scope),{headers:{'Cache-Control':'no-store'}});
+    return Response.json(await drainQueue(request,scope,consumer?.credential.intervalMs),{headers:{'Cache-Control':'no-store'}});
   } catch(error) {
     const status=error instanceof DomainError?({UNAUTHORIZED:401,FORBIDDEN:403}[error.code]??400):503;
     return Response.json({error:error instanceof DomainError?error.message:'Runtime temporarily unavailable. Durable jobs and checkpoints are retained.'},{status,headers:{'Cache-Control':'no-store'}});

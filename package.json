@@ -52,7 +52,9 @@
     "test:cre": "node scripts/test-cre.mjs",
     "demo:cre-dispatcher": "node scripts/cre-cli.mjs build && node scripts/test-cre.mjs && node scripts/demo-cre-dispatcher.mjs",
     "skill:conformance": "node scripts/skill-conformance.mjs",
-    "demo:skill": "node scripts/demo-skill.mjs"
+    "demo:skill": "node scripts/demo-skill.mjs",
+    "consumer": "node scripts/consumer.mjs",
+    "demo:consumer": "node scripts/demo-consumer.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

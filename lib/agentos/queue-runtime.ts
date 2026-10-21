@@ -8,10 +8,10 @@ import {workflowPublisher} from './workflow-runtime';
 import {runWorkflow} from './workflow-runner';
 
 /** Durable checkpoints and expiring claims survive a killed request or consumer. */
-export async function drainQueue(request: Request, ownerId?: string) {
+export async function drainQueue(request: Request, ownerId?: string, intervalMs=2000) {
   if (!env.DB) throw new Error('Runtime database unavailable.');
   const scope=ownerId??'__service__';
-  const heartbeat=(status:string)=>env.DB!.prepare('INSERT INTO agentos_runtime_consumers(scope,last_seen,status) VALUES(?,?,?) ON CONFLICT(scope) DO UPDATE SET last_seen=excluded.last_seen,status=excluded.status').bind(scope,Date.now(),status).run();
+  const heartbeat=(status:string)=>env.DB!.prepare('INSERT INTO agentos_runtime_consumers(scope,last_seen,status,interval_ms) VALUES(?,?,?,?) ON CONFLICT(scope) DO UPDATE SET last_seen=excluded.last_seen,status=excluded.status,interval_ms=excluded.interval_ms').bind(scope,Date.now(),status,intervalMs).run();
   await heartbeat('busy');
   try {
   const counts = {claimed:0,completed:0,rescheduled:0,failed:0}, started=Date.now();
@@ -46,6 +46,6 @@ export async function drainQueue(request: Request, ownerId?: string) {
     }
   }
   const result={...counts,queue:await queueSummary(env.DB,ownerId)};
-  await heartbeat('ready');return result;
+  await heartbeat(counts.failed?'failed':'ready');return result;
   }catch(error){await heartbeat('failed').catch(()=>{});throw error;}
 }

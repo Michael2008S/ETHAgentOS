@@ -1,9 +1,11 @@
 import { DomainError } from './engine.ts';
+export const CONSUMER_HEADER='x-agentos-consumer-token';
 
 export const isLoopback = (url: URL) => ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
 
 /** Hosted identity is supplied by the trusted Sites gateway, never by a public API key. */
 export function owner(request: Request): string {
+  if(request.headers.has(CONSUMER_HEADER))throw new DomainError('Consumer credentials cannot access owner APIs.','FORBIDDEN');
   const local = isLoopback(new URL(request.url));
   const user = request.headers.get('oai-authenticated-user-id');
   if (!user && !local) throw new DomainError('Sign in to access your workspace.', 'UNAUTHORIZED');
