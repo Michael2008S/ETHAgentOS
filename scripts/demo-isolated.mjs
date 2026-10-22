@@ -8,7 +8,7 @@ if(previous&&!previous.persistent)throw Error('This older runtime is in-memory. 
 const sourceProxy=previous?.sourceProxy??process.env.AGENTOS_DEMO_SOURCE_PROXY==='1';
 const capturedSource=previous?.capturedSource??process.env.AGENTOS_DEMO_CAPTURED_SOURCE==='1';
 const ports={web:Number(process.env.AGENTOS_DEMO_WEB_PORT||5187),chain:Number(process.env.AGENTOS_DEMO_CHAIN_PORT||8555),supplier:Number(process.env.AGENTOS_DEMO_SUPPLIER_PORT||7471),supplier2:Number(process.env.AGENTOS_DEMO_SUPPLIER_PORT||7471)+1};
-ports.plugin=Number(process.env.AGENTOS_DEMO_PLUGIN_PORT||ports.web+1);ports.mcp=Number(process.env.AGENTOS_DEMO_MCP_PORT||ports.web+2);if(capturedSource||sourceProxy)ports.data=Number(previous?.replayURL?new URL(previous.replayURL).port:ports.web+3);
+ports.plugin=Number(process.env.AGENTOS_DEMO_PLUGIN_PORT||ports.web+1);ports.mcp=Number(process.env.AGENTOS_DEMO_MCP_PORT||ports.web+2);if(capturedSource||sourceProxy)ports.data=Number((previous?.sourceProxyURL||previous?.replayURL)?new URL(previous.sourceProxyURL||previous.replayURL).port:ports.web+3);
 if(sourceProxy&&capturedSource)ports.capture=ports.data+1;
 if(previous)for(const [key,field]of Object.entries({web:'baseURL',chain:'chainURL',supplier:'supplierURL',supplier2:'supplier2URL',plugin:'pluginURL',mcp:'mcpURL'}))ports[key]=Number(new URL(previous[field]).port);
 if(Object.values(ports).some(n=>!Number.isInteger(n)||n<1024||n>65535)||new Set(Object.values(ports)).size!==Object.values(ports).length)throw new Error('Choose six distinct unprivileged ports.');
