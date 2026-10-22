@@ -21,3 +21,11 @@ export async function businessWizardDraft({requestId=crypto.randomUUID(),buyer,t
 export function mixedGrantSelections(draft:MixedWorkflowDraft,catalog:ServiceDescriptor[]){
  const grants=new Map<string,{pluginId:string;manifestHash:string;runtimeHash:string;maxPriceCents:number;maxRuns:number}>();for(const step of draft.steps){const s=catalog.find(s=>s.id===step.serviceId&&s.digest===step.serviceDigest);if(!s)throw new DomainError('Service changed. Prepare and review again.');if(s.executor!=='plugin')continue;const prior=grants.get(s.id);if(prior){prior.maxRuns++;prior.maxPriceCents=Math.max(prior.maxPriceCents,step.maxPriceCents);}else grants.set(s.id,{pluginId:s.binding.pluginId!,manifestHash:s.binding.manifestHash!,runtimeHash:s.binding.runtimeHash!,maxPriceCents:step.maxPriceCents,maxRuns:1});}return [...grants.values()];
 }
+
+/** Decimal percentages are parsed as text to avoid IEEE-754 validation drift. */
+export function percentToBps(value:string|number){
+ const text=String(value).trim();if(!/^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,2})?$/.test(text))throw new DomainError('Threshold must have at most two decimal places.');const [whole,fraction='']=text.split('.'),bps=Number(whole)*100+Number(fraction.padEnd(2,'0'));if(bps<1||bps>10000)throw new DomainError('Threshold must be 0.01–100%.');return bps;
+}
+export function draftThresholdBps(draft:MixedWorkflowDraft){
+ const id=draft.steps.find(s=>/^plugin:usdc-treasury-policy(?:-[0-9]+)?@1\.0\.0$/.test(s.serviceId))?.serviceId;if(!id)return undefined;return Number(id.match(/policy-([0-9]+)@/)?.[1]??5000);
+}
