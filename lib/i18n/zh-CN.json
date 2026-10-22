@@ -1394,5 +1394,22 @@
   "Dismiss plugin plan": "放弃插件方案",
   "Refresh the service catalogue after starting the local runtime.": "启动本地运行服务后，请刷新服务目录。",
   "Reviewed plan applied. Authorize execution and payment separately before starting.": "已采用审阅方案。开始前请分别授予执行与付款权限。",
-  "Purchase is bound to reviewed plan": "本次采购绑定已审阅方案"
+  "Purchase is bound to reviewed plan": "本次采购绑定已审阅方案",
+  "Reusable plugin service templates": "可复用插件服务模板",
+  "Templates keep plugin versions, data contracts, dependencies and fee ceilings. Original JSON, runtime authority, wallets and signatures are never exported. Reuse creates a new review proposal without running a model or a plugin.": "模板保留插件版本、数据契约、依赖和费用上限，不导出原始 JSON、运行授权、钱包或签名。复用只生成新的待审阅方案，不调用模型或运行插件。",
+  "Save selected service plan as template": "将所选服务方案保存为模板",
+  "Refresh plugin templates": "刷新插件模板",
+  "Saved plugin template": "已保存的插件模板",
+  "Portable plugin template JSON": "可移植插件模板 JSON",
+  "Prepare plugin template with current input": "使用当前输入准备插件模板",
+  "Restore plugin template": "恢复插件模板",
+  "Archive plugin template": "归档插件模板",
+  "Import portable plugin template JSON": "导入可移植插件模板 JSON",
+  "Import plugin template": "导入插件模板",
+  "Plugin template saved. No execution or payment authority was copied.": "插件模板已保存，未复制任何执行或付款授权。",
+  "Template proposal saved. Review its current input, runtime and fees before applying.": "模板方案已保存，采用前请审阅当前输入、运行时和费用。",
+  "Plugin template imported. Install exact plugin versions before preparing a proposal.": "插件模板已导入，准备方案前请安装完全匹配的插件版本。",
+  "Import only a portable template definition and digest.": "请仅导入可移植模板定义与摘要。",
+  "Service templates unavailable.": "插件服务模板暂不可用。",
+  "Permission duration must cover the purchase window.": "授权期限必须覆盖采购时限。"
 }

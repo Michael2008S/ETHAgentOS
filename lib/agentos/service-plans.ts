@@ -1,37 +1,22 @@
 import {z} from 'zod';
 import {canonical} from '../../cre/workflow/verify.ts';
 import {digest,DomainError} from './engine.ts';
-import {boundedJson,type Json} from './plugin-protocol.ts';
-import {pluginPurchaseInputSchema,selectPluginPurchaseInput,type PluginPurchaseDraft} from './plugin-purchase-protocol.ts';
+import {type PluginPurchaseDraft} from './plugin-purchase-protocol.ts';
 import {checkServiceInput,verifyService,type ServiceDescriptor} from './service-catalog.ts';
 import {modelDescriptor,type ModelConfiguration,type ModelDescriptor} from './model.ts';
+import {verifyTemplateApplication,type ServiceTemplateSource} from './service-template-protocol.ts';
 import type {Workspace} from './types.ts';
 
-const hash=z.string().regex(/^0x[0-9a-f]{64}$/),cents=z.number().int().positive().max(1000000);
-export const servicePlanParametersSchema=z.object({requestId:z.string().uuid(),goal:z.string().trim().min(3).max(500),input:z.custom<Json>(v=>{try{boundedJson(v);return true;}catch{return false;}},'Invalid bounded JSON input.'),totalBudget:cents,perStepBudget:cents,maxSteps:z.number().int().min(1).max(8).default(4),timeoutSeconds:z.number().int().min(60).max(3600).default(600)}).strict();
-export type ServicePlanParameters=z.infer<typeof servicePlanParametersSchema>;
-const step=z.object({serviceId:z.string().min(1).max(200),input:pluginPurchaseInputSchema}).strict();
-export const serviceProgramSchema=z.object({status:z.enum(['planned','unsupported']),steps:z.array(step).max(8)}).strict();
-export type ServiceProgram=z.infer<typeof serviceProgramSchema>;
-export type ServicePlanDraft=Omit<PluginPurchaseDraft,'buyer'|'vaultSessionId'>;
-export type ServiceProposal={version:'agentos.service-plan.v1';id:string;scope:string;parameters:ServicePlanParameters;catalog:ServiceDescriptor[];program:ServiceProgram;draft:ServicePlanDraft;model:ModelDescriptor;promptHash:string;responseHash:string;generatedAt:string;expiresAt:string;digest:string;status:'proposed'|'accepted'|'dismissed';workflowId?:string;acceptedAt?:string;dismissedAt?:string};
+import {servicePlanParametersSchema,serviceProgramSchema,compileServiceProgram,type ServicePlanParameters,type ServiceProgram,type ServicePlanDraft} from './service-program.ts';
+export {servicePlanParametersSchema,serviceProgramSchema,compileServiceProgram,type ServicePlanParameters,type ServiceProgram,type ServicePlanDraft} from './service-program.ts';
+const hash=z.string().regex(/^0x[0-9a-f]{64}$/);
+export type ServiceProposal={version:'agentos.service-plan.v1';id:string;scope:string;parameters:ServicePlanParameters;catalog:ServiceDescriptor[];program:ServiceProgram;draft:ServicePlanDraft;template?:ServiceTemplateSource;model?:ModelDescriptor;promptHash?:string;responseHash?:string;generatedAt:string;expiresAt:string;digest:string;status:'proposed'|'accepted'|'dismissed';workflowId?:string;acceptedAt?:string;dismissedAt?:string};
 export const serviceProposalTerms=({digest:_,status:__,workflowId:___,acceptedAt:____,dismissedAt:_____,...terms}:ServiceProposal)=>terms;
 export function servicePlan(state:Workspace,id:string){const p=state.servicePlans?.find(p=>p.id===id);if(!p)throw new DomainError('Service plan not found.','NOT_FOUND');return p;}
-export function compileServiceProgram(raw:unknown,parameters:ServicePlanParameters,catalog:ServiceDescriptor[]):ServicePlanDraft{
- const program=serviceProgramSchema.parse(raw);if(program.status!=='planned'||!program.steps.length||program.steps.length>parameters.maxSteps)throw new DomainError('The goal is unsupported or exceeds its reviewed step limit.','MODEL_REJECTED');
- const selected:ServiceDescriptor[]=[],steps:PluginPurchaseDraft['steps']=[];
- for(const [index,step]of program.steps.entries()){
-  const service=catalog.find(c=>c.id===step.serviceId);if(!service||service.executor!=='plugin'||service.priceKind!=='fixed'||service.priceCents>parameters.perStepBudget)throw new DomainError('Model selected an unavailable service or incompatible execution adapter.','MODEL_REJECTED');
-  if(step.input.from==='root')checkServiceInput(service,selectPluginPurchaseInput(parameters.input,step.input,new Map()));
-  else{if(step.input.step>=index)throw new DomainError('Service input must reference an earlier paid step.','MODEL_REJECTED');checkServiceInput(service,{source:selected[step.input.step],path:step.input.path},true);}
-  selected.push(service);const binding=service.binding;steps.push({pluginId:binding.pluginId!,manifestHash:binding.manifestHash!,runtimeHash:binding.runtimeHash!,maxPriceCents:service.priceCents,input:step.input});
- }
- if(selected.reduce((n,s)=>n+s.priceCents,0)>parameters.totalBudget)throw new DomainError('Service plan exceeds the reviewed total budget.','FORBIDDEN');
- return {requestId:parameters.requestId,title:parameters.goal.slice(0,120).trim(),input:structuredClone(parameters.input),steps,totalBudget:parameters.totalBudget,timeoutSeconds:parameters.timeoutSeconds};
-}
 export async function verifyServiceProposal(p:ServiceProposal){
  if(!p||p.version!=='agentos.service-plan.v1'||!hash.safeParse(p.scope).success||!['proposed','accepted','dismissed'].includes(p.status)||!Array.isArray(p.catalog)||!p.catalog.length||p.catalog.length>64||new Set(p.catalog.map(s=>s.id)).size!==p.catalog.length||p.digest!==await digest(serviceProposalTerms(p)))throw new DomainError('Service plan commitment differs.','FORBIDDEN');
- const parameters=servicePlanParametersSchema.parse(p.parameters);if(canonical(parameters)!==canonical(p.parameters)||p.id!=='service-plan-'+parameters.requestId||!Number.isFinite(Date.parse(p.generatedAt))||Date.parse(p.expiresAt)!==Date.parse(p.generatedAt)+300000||!hash.safeParse(p.promptHash).success||!hash.safeParse(p.responseHash).success)throw new DomainError('Invalid service plan evidence.','FORBIDDEN');
+ const parameters=servicePlanParametersSchema.parse(p.parameters);if(canonical(parameters)!==canonical(p.parameters)||p.id!=='service-plan-'+parameters.requestId||!Number.isFinite(Date.parse(p.generatedAt))||Date.parse(p.expiresAt)!==Date.parse(p.generatedAt)+300000)throw new DomainError('Invalid service plan evidence.','FORBIDDEN');
+ if(p.template){if(p.model!==undefined||p.promptHash!==undefined||p.responseHash!==undefined)throw new DomainError('A template application cannot claim model inference.','FORBIDDEN');await verifyTemplateApplication(p.template,parameters,p.catalog,p.program);}else if(!p.model||!hash.safeParse(p.promptHash).success||!hash.safeParse(p.responseHash).success)throw new DomainError('Model plan evidence is incomplete.','FORBIDDEN');
  for(const service of p.catalog)await verifyService(service);
  if(canonical(compileServiceProgram(p.program,parameters,p.catalog))!==canonical(p.draft))throw new DomainError('Service plan draft differs from its reviewed program.','FORBIDDEN');
 }
@@ -54,12 +39,13 @@ export async function generateServiceProposal(state:Workspace,raw:ServicePlanPar
  const terms={version:'agentos.service-plan.v1' as const,id:'service-plan-'+parameters.requestId,scope,parameters,catalog:structuredClone(catalog),program,draft,model:await modelDescriptor(configuration),promptHash:await digest(body),responseHash:await digest(text),generatedAt:now,expiresAt:new Date(Date.parse(now)+300000).toISOString()};return {...terms,digest:await digest(terms),status:'proposed'};
 }
 export async function saveServiceProposal(state:Workspace,p:ServiceProposal,scope:string){
- await verifyServiceProposal(p);if(p.scope!==scope)throw new DomainError('Service plan belongs to another workspace.','FORBIDDEN');const prior=state.servicePlans?.find(s=>s.id===p.id);if(prior){if(canonical(prior.parameters)!==canonical(p.parameters))throw new DomainError('Service plan identifier already has different parameters.','IDEMPOTENCY_CONFLICT');return state;}
+ await verifyServiceProposal(p);if(p.scope!==scope)throw new DomainError('Service plan belongs to another workspace.','FORBIDDEN');const prior=state.servicePlans?.find(s=>s.id===p.id);if(prior){if(canonical(prior.parameters)!==canonical(p.parameters)||canonical(prior.template??null)!==canonical(p.template??null))throw new DomainError('Service plan identifier already has different parameters.','IDEMPOTENCY_CONFLICT');return state;}
  if((state.servicePlans?.length??0)>=20)throw new DomainError('Service plan history is full.');return {...state,servicePlans:[p,...state.servicePlans??[]]};
 }
 export type ServicePlanReview={planId:string;digest:string};
 export async function approveServicePlan(state:Workspace,review:ServicePlanReview,scope:string,draft:PluginPurchaseDraft,now:string){
  const p=servicePlan(state,review.planId);await verifyServiceProposal(p);if(p.scope!==scope||p.digest!==review.digest||p.status!=='proposed'||p.expiresAt<=now)throw new DomainError('Service plan is expired, unavailable or differs from the reviewed digest.','FORBIDDEN');
+ if(p.template){const current=state.serviceTemplates?.find(t=>t.id===p.template!.id);if(!current||current.archivedAt||current.scope!==scope||current.digest!==p.template.digest||canonical(current.definition)!==canonical(p.template.definition))throw new DomainError('Service template changed or was archived before approval.','FORBIDDEN');}
  const {buyer:_,vaultSessionId:__,...program}=draft;if(canonical(program)!==canonical(p.draft))throw new DomainError('Purchase differs from the reviewed service plan.','FORBIDDEN');
  return {...state,servicePlans:state.servicePlans!.map(plan=>plan.id===p.id?{...plan,status:'accepted' as const,workflowId:'plugin-purchase-'+draft.requestId,acceptedAt:now}:plan)};
 }

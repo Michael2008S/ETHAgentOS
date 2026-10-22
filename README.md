@@ -216,4 +216,6 @@ Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/
 
 通用插件网页采购：Agents → 付费插件工作流，安装 JSON 示例，审阅代码、工具和费用，分别授权执行次数及本地 Vault 付款，再明确启动。刷新后重新连接本地买方钱包；中断提交沿用原编号。支持逐步付款凭证、签名交付、父成果和显式恢复/取消/撤销。公共模式仍拒绝通用插件采购，完整操作与边界见 [PLUGIN-PURCHASES](docs/PLUGIN-PURCHASES.md)。
 
-统一服务与插件规划：业务技能、供应商规划候选和通用插件采用版本化服务描述。插件方案支持目标规划、结构化输入输出检查、审阅摘要与原子审批采购；生成方案不执行、不授权。运行 `npm run demo:service-plans`；模板与失败修复接入是后续增量，详见 [SERVICE-CATALOG](docs/SERVICE-CATALOG.md)。
+统一服务与插件规划：业务技能、供应商规划候选和通用插件采用版本化服务描述。插件方案支持目标规划、结构化输入输出检查、审阅摘要与原子审批采购；生成方案不执行、不授权。运行 `npm run demo:service-plans`；可移植插件模板已接入，失败修复是后续增量，详见 [SERVICE-CATALOG](docs/SERVICE-CATALOG.md)。
+
+插件服务模板：保存所选模型/模板方案，或导入仅含插件版本、数据契约、依赖与费用上限的 JSON。复用不调用模型、不复制输入或授权；重新审阅后使用当前运行时付款。支持归档/恢复和原编号重试。运行 `npm run demo:service-templates`，见 [SERVICE-TEMPLATES](docs/SERVICE-TEMPLATES.md)。
