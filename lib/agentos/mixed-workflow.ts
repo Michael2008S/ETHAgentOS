@@ -1,3 +1,4 @@
+import {usdcTreasurySchema} from './treasury-business.ts';
 import {selectedPluginMemorySchema,type SelectedPluginMemory} from './plugin-semantic-memory.ts';
 import {z} from 'zod';
 import {digest,DomainError,normalizeInput} from './engine.ts';
@@ -10,7 +11,7 @@ import type {WorkflowSupplierBinding} from './workflow-suppliers.ts';
 
 const hash=z.string().regex(/^0x[0-9a-f]{64}$/),cents=z.number().int().positive().max(1000000);
 const path=z.array(z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/).refine(k=>!['constructor','prototype','__proto__'].includes(k))).max(8);
-export const mixedInputSchema=z.object({from:z.enum(['root','step']),step:z.number().int().min(0).max(7).optional(),adapter:z.enum(['json.v1','transfers.v1','business-summary.v1','business-transfers.v1']),path:path.default([])}).strict();
+export const mixedInputSchema=z.object({from:z.enum(['root','step']),step:z.number().int().min(0).max(7).optional(),adapter:z.enum(['json.v1','transfers.v1','business-summary.v1','business-transfers.v1','business-usdc.v1']),path:path.default([])}).strict();
 export const mixedWorkflowDraftSchema=z.object({requestId:z.string().uuid(),title:z.string().trim().min(1).max(120),buyer:z.string().regex(/^0x[0-9a-fA-F]{40}$/),vaultSessionId:z.string().uuid(),memory:z.lazy(()=>selectedPluginMemorySchema).optional(),input:z.custom<Json>(v=>{try{boundedJson(v,32768);return true;}catch{return false;}},'Invalid mixed workflow JSON.'),steps:z.array(z.object({serviceId:z.string().min(1).max(200),serviceDigest:hash,maxPriceCents:cents,input:mixedInputSchema}).strict()).min(2).max(8),totalBudget:cents,timeoutSeconds:z.number().int().min(120).max(3600).default(600)}).strict();
 export type MixedWorkflowDraft=z.infer<typeof mixedWorkflowDraftSchema>;
 export type MixedStep={requestId:string;service:ServiceDescriptor;maxPriceCents:number;quote:number;input:z.infer<typeof mixedInputSchema>;grantEpoch?:number;supplierBinding?:WorkflowSupplierBinding;childId?:string;status:'pending'|'active'|'paid'|'cancelled'|'failed';inputHash?:string;parent?:{kind:'order'|'plugin';id:string;step?:number;payment:string;artifactHash:string};outputHash?:string;payment?:string};
@@ -66,6 +67,7 @@ export async function validateMixedProgram(draft:MixedWorkflowDraft,catalog:Serv
   if(service.executor==='plugin'){
    if(service.input.protocol!=='json.v1')throw new DomainError('Plugin input contract differs.');
    if(source){let schema:PluginSchema;if(source.executor==='plugin'){if(edge.adapter!=='json.v1'||source.output.protocol!=='json.v1')throw new DomainError('A JSON parent requires its explicit JSON adapter.');schema=source.output.schema;}
+    else if(edge.adapter==='business-usdc.v1'){const original=body.steps[edge.step!].input;if(source.binding.skill!=='treasury-report'||original.from!=='root'||original.adapter!=='transfers.v1'||edge.path.length||!normalizeInput(jsonPath(body.input,original.path) as unknown as TaskInput).source)throw new DomainError('USDC adapter requires a directly sourced treasury report and full provenance.','FORBIDDEN');schema=usdcTreasurySchema;}
     else{if(edge.adapter!=='business-summary.v1')throw new DomainError('Business results require the reviewed summary adapter.');schema=businessSummarySchema(source.binding.skill as Skill);}
     if(!schemaAssignable(schemaAtPath(schema,edge.path),service.input.schema))throw new DomainError('Mixed source schema cannot satisfy the next plugin.','FORBIDDEN');
    }else{if(edge.adapter!=='json.v1')throw new DomainError('Original plugin input requires the JSON adapter.');validatePluginValue(service.input.schema,jsonPath(body.input,edge.path));}
