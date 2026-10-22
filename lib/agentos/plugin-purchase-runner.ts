@@ -1,3 +1,4 @@
+import {canonicalPluginPaidRoot} from './plugin-paid-memory.ts';
 import {digest,DomainError} from './engine.ts';
 import {canonical,resultHash} from '../../cre/workflow/verify.ts';
 import {pluginInstallation,pluginGrant,pluginJob,createPluginJob,cancelPluginJob,type PluginDatabase, type PluginSnapshot} from './plugin-store.ts';
@@ -49,6 +50,7 @@ export async function runPluginPurchase(store:PluginDatabase,owner:string,id:str
      if(receipt.status!=='paid'||receipt.outputHash!==resultHash(execution))throw new DomainError('Plugin parent delivery or canonical payment changed.','CONFLICT');
      paid.set(original.index,execution.output);parent={step:original.index,taskId:original.taskId,transactionHash:receipt.transactionHash,executionDigest:execution.digest};
     }
+    if(step.input.from==='root'&&flow.acceptedRoot){const root=flow.acceptedRoot,accepted=await canonicalPluginPaidRoot(store,owner,root,chain,flow.buyer);if(canonical(accepted.execution.output)!==canonical(flow.input))throw new DomainError('Repair input differs from its original paid output.','FORBIDDEN');parent={workflowId:root.workflowId,step:root.step,taskId:root.taskId as `0x${string}`,transactionHash:root.settlementTransactionHash as `0x${string}`,executionDigest:root.executionDigest};}
     let inputValue:Json;try{inputValue=selectPluginPurchaseInput(flow.input,step.input,paid);validatePluginValue(authority.installed.manifest.input,inputValue);}catch{await stop('invalid-delivery','The paid dependency does not match the next plugin input schema.');continue;}
     const block=await chain.client.getBlock(),window=BigInt(Math.max(120,Math.ceil(2*authority.installed.manifest.limits.wallMs/1000)+30)),deadline=block.timestamp+window<BigInt(flow.vault.expires)?block.timestamp+window:BigInt(flow.vault.expires);
     if(deadline<=block.timestamp+20n){await stop('expired','The Vault grant leaves insufficient escrow time.');continue;}

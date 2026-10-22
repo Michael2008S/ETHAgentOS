@@ -22,7 +22,11 @@ export function pluginPurchaseRoutes({client,wallet,config,metadata,buyer,execut
   const permission=session.pluginPermissions?.find(p=>p.pluginId===step.pluginId&&p.manifestHash===step.manifestHash&&p.runtimeHash===step.runtimeHash&&p.maxPriceCents>=step.priceCents);
   if(!permission||await pluginManifestHash(manifest)!==step.manifestHash||await digest(step.inputValue)!==step.inputHash||await digest(pluginPurchaseSpec(flow,step))!==step.specHash)throw Error('Plugin input, price or code differs from the approved intent.');
   validatePluginValue(manifest.input,step.inputValue);
-  const paid=new Map();if(step.input.from==='step'){
+  const paid=new Map();if(step.input.from==='root'&&flow.acceptedRoot){
+   const root=flow.acceptedRoot,record=records.get(root.taskId),view=await task(root.taskId);
+   if(!record?.acceptedExecution||record.workflowId!==root.workflowId||record.scope!==flow.scope||!same(record.buyer,flow.buyer)||root.executionDigest!==record.acceptedExecution.digest||view[5]!==2||view[6]!==resultHash(record.acceptedExecution)||canonical(flow.input)!==canonical(record.acceptedExecution.output)||canonical(step.parent)!==canonical({workflowId:root.workflowId,step:root.step,taskId:root.taskId,transactionHash:root.settlementTransactionHash,executionDigest:root.executionDigest}))throw Error('Repair input has no independently accepted paid parent.');
+   const proof=await evidence(record.intent,'settlement');if(proof.status!=='paid'||proof.transactionHash!==root.settlementTransactionHash)throw Error('Repair parent payment is not canonical.');
+  }if(step.input.from==='step'){
    const parent=flow.steps[step.input.step],record=records.get(parent.taskId),view=await task(parent.taskId);
    if(!step.parent||step.parent.step!==parent.index||step.parent.taskId!==parent.taskId||!record?.acceptedExecution||view[5]!==2||view[6]!==resultHash(record.acceptedExecution)||step.parent.executionDigest!==record.acceptedExecution.digest)throw Error('Plugin input has no independently accepted paid parent.');
    const proof=await evidence(record.intent,'settlement');if(proof.status!=='paid'||proof.transactionHash!==step.parent.transactionHash)throw Error('Plugin parent payment is not canonical.');paid.set(parent.index,record.acceptedExecution.output);
@@ -30,7 +34,7 @@ export function pluginPurchaseRoutes({client,wallet,config,metadata,buyer,execut
   if(canonical(selectPluginPurchaseInput(flow.input,step.input,paid))!==canonical(step.inputValue))throw Error('Plugin input differs from its committed paid dependency.');
   const {decimals}=await chain.validateDeployment(),intent={id:step.taskId,buyer:flow.vault.vault,seller:config.seller,amount:centsToToken(step.priceCents,decimals),deadline:BigInt(step.fundingIntent.deadline),specHash:step.specHash},request={jobId:step.jobId,scope:flow.scope,manifest,manifestHash:step.manifestHash,input:step.inputValue,inputHash:step.inputHash,runtimeHash:step.runtimeHash};
   const prior=records.get(intent.id);if(prior&&(canonical(prior.request)!==canonical(request)||canonical({...prior.intent,amount:String(prior.intent.amount),deadline:String(prior.intent.deadline)})!==canonical({...intent,amount:String(intent.amount),deadline:String(intent.deadline)})))throw Error('Plugin escrow intent is immutable.');
-  if(!prior)records.set(intent.id,{intent,request,runtime:flow.runtime,sessionId:session.sessionId,scope:flow.scope,priceCents:step.priceCents});return {record:records.get(intent.id),session};
+  if(!prior)records.set(intent.id,{workflowId:flow.id,buyer:flow.buyer,intent,request,runtime:flow.runtime,sessionId:session.sessionId,scope:flow.scope,priceCents:step.priceCents});return {record:records.get(intent.id),session};
  }
  async function handle(path,body){
   if(path==='/plugin-purchase/fund'){

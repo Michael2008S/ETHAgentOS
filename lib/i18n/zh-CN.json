@@ -1411,5 +1411,19 @@
   "Plugin template imported. Install exact plugin versions before preparing a proposal.": "插件模板已导入，准备方案前请安装完全匹配的插件版本。",
   "Import only a portable template definition and digest.": "请仅导入可移植模板定义与摘要。",
   "Service templates unavailable.": "插件服务模板暂不可用。",
-  "Permission duration must cover the purchase window.": "授权期限必须覆盖采购时限。"
+  "Permission duration must cover the purchase window.": "授权期限必须覆盖采购时限。",
+  "Repair unfinished plugin work": "修复未完成的插件工作",
+  "Keep original paid results and receipts. All funded attempts, including refunds, count toward the cumulative goal budget. A replacement is purchased only after a separate review and current execution/payment grants.": "保留原有已付款成果与凭证。全部已注资尝试（包括退款）都计入累计目标预算。替代采购仍需独立审阅及当前执行与付款授权。",
+  "Finish cancellation and refunds before planning a repair. Completed or already replaced workflows cannot be repaired again.": "规划修复前请先完成取消和退款。已完成或已被替代的工作流不能再次修复。",
+  "Remaining plugin goal": "剩余插件目标",
+  "Verify repair payments and available roots": "核验修复付款与可用成果",
+  "Reviewed repair input": "审阅的修复输入",
+  "Original goal input": "原目标输入",
+  "Verified cumulative repair context": "已核验的累计修复上下文",
+  "Generate or retry plugin repair plan": "生成或重试插件修复方案",
+  "I reviewed the remaining work, paid input and cumulative fees.": "我已审阅剩余工作、已付款输入与累计费用。",
+  "Apply reviewed plugin repair": "采用已审阅的插件修复",
+  "Original paid repair input": "修复所用的原始已付款成果",
+  "Gross goal budget · test tokens": "累计目标预算 · 测试代币",
+  "Remaining plan budget · test tokens": "剩余方案预算 · 测试代币"
 }

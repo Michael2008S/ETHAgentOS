@@ -15,7 +15,7 @@ export async function POST(request:Request){try{
  const body=schema.parse(JSON.parse(text)),snapshot=await read(ownerId);if(body.scope!==snapshot.scope)throw new DomainError('Service plan belongs to another workspace.','FORBIDDEN');
  let id:string;if(body.action==='propose'){
   id='service-plan-'+body.parameters.requestId;const prior=snapshot.state.servicePlans?.find(p=>p.id===id);
-  if(prior){if(prior.template||canonical(prior.parameters)!==canonical(body.parameters))throw new DomainError('Service plan identifier already has different parameters.','IDEMPOTENCY_CONFLICT');}
+  if(prior){if(prior.template||prior.replan||canonical(prior.parameters)!==canonical(body.parameters))throw new DomainError('Service plan identifier already has different parameters.','IDEMPOTENCY_CONFLICT');}
   else{const catalog=await configuredServiceCatalog(request,ownerId,snapshot.state),model=workflowPlanningModel(request),proposal=await generateServiceProposal(snapshot.state,body.parameters,snapshot.scope,catalog.entries,model.configuration,model.key);await updateWorkspace(ownerId,state=>saveServiceProposal(state,proposal,snapshot.scope));}
  }else{id=body.planId;await updateWorkspace(ownerId,state=>{const p=servicePlan(state,id);if(p.status==='accepted')throw new DomainError('An accepted service plan cannot be dismissed.','CONFLICT');return {...state,servicePlans:state.servicePlans!.map(p=>p.id===id?{...p,status:'dismissed' as const,dismissedAt:new Date().toISOString()}:p)};});}
  const current=await read(ownerId);return Response.json({scope:current.scope,proposal:servicePlan(current.state,id)},{headers});

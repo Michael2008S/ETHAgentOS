@@ -62,6 +62,6 @@ The browser case uses the actual import form, lost response, refresh, archive an
 restore, a template-derived proposal and two paid steps with a 300-second timeout;
 it checks Chinese/English and 390px layout. Unit checks cover strict portability,
 schema composition, identity conflicts and independent SDK verification. See the
-roadmap for current results. The full runner includes this stage; failure repair
-and the final complete sequence remain subsequent work. Public-chain settlement,
+roadmap for current results. The full runner includes this stage; reviewed repair is now available (SERVICE-REPLANNING.md). Bounded automatic repair
+proposals and the final complete sequence remain subsequent work. Public-chain settlement,
 DON and hosted execution are deferred.

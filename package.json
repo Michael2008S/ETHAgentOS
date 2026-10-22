@@ -77,7 +77,8 @@
     "demo:cleanup": "node scripts/demo-cleanup.mjs",
     "demo:plugin-purchases": "node scripts/demo-plugin-purchases.mjs",
     "demo:service-plans": "node scripts/demo-service-plans.mjs",
-    "demo:service-templates": "node scripts/demo-service-templates.mjs"
+    "demo:service-templates": "node scripts/demo-service-templates.mjs",
+    "demo:service-replanning": "node scripts/demo-service-replanning.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
