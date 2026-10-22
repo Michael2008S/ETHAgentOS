@@ -24,7 +24,7 @@
 - 审阅式重规划：保留已付款成果与原凭证，确认退款后为剩余目标生成替代步骤；人工批准时原子替换未支出工作，退款尝试仍占用累计额度。见 [WORKFLOW-REPLANNING](docs/WORKFLOW-REPLANNING.md)。
 - 使用真实 `@chainlink/cre-sdk` 的工作流源码与 TypeScript 客户端 SDK。
 
-- 通用插件付费核心：API/SDK 与持久队列支持通用 JSON 输入、已付款父成果、精确插件支付授权、签名交付、独立重放和实际本地 Vault 付款/退款。浏览器付费入口及新版完整 demo 仍在进行，见 [PLUGIN-PURCHASES](docs/PLUGIN-PURCHASES.md)。
+- 通用插件付费核心：API/SDK 与持久队列支持通用 JSON 输入、已付款父成果、精确插件支付授权、签名交付、独立重放和实际本地 Vault 付款/退款。双语浏览器付费入口和 37 步本地 demo 已验收；后续新增关卡单独记录，见 [PLUGIN-PURCHASES](docs/PLUGIN-PURCHASES.md)。
 
 ## 状态边界
 
@@ -215,3 +215,5 @@ Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/
 通用插件执行层：智能体页可安装处理通用 JSON 的 JavaScript 清单，审阅独立校验器和只读 MCP 工具后授予次数/期限，再通过持久队列执行。QuickJS WASM 隔离、源码/工具声明绑定、撤权和晚到结果拒绝、工作区隔离及真实 MCP 读取已接通。运行 `npm run mcp:local`、`npm run plugins:local`、`npm run demo:plugins`；协议、迁移和验收边界见 [PLUGINS](docs/PLUGINS.md)。免费作业没有付款权，通用插件采购使用下述独立付费控制器；原有业务 DAG 协议保持原语义。
 
 通用插件网页采购：Agents → 付费插件工作流，安装 JSON 示例，审阅代码、工具和费用，分别授权执行次数及本地 Vault 付款，再明确启动。刷新后重新连接本地买方钱包；中断提交沿用原编号。支持逐步付款凭证、签名交付、父成果和显式恢复/取消/撤销。公共模式仍拒绝通用插件采购，完整操作与边界见 [PLUGIN-PURCHASES](docs/PLUGIN-PURCHASES.md)。
+
+统一服务与插件规划：业务技能、供应商规划候选和通用插件采用版本化服务描述。插件方案支持目标规划、结构化输入输出检查、审阅摘要与原子审批采购；生成方案不执行、不授权。运行 `npm run demo:service-plans`；模板与失败修复接入是后续增量，详见 [SERVICE-CATALOG](docs/SERVICE-CATALOG.md)。
