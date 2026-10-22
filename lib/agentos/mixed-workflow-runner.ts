@@ -20,20 +20,20 @@ import type {Workspace,TaskInput} from './types.ts';
 import type {Json} from './plugin-protocol.ts';
 
 export type MixedRuntime={chain:OrderChain;publish:EvidencePublisher;orderOptions:NonNullable<Parameters<typeof runOrder>[4]>;suppliers:WorkflowSupplierAccess;pluginContext:()=>Promise<MixedCreationContext['plugins']>;plugins:()=>Promise<PluginPurchaseRuntime>;checkInput:(input:TaskInput)=>Promise<void>};
-async function paidStep(store:MixedStore,owner:string,state:Workspace,f:MixedWorkflow,index:number,r:MixedRuntime):Promise<{json:Json;business?:TaskInput;usdc?:Json;proof:NonNullable<MixedStep['parent']>}>{
+export async function paidMixedStep(store:MixedStore,owner:string,state:Workspace,f:MixedWorkflow,index:number,r:MixedRuntime):Promise<{json:Json;business?:TaskInput;usdc?:Json;proof:NonNullable<MixedStep['parent']>}>{
  const step=f.steps[index];if(step.status!=='paid'||!step.childId)throw new DomainError('Mixed parent has no accepted payment.','FORBIDDEN');
  if(step.service.executor==='plugin'){
   const child=await readPluginFlow(store,owner,step.childId),s=child.steps[0];if(child.buyer.toLowerCase()!==f.buyer.toLowerCase()||child.requestId!==step.requestId||!s.settlement||!s.outputHash)throw new DomainError('Mixed plugin parent differs.','FORBIDDEN');
   const result=await canonicalPluginPaidRoot(store,owner,{workflowId:child.id,step:0,taskId:s.taskId,settlementTransactionHash:s.settlement.transactionHash,executionDigest:(await pluginJob(store.database,owner,s.jobId)).execution!.digest},(await r.plugins()).chain,f.buyer);
   return {json:result.execution.output,proof:{kind:'plugin' as const,id:child.id,step:0,payment:result.settlement.transactionHash,artifactHash:result.execution.digest}};
  }
- const order=findOrder(state,step.childId);if(order.requestId!==step.requestId||order.workflowId!==f.id||order.buyer.toLowerCase()!==f.buyer.toLowerCase()||canonical(order.deployment)!==canonical(f.deployment))throw new DomainError('Mixed business parent differs.','FORBIDDEN');
+ const order=findOrder(state,step.childId);if(order.requestId!==step.requestId||order.workflowId!==(step.originWorkflowId??f.id)||order.buyer.toLowerCase()!==f.buyer.toLowerCase()||canonical(order.deployment)!==canonical(f.deployment))throw new DomainError('Mixed business parent differs.','FORBIDDEN');
  await verifyAcceptedOrder(state,order,r.chain);return {json:businessSummary(order.skill,order.output!),business:acceptedArtifactInput(order),...(order.skill==='treasury-report'&&order.input.source?{usdc:usdcTreasuryInput(order)}:{}),proof:{kind:'order' as const,id:order.id,payment:order.settlement!.transactionHash,artifactHash:order.settlement!.outputHash}};
 }
 async function inputFor(store:MixedStore,owner:string,state:Workspace,f:MixedWorkflow,index:number,r:MixedRuntime){
  const memory=f.memory?await verifySelectedPluginMemory(store,owner,f.memory,f.scope,f.buyer,f.input,(await r.plugins()).chain,false):undefined;
  const root=memory?{json:memory.execution.output,business:undefined as TaskInput|undefined,usdc:undefined as Json|undefined,proof:{kind:'plugin' as const,id:memory.flow.id,step:memory.step.index,payment:memory.settlement.transactionHash,artifactHash:memory.execution.digest}}:undefined;
- const step=f.steps[index],source=step.input.from==='step'?await paidStep(store,owner,state,f,step.input.step!,r):root;
+ const step=f.steps[index],source=step.input.from==='step'?await paidMixedStep(store,owner,state,f,step.input.step!,r):root;
  const value=step.input.adapter==='business-transfers.v1'?source?.business:step.input.adapter==='business-usdc.v1'?source?.usdc:mixedAdapterValue(step.input,source?.json??f.input);
  if(value===undefined)throw new DomainError('The selected mixed adapter has no compatible paid input.','FORBIDDEN');
  if(step.parent&&canonical(step.parent)!==canonical(source?.proof))throw new DomainError('Mixed canonical parent payment changed.','CONFLICT');

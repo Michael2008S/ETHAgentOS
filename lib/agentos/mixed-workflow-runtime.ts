@@ -20,7 +20,7 @@ export const mixedStore=()=>({...pluginDatabase(),updateWorkspace:store.updateWo
 export async function configuredMixedContext(request:Request,owner:string,state:Workspace):Promise<MixedCreationContext>{
  const plugins=await configuredPluginPurchaseContext(request),installed=await pluginRows<InstalledPlugin>(pluginDatabase().database,owner,'agentos_plugins'),catalog=(await serviceCatalog(state,installed,plugins)).entries,bindings=new Map<string,WorkflowSupplierBinding>(),configured=await configuredOrderChain(request),access=workflowSupplierAccess(configured,await digest({workspace:owner}));
  for(const agent of state.agents.filter(a=>a.enabled&&state.policy.allowedSkills.includes(a.skill)))for(const supplier of configured.supplier?.suppliers??[])if(supplier.descriptor.skills.includes(agent.skill))try{const binding=await access.bind(state,agent.id,supplier.descriptor.id);await access.authorize(binding);const entry=await skillService(agent,{supplierId:supplier.descriptor.id,priceCents:state.policy.maxTaskBudget,revision:await workflowBindingHash(binding)});catalog.push(entry);bindings.set(entry.id,binding);}catch{}
- return {plugins,catalog,bindings};
+ return {plugins,catalog,bindings,repairRuntime:()=>configuredMixedRuntime(request,owner)};
 }
 export async function configuredMixedRuntime(request:Request,owner:string):Promise<MixedRuntime>{
  const configured=await configuredOrderChain(request),suppliers=workflowSupplierAccess(configured,await digest({workspace:owner}));
