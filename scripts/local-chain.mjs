@@ -1,3 +1,4 @@
+import {readLocalState,writeLocalState,localMap} from './local-state.mjs';
 import {pluginPurchaseRoutes} from './plugins/purchase-chain-routes.mjs';
 import {inputEvidence} from '../sdk/wallet.ts';
 import {vaultFunder} from '../lib/agentos/vault-executor.ts';
@@ -13,21 +14,25 @@ import { specHash, verifyDelivery, validateVerification } from '../cre/workflow/
 import { deployIdentityRegistries } from './compile-identity.mjs';
 
 const rpcMethods=new Set(['personal_sign','eth_chainId','eth_accounts','eth_blockNumber','eth_call','eth_getBalance','eth_getTransactionReceipt','eth_getTransactionByHash','eth_getBlockByNumber','eth_getBlockByHash','eth_estimateGas','eth_gasPrice','eth_maxPriorityFeePerGas','eth_feeHistory','eth_getTransactionCount','eth_sendTransaction','web3_clientVersion','net_version','eth_getCode','eth_getLogs']);
-export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:5177',identity=true}={}){
+export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:5177',identity=true,stateDirectory}={}){
   const origin=new URL(appOrigin);if(!['127.0.0.1','localhost','[::1]'].includes(origin.hostname))throw new Error('Local chain requires a loopback app origin.');
-  const provider=ganache.provider({logging:{quiet:true},chain:{hardfork:'shanghai',chainId:31337}});
+  const statePath=stateDirectory?stateDirectory+'/deployment.bin':undefined;let saved=readLocalState(statePath,null);const fresh=!saved;if(!saved){saved={seed:crypto.randomUUID(),appOrigin:origin.origin,identity};writeLocalState(statePath,saved);}if(saved.appOrigin!==origin.origin||saved.identity!==identity)throw Error('Persistent local chain origin or identity configuration changed.');
+  const provider=ganache.provider({logging:{quiet:true},chain:{hardfork:'shanghai',chainId:31337},...(stateDirectory?{wallet:{seed:saved.seed},database:{dbPath:stateDirectory+'/evm'}}:{})});
   const client=createPublicClient({transport:custom(provider),cacheTime:0}),wallet=createWalletClient({transport:custom(provider),chain:null});
-  const [buyer,seller,forwarder,executor,seller2]=await wallet.getAddresses(),artifacts=compile();
+  const [buyer,seller,forwarder,executor,seller2]=await wallet.getAddresses();let config;const metadata=stringToHex('agentos-local-verifier:v1');
+  if(!fresh&&!saved.config){await provider.disconnect();throw Error('Incomplete local deployment journal; preserve it and create a separate instance.');}
+  if(saved.config){config=saved.config;if(saved.buyer!==buyer){await provider.disconnect();throw Error('Persistent local wallet differs.');}for(const address of [config.token,config.escrow,config.vault,config.identityRegistry,config.reputationRegistry].filter(Boolean))if((await client.getCode({address}))==='0x'||!await client.getCode({address})){await provider.disconnect();throw Error('Persistent deployment is missing contract code.');}}else{const artifacts=compile();
   async function deploy(name,args=[]){const hash=await wallet.deployContract({...artifacts[name],account:buyer,args,gas:6000000n});return(await client.waitForTransactionReceipt({hash})).contractAddress;}
-  const token=await deploy('MockToken'),metadata=stringToHex('agentos-local-verifier:v1'),metadataHash=keccak256(metadata),escrow=await deploy('AgentEscrow',[token,forwarder,metadataHash]);
+  const token=await deploy('MockToken'),metadataHash=keccak256(metadata),escrow=await deploy('AgentEscrow',[token,forwarder,metadataHash]);
   await client.waitForTransactionReceipt({hash:await wallet.writeContract({address:token,abi:artifacts.MockToken.abi,functionName:'mint',args:[buyer,100000000n],account:buyer,gas:6000000n})});
   const vault=await deploy('AgentVault',[escrow]);
   const registries=identity?await deployIdentityRegistries(client,wallet,buyer):{};
-  const config={mode:'local',chainId:31337,token,escrow,forwarder,metadataHash,confirmations:1,seller,vault,vaultExecutor:executor,deployedBlock:'0',...registries},deliveries=new Map(),settlements=new Map();
-  const pluginRoutes=pluginPurchaseRoutes({client,wallet,config,metadata,buyer,executor,forwarder});
+  config={mode:'local',chainId:31337,token,escrow,forwarder,metadataHash,confirmations:1,seller,vault,vaultExecutor:executor,deployedBlock:'0',...registries};writeLocalState(statePath,{...saved,buyer,config});}
+  const {token,escrow,vault,metadataHash}=config,deliveryJournal=localMap(stateDirectory?stateDirectory+'/deliveries.bin':undefined),deliveries=deliveryJournal.map,settlements=new Map();
+  const pluginRoutes=pluginPurchaseRoutes({client,wallet,config,metadata,buyer,executor,forwarder,stateDirectory});
   let base;
   const server=createServer(async(req,res)=>{
-    const json=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data));};
+    const json=(status,data)=>{if(req.method==='POST')deliveryJournal.flush();res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data));};
     try{
       if(req.headers.host!==new URL(base).host||req.headers.origin&&req.headers.origin!==origin.origin)return json(403,{error:'Local chain origin rejected.'});
       if(req.headers.origin)res.setHeader('Access-Control-Allow-Origin',origin.origin);
@@ -131,7 +136,7 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
   console.log('Preparing local EVM contracts'+(process.env.AGENTOS_DEMO_SKIP_IDENTITY==='1'?' (Vault-only validation; identity disabled)':' including official identity registries')+'…');
-  const local=await startLocalChain({port:Number(process.env.AGENTOS_CHAIN_PORT||8545),appOrigin:process.env.AGENTOS_APP_ORIGIN||'http://127.0.0.1:5177',identity:process.env.AGENTOS_DEMO_SKIP_IDENTITY!=='1'});
+  const local=await startLocalChain({port:Number(process.env.AGENTOS_CHAIN_PORT||8545),appOrigin:process.env.AGENTOS_APP_ORIGIN||'http://127.0.0.1:5177',identity:process.env.AGENTOS_DEMO_SKIP_IDENTITY!=='1',stateDirectory:process.env.AGENTOS_CHAIN_STATE});
   console.log('AgentOS temporary local EVM: '+local.base+' (chain 31337; test tokens; no DON)');
   console.log('Public deployment: '+JSON.stringify(local.config));
   let closing=false;for(const signal of ['SIGINT','SIGTERM'])process.on(signal,async()=>{if(closing)return;closing=true;await local.close();process.exitCode=0;});

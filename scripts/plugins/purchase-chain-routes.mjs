@@ -1,3 +1,4 @@
+import {localMap} from '../local-state.mjs';
 import {encodeFunctionData} from 'viem';
 import {canonical,resultHash} from '../../cre/workflow/verify.ts';
 import {digest} from '../../lib/agentos/engine.ts';
@@ -9,8 +10,8 @@ import {verifyPluginForSettlement} from './settlement-verifier.mjs';
 const same=(a,b)=>String(a).toLowerCase()===String(b).toLowerCase();
 
 /** Local EVM acceptance authority. It has no public-chain signer or DON claim. */
-export function pluginPurchaseRoutes({client,wallet,config,metadata,buyer,executor,forwarder}){
- const records=new Map(),funds=new Map(),settlements=new Map(),chain=new AgentChainClient(client,config);
+export function pluginPurchaseRoutes({client,wallet,config,metadata,buyer,executor,forwarder,stateDirectory}){
+ const journal=localMap(stateDirectory?stateDirectory+'/plugin-records.bin':undefined),records=journal.map,funds=new Map(),settlements=new Map(),chain=new AgentChainClient(client,config);
  const task=id=>client.readContract({address:config.escrow,abi:escrowABI,functionName:'tasks',args:[id]});
  async function evidence(intent,phase){const event=phase==='funding'?'Opened':'Settled',logs=await client.getContractEvents({address:config.escrow,abi:escrowABI,eventName:event,args:{id:intent.id},fromBlock:BigInt(config.deployedBlock)});if(logs.length!==1)throw Error('Plugin purchase canonical event is unavailable.');return chain.verifyEvidence(intent,logs[0].transactionHash,phase);}
  async function prepare(body){
@@ -34,15 +35,15 @@ export function pluginPurchaseRoutes({client,wallet,config,metadata,buyer,execut
   if(canonical(selectPluginPurchaseInput(flow.input,step.input,paid))!==canonical(step.inputValue))throw Error('Plugin input differs from its committed paid dependency.');
   const {decimals}=await chain.validateDeployment(),intent={id:step.taskId,buyer:flow.vault.vault,seller:config.seller,amount:centsToToken(step.priceCents,decimals),deadline:BigInt(step.fundingIntent.deadline),specHash:step.specHash},request={jobId:step.jobId,scope:flow.scope,manifest,manifestHash:step.manifestHash,input:step.inputValue,inputHash:step.inputHash,runtimeHash:step.runtimeHash};
   const prior=records.get(intent.id);if(prior&&(canonical(prior.request)!==canonical(request)||canonical({...prior.intent,amount:String(prior.intent.amount),deadline:String(prior.intent.deadline)})!==canonical({...intent,amount:String(intent.amount),deadline:String(intent.deadline)})))throw Error('Plugin escrow intent is immutable.');
-  if(!prior)records.set(intent.id,{workflowId:flow.id,buyer:flow.buyer,intent,request,runtime:flow.runtime,sessionId:session.sessionId,scope:flow.scope,priceCents:step.priceCents});return {record:records.get(intent.id),session};
+  if(!prior)records.set(intent.id,{workflowId:flow.id,buyer:flow.buyer,intent,request,runtime:flow.runtime,sessionId:session.sessionId,scope:flow.scope,priceCents:step.priceCents});journal.flush();return {record:records.get(intent.id),session};
  }
  async function handle(path,body){
   if(path==='/plugin-purchase/fund'){
    const {record,session}=await prepare(body),id=record.intent.id;
-   if(!funds.has(id)){const action=(async()=>{const existing=await task(id);if(existing[5]!==0){record.funding=await evidence(record.intent,'funding');return {hash:record.funding.transactionHash};}
-    const view=await checkVaultBinding(client,config,session),used=Array.from(records.values()).filter(r=>r.sessionId===record.sessionId&&r.scope===record.scope&&r.funding).reduce((n,r)=>n+r.priceCents,0);
+   if(!funds.has(id)){const action=(async()=>{const existing=await task(id);if(existing[5]!==0){record.funding=await evidence(record.intent,'funding');journal.flush();return {hash:record.funding.transactionHash};}
+    const view=await checkVaultBinding(client,config,session),used=(await Promise.all(Array.from(records.values()).filter(r=>r.sessionId===record.sessionId&&r.scope===record.scope).map(async r=>(await task(r.intent.id))[5]!==0?r.priceCents:0))).reduce((n,value)=>n+value,0);
     if(used+record.priceCents>session.totalCents||record.priceCents>session.perTaskCents||record.intent.deadline<=view.now||record.intent.deadline>view.now+86400n||view.balance<record.intent.amount||view.spent+record.intent.amount>view.grant[1])throw Error('Plugin Vault limits do not permit funding.');
-    const data=encodeFunctionData({abi:vaultABI,functionName:'execute',args:[id,record.intent.seller,record.intent.amount,record.intent.deadline,record.intent.specHash]}),hash=await wallet.sendTransaction({account:executor,to:config.vault,data,gas:6000000n}),receipt=await client.waitForTransactionReceipt({hash});if(receipt.status!=='success')throw Error('Plugin Vault funding reverted.');record.funding=await chain.verifyEvidence(record.intent,hash,'funding');return {hash};})();funds.set(id,action);action.catch(()=>funds.delete(id));}
+    const data=encodeFunctionData({abi:vaultABI,functionName:'execute',args:[id,record.intent.seller,record.intent.amount,record.intent.deadline,record.intent.specHash]}),hash=await wallet.sendTransaction({account:executor,to:config.vault,data,gas:6000000n}),receipt=await client.waitForTransactionReceipt({hash});if(receipt.status!=='success')throw Error('Plugin Vault funding reverted.');record.funding=await chain.verifyEvidence(record.intent,hash,'funding');journal.flush();return {hash};})();funds.set(id,action);action.catch(()=>funds.delete(id));}
    return await funds.get(id);
   }
   if(path==='/plugin-purchase/settle'){
@@ -51,6 +52,7 @@ export function pluginPurchaseRoutes({client,wallet,config,metadata,buyer,execut
     if((await client.getBlock()).timestamp>=record.intent.deadline){const hash=await wallet.writeContract({address:config.escrow,abi:escrowABI,functionName:'refundExpired',args:[body.id],account:buyer,gas:6000000n});await client.waitForTransactionReceipt({hash});return {hash,mode:'local expired plugin escrow refund'};}
     let accepted=false,outputHash=resultHash({version:'agentos.plugin-rejection.v1',taskId:body.id});
     if(body.mode==='verify'&&body.execution){try{await verifyPluginForSettlement(record.request,body.execution,record.runtime);accepted=true;outputHash=resultHash(body.execution);}catch{accepted=false;}}
+    if(accepted){record.acceptedExecution=structuredClone(body.execution);journal.flush();}
     const hash=await wallet.writeContract({address:config.escrow,abi:[{type:'function',name:'onReport',stateMutability:'nonpayable',inputs:[{name:'metadata',type:'bytes'},{name:'report',type:'bytes'}],outputs:[]}],functionName:'onReport',args:[metadata,encodeSettlementReport(body.id,record.intent.specHash,outputHash,accepted)],account:forwarder,gas:6000000n}),receipt=await client.waitForTransactionReceipt({hash});if(receipt.status!=='success')throw Error('Plugin settlement reverted.');if(accepted)record.acceptedExecution=structuredClone(body.execution);return {hash,accepted,mode:'local independent plugin verifier; no DON'};
    })();settlements.set(body.id,action);action.catch(()=>settlements.delete(body.id));}
    return await settlements.get(body.id);
