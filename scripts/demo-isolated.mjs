@@ -2,7 +2,7 @@ import {spawn} from 'node:child_process';
 import {mkdir,open,writeFile,readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {createConnection} from 'node:net';
-import {syncDemoSource} from './demo-source.mjs';
+import {syncDemoSource,verifyDemoSource} from './demo-source.mjs';
 const resumeAt=process.argv.indexOf('--resume'),previous=resumeAt>=0?JSON.parse(await readFile(resolve(process.argv[resumeAt+1]),'utf8')):undefined;
 if(previous&&!previous.persistent)throw Error('This older runtime is in-memory. Start a new persistent instance; its running chain was not changed.');
 const sourceProxy=previous?.sourceProxy??process.env.AGENTOS_DEMO_SOURCE_PROXY==='1';
@@ -21,7 +21,7 @@ const env={...process.env,...(capturedSource?{AGENTOS_REPLAY_PORT:String(ports.c
 let stopping=false;const stop=()=>{if(stopping)return;stopping=true;for(const child of children)if(child.exitCode===null)child.kill('SIGTERM');};for(const signal of ['SIGTERM','SIGINT'])process.on(signal,stop);
 const occupied=port=>new Promise(done=>{const socket=createConnection({host:'127.0.0.1',port});socket.once('connect',()=>{socket.destroy();done(true);});socket.once('error',()=>done(false));});
 async function run(name,args,ready,overrides={}){
- const log=await open(root+'/'+name+'.log','a',0o600),child=spawn(process.execPath,args,{env:{...env,...overrides},stdio:['ignore',log.fd,log.fd]});await log.close();children.push(child);
+ const log=await open(root+'/'+name+'.log','a',0o600),child=spawn(process.execPath,args,{cwd:root+'/source',env:{...env,...overrides},stdio:['ignore',log.fd,log.fd]});await log.close();children.push(child);
  let terminal=false;const finished=new Promise(done=>{child.once('exit',code=>{terminal=true;done(code);});child.once('error',()=>{terminal=true;done(1);});});
  if(!ready){const code=await finished;if(code!==0)throw new Error(name+' failed; inspect '+root+'/'+name+'.log');return;}
  void finished.then(()=>{if(!stopping){console.error(name+' stopped unexpectedly; inspect '+root+'/'+name+'.log');process.exitCode=1;stop();}});
@@ -32,7 +32,7 @@ async function run(name,args,ready,overrides={}){
 try{
  for(const port of Object.values(ports))if(await occupied(port))throw new Error('Port '+port+' is already in use; no existing process was changed.');
  await mkdir(root,{recursive:true});
-  console.log('SOURCE '+JSON.stringify(await syncDemoSource(root+'/source')));
+  console.log('SOURCE '+JSON.stringify(await(previous?verifyDemoSource(root+'/source'):syncDemoSource(root+'/source'))));
  if(!previous)await run('database',['scripts/db-local.mjs']);
  if(capturedSource)await run('captured-source',['scripts/usdc-replay.mjs'],'http://127.0.0.1:'+(ports.capture??ports.data)+'/health');
  if(sourceProxy)await run('source-proxy',['scripts/data-proxy.mjs'],'http://127.0.0.1:'+ports.data+'/health',{AGENTOS_SOURCE_PROXY_PORT:String(ports.data),AGENTOS_SOURCE_PROXY_UPSTREAM:capturedSource?'http://127.0.0.1:'+ports.capture+'/captured-usdc':process.env.AGENTOS_DATA_RPC_URL||'https://ethereum-rpc.publicnode.com',AGENTOS_SOURCE_PROXY_MODE:capturedSource?'captured-finalized-replay':'live-finalized-read'});
