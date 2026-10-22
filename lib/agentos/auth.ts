@@ -16,7 +16,8 @@ export function owner(request: Request): string {
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(sandbox)) throw new DomainError('Invalid test workspace.');
     return `${identity}:sandbox:${sandbox}`;
   }
-  return identity;
+  const workspace=local?request.headers.get('cookie')?.match(/(?:^|;\s*)agentos-local-workspace=([0-9a-f-]{36})(?:;|$)/)?.[1]:undefined;
+  return workspace?`${identity}:workspace:${workspace}`:identity;
 }
 
 export function checkOrigin(request: Request) {
