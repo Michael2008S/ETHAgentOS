@@ -10,7 +10,7 @@ User request: complete improvements in the review order, test and commit each it
 | 4 | Two-step workflow and memory references | Persisted dependencies, previous accepted artifact as next input, recovery without duplicate payment | Implemented; item validation below |
 | 5 | Public testnet and CRE settlement | Real wallet, registered workflow execution, actual forwarder payment/refund transactions; account access verified rather than assumed | In progress; receiver/publisher/reconciliation/reusable dispatcher implemented; public acceptance pending |
 | 6 | Third-party onboarding and hosted operation | New skill onboarding with integration acceptance; authenticated deployed consumer, monitoring and failure recovery | In progress; new skill and scoped consumer operations locally accepted; actual hosted operation remains open |
-| Local complete-demo gate | Execute the current complete local sequence after implementation commits | 41-step HTTP/D1/EVM/model/supplier/plugin/CRE dry-run and cleanup | Passed on 709bcd3: 41 final steps code=0 after two explicit same-source network recoveries. Original failures retained. Latest affected checks and 6 CRE SDK tests passed; earlier full browser evidence is scoped separately below. |
+| Local complete-demo gate | Execute the current complete local sequence after implementation commits | 44-step HTTP/D1/EVM/model/supplier/plugin/mixed-memory/USDC/CRE dry-run and cleanup | Passed on ffaf883: 44 final steps code=0 after one explicit same-source HTTPS recovery at dispatcher step 43. Original failure, 43 artifact snapshots and model journals retained; current focused browser/type/unit checks remain distinct from older broad regression evidence. |
 
 The complete demo is a final gate after the individual changes. Public workflow deployment depends on actual account capabilities and configured infrastructure; local simulation does not satisfy item 5. No unattended schedule is enabled merely to represent deployment.
 
@@ -468,3 +468,19 @@ CLI 验收后停模型（约 2444 MiB RSS），编写浏览器用例期间模型
 本轮四项核心交付分别提交：统一服务与插件规划 ae64c32，模板 8072852，规范已付款成果修复 e937b72，有界自动修复提案 287a711；资源管理与阻塞修复另行提交。最新专项：14 项规划单测、5 项资源检查、实际两步/三步目标五笔付款、队列六场景、供应商十三场景及受影响浏览器复验通过。此前 fd631ca 上全量 Chromium 25/25 通过，之后按用户快速 demo 要求只复验受影响流程。未再次扩大全量 Node/类型/构建；历史 259 项记录不作为新提交全量回归。
 
 16 次自有模型启动全部停止，原始及续跑记录分别保存，三个模型端口关闭，临时 CRE CLI/隧道为空；六项保留服务 HTTP 200。清理 stopped=0、remaining=[]，报告 outputs/process-cleanup-74c17cf9-ef8b-4a96-8b24-f25af83c91b3.json，状态 outputs/validation-final-services-2026-10-22/final-processes.json。当前唯一服务、D1/交易历史及模型文件保留，未操作其他项目。本轮本地 demo 目标完成；公共链、实际 DON、托管发布/调度继续暂缓。跨契约混合图、开放市场和生产钱包等仍为后续平台范围。
+
+
+## Current three-increment local delivery — 2026-10-22
+
+- `21538d5`: mixed skill/plugin sequential controller, explicit contracts/adapters, shared reservations, durable queue, bilingual reviewed editor and actual paid execution.
+- `fb0b078`: unified paid-plugin semantic summaries and canonical paid-root adoption into a new mixed purchase.
+- `8b99ae5`: finalized mainnet USDC treasury review with exact six-decimal policy calculation and local paid report.
+- `ffaf883`: resolved extension-skill input commitment and an actual plugin→new versioned skill→plugin regression.
+
+The 44-step run on this implementation started at 2026-10-22 07:30:30 UTC and finished at 07:49:42 UTC. The first dispatcher attempt encountered an unavailable temporary HTTPS evidence publisher; original log/artifact remain. Same-source resume at step 43 passed all four CLI dispatcher cases, local callbacks and the final doctor; no stage was skipped. The initial pre-fix full attempt was explicitly interrupted and is not counted as a pass.
+
+Current report: `outputs/full-demo-b3ac1f6a-e230-49a1-88fe-a62a10a647a4/report.json`. Verification: `verification.json` in the same directory commits 43 child artifact snapshots, log hashes, the exact source digest `e43deea829433e8570823403d8e79a54909743f453320915b68d692c019df5c7` and both model journals around the explicit resume. Owned model starts/stops match: base 7/7, planning 6/6, memory 4/4. Final doctor reported all nine service checks ready with no warnings.
+
+Final cleanup: `outputs/process-cleanup-6c16d5c4-a7d0-42b4-bba0-622ad3243c03.json` and `processes-after-cleanup.json` alongside the run report. No owned model, CRE, temporary tunnel or test-runner process remained; model ports 11435/11436/11437 were closed. The one retained runtime on 6097/9455 and its two suppliers, plugin and MCP services all returned HTTP 200. Data and histories were preserved. Documentation-only updates follow the validated implementation commit; no application code was changed after this run.
+
+Focused current checks include semantic-memory/model-management/mixed-contract tests, actual independent QuickJS policy boundary checks, website TypeScript checks and one affected bilingual/mobile browser test. This increment deliberately did not repeat the entire Node/browser suite or production build. Public wallet/Sepolia/DON acceptance and hosted scheduling remain deferred by the user.

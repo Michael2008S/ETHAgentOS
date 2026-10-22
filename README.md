@@ -24,11 +24,15 @@
 - 审阅式重规划：保留已付款成果与原凭证，确认退款后为剩余目标生成替代步骤；人工批准时原子替换未支出工作，退款尝试仍占用累计额度。见 [WORKFLOW-REPLANNING](docs/WORKFLOW-REPLANNING.md)。
 - 使用真实 `@chainlink/cre-sdk` 的工作流源码与 TypeScript 客户端 SDK。
 
-- 通用插件付费核心：API/SDK 与持久队列支持通用 JSON 输入、已付款父成果、精确插件支付授权、签名交付、独立重放和实际本地 Vault 付款/退款。插件规划、模板和失败修复已接通，当前 41 步本地 demo 最终全部通过；两次网络失败和同源码续跑记录保留，见 [PLUGIN-PURCHASES](docs/PLUGIN-PURCHASES.md)。
+- 通用插件付费核心：API/SDK 与持久队列支持通用 JSON 输入、已付款父成果、精确插件支付授权、签名交付、独立重放和实际本地 Vault 付款/退款。插件规划、模板和失败修复已接通，当前 44 步本地 demo 最终全部通过；一次临时 HTTPS 失败和同源码续跑记录保留，见 [PLUGIN-PURCHASES](docs/PLUGIN-PURCHASES.md)。
+
+- 技能与插件混合编排：2–8 步明确程序，支持插件→业务技能、已付款业务成果→插件、显式数据适配、共享额度和持久恢复；包含新安装版本化技能的真实本地付款验收。
+- 插件成果统一记忆：已付款插件摘要可进入真实向量检索，审阅采用时重验签名产物与链上付款，新采购仍需新的明确授权。
+- USDC 财库业务场景：读取最终确认的主网支出样本，以 6 位原始精度判断单一收款方 50% 集中度，生成可追溯的人工复核报告；服务付款使用本地测试币。运行证据见 [VALIDATION](docs/VALIDATION.md)。
 
 ## 状态边界
 
-**沙盒任务与链上订单是两条独立链路。** 沙盒使用 testUSD 积分；预注资订单通过真实 EVM 托管测试代币。两个版本化技能可分析内置或用户提交的转账记录，可选择内置适配器或受授权的独立 HTTP 供应商。预注资订单可选择真实 LLM 工具规划，服务端负责权限校验与独立复算；模型不签名、不计算最终金额。智能体档案可绑定真实 ERC-8004 注册表身份快照。任务由服务端后台推进，关闭浏览器不影响当前执行。请求中止或服务重启后，持久检查点可通过恢复 API 或本地恢复 worker 继续。自定义 Agent 绑定现有版本化技能，不执行任意第三方代码。
+**沙盒任务与链上订单是两条独立链路。** 沙盒使用 testUSD 积分；预注资订单通过真实 EVM 托管测试代币。两个内置技能及按需安装的版本化扩展可分析内置或用户提交的转账记录，可选择内置适配器或受授权的独立 HTTP 供应商。预注资订单可选择真实 LLM 工具规划，服务端负责权限校验与独立复算；模型不签名、不计算最终金额。智能体档案可绑定真实 ERC-8004 注册表身份快照。任务由服务端后台推进，关闭浏览器不影响当前执行。请求中止或服务重启后，持久检查点可通过恢复 API 或本地恢复 worker 继续。自定义业务 Agent 绑定已安装的版本化技能；通用 JavaScript 插件通过独立的受限 QuickJS 执行，当前付款仍仅限本地环境。
 
 Solidity 在本地 EVM 中测试；CRE 工作流已通过 SDK 与官方 CLI 编译，并完成真实 HTTPS 读取、节点共识、报告生成和 EVM capability 的 CLI dry-run。**尚未部署 DON、验收真实浏览器钱包扩展或广播公共测试网交易。沙盒积分账本保持独立；预注资链上订单有单独的资金凭证与 D1 对账。** 不应将界面收据展示为链上证明或 Chainlink 签名。x402、CCIP、Data Feeds 是后续扩展；身份与信誉注册表已经本地 EVM 验证，公共测试网仍待配置。
 
@@ -55,7 +59,7 @@ npm run cre:build         # 需要 Bun >=1.2.21；生成 outputs/agentos-cre.was
 npm run cre:prepare       # 生成本地 CRE 配置，保留已有配置
 npm run cre:cli-build     # 通过官方 CLI 构建 outputs/agentos-cli.wasm
 npm run cre:simulate      # 需实际配置、账户认证；默认不广播
-npm run demo:cre          # 先编译，再运行 3 场景的本地 RPC + HTTPS dry-run
+npm run demo:cre          # 先编译，再运行 5 场景的本地 RPC + HTTPS dry-run
 npm run demo              # 完整闭环，独立沙盒，不需要打开浏览器
 npm run demo:deadline     # 自动超时、预留释放、已付款跨期限恢复
 npm run demo:chain        # 网页成果 → 本地校验器 → 真实本地 EVM 托管与退款
@@ -68,6 +72,9 @@ npm run demo:identity     # 官方 ERC-8004 + HTTP/D1/EVM，6 组身份与评价
 npm run supplier:local    # 独立技能服务与签名交付日志，127.0.0.1:7461
 npm run demo:supplier     # 13 组独立服务、恢复、权限与付款/退款场景
 npm run demo:queue        # 丢失后台请求后，从 D1 队列独立恢复并单次付款
+npm run demo:mixed        # 插件→内置/版本化扩展技能→插件，本地真实付款与恢复
+npm run demo:plugin-memory # 真实向量检索、付款成果采用及新混合采购；模型按需启停
+npm run demo:treasury-business # 主网 USDC 只读样本、精确集中度及本地付费报告
 npm run test:api          # 并发、撤销、收据 API 回归
 npm run worker            # 可选：本地常驻恢复 worker
 ```

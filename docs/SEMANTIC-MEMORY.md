@@ -1,6 +1,6 @@
 # Semantic memory and reviewed paid-result reuse
 
-The Memory page now retrieves related task snapshots, stored paid results and private knowledge notes using real embeddings. It keeps the existing keyword search and exports below the semantic panel. The wallet workflow panel searches paid results for the connected buyer and can apply a reviewed result as new root input. Indexing, searching and applying do not create an order or sign a new spending authorization.
+The Memory page now retrieves related task snapshots, stored paid business/plugin results and private knowledge notes using real embeddings. It keeps the existing keyword search and exports below the semantic panel. The wallet workflow panel searches paid results for the connected buyer and can apply a reviewed result as new root input. Indexing, searching and applying do not create an order or sign a new spending authorization.
 
 ## Local model and setup
 
@@ -40,7 +40,7 @@ Applying the selected input clears the editor's selected Vault session. The user
 
 ## API, SDK and acceptance
 
-`GET /api/memory/semantic` returns scoped summaries, index coverage, the next reviewed batch, optional notes and request metadata. `GET ?id=<uuid>` retrieves a saved request. POST actions are `index`, `search`, `save-note`, `delete-note`, `forget-request` and `adopt`. Callers cannot supply an endpoint, owner or credential.
+`GET /api/memory/semantic` returns scoped summaries, index coverage, the next reviewed batch, optional notes and request metadata. `GET ?id=<uuid>` retrieves a saved request. POST actions are `index`, `search`, `save-note`, `delete-note`, `forget-request`, `adopt` and `adopt-plugin`. Callers cannot supply an endpoint, owner or credential.
 
 `sdk/semantic-memory.ts` exposes `AgentSemanticMemoryClient`: catalogue, index, search, saved, saveNote, deleteNote, forget and adopt. Supply an expected workspace hash when binding a client. Use a fresh request UUID for an acknowledged failed query; preserve its UUID after uncertain response loss.
 
@@ -51,3 +51,12 @@ npm run test:browser -- --runtime .sites-runtime/isolated-demo/current.json --gr
 ```
 
 The HTTP demo uses real multilingual embeddings, D1 and two independent signed local suppliers, then reuses a paid result in a new two-step workflow on actual local Vault/EVM contracts. It checks English-result retrieval by Chinese meaning, unrelated ranking, saved-response-loss replay, owner/buyer/model constraints, note invalidation/deletion, unchanged original payment, one session signature, unique funding events, balance deltas and an empty queue. Unit fixtures exercise actual SQLite atomicity and controlled vector responses for deterministic races; those controlled responses are not evidence of semantic quality. The full runner includes this unit, but its final complete run and public-network gates remain separate.
+
+
+## Paid plugin results and mixed drafts — 2026-10-22
+
+The paid-plugin source kind is `paid-plugin`. Its embedding input contains a reviewed title, plugin identifier, output field names and small numeric/boolean aggregates. Full arbitrary JSON, raw transfer rows and signature bytes are not automatically indexed. Source hashes commit the complete signed execution, original input, manifest/runtime, buyer, deployment and settlement reference. Catalog snapshots are not a claim of continuously monitored finality.
+
+The mixed wallet panel can adopt a reviewed hit through `adopt-plugin`. The API checks the saved search, source hash, buyer and current canonical funding/settlement, then returns the exact signed output and paid-root reference. Adoption creates no job and grants no spending. New mixed creation verifies the persisted review again; execution rechecks the canonical paid output. The editor clears selected payment authority on adoption/edit. Fresh execution and exact payment grants remain necessary. This does not add document chunking, full-output text indexing or unreviewed automatic memory selection.
+
+Actual local embedding and reuse acceptance is part of the current 44-step demo; see VALIDATION.md.
