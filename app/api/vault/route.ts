@@ -4,8 +4,12 @@ import {configuredOrderChain} from '@/lib/agentos/order-runtime';
 import {prepareVaultSession,inspectVault,checkVaultBinding} from '@/lib/agentos/vault';
 import {DomainError,digest} from '@/lib/agentos/engine';
 import {apiFailure} from '@/lib/agentos/api-failure';
+import {vaultPluginPermissionSchema,normalizePluginPermissions} from '@/lib/agentos/plugin-purchase-protocol';
+import {pluginInstallation} from '@/lib/agentos/plugin-store';
+import {pluginDatabase,configuredPluginExecutor} from '@/lib/agentos/plugin-runtime';
+import {pluginToolsAvailable} from '@/lib/agentos/plugin-state';
 const schema=z.discriminatedUnion('action',[
- z.object({action:z.literal('prepare'),buyer:z.string().regex(/^0x[0-9a-fA-F]{40}$/),perTaskCents:z.number().int().positive().max(1000000),totalCents:z.number().int().positive().max(1000000),dailyCents:z.number().int().positive().max(1000000).optional(),sellers:z.array(z.string().regex(/^0x[0-9a-fA-F]{40}$/).transform(a=>a as `0x${string}`)).min(1).max(8).optional()}).strict(),
+ z.object({action:z.literal('prepare'),buyer:z.string().regex(/^0x[0-9a-fA-F]{40}$/),perTaskCents:z.number().int().positive().max(1000000),totalCents:z.number().int().positive().max(1000000),dailyCents:z.number().int().positive().max(1000000).optional(),sellers:z.array(z.string().regex(/^0x[0-9a-fA-F]{40}$/).transform(a=>a as `0x${string}`)).min(1).max(8).optional(),pluginPermissions:z.array(vaultPluginPermissionSchema).min(1).max(20).optional()}).strict(),
  z.object({action:z.literal('bind'),sessionId:z.string().uuid(),signature:z.string().regex(/^0x[0-9a-fA-F]+$/).min(130).max(8194)}).strict(),
  z.object({action:z.literal('revoke'),sessionId:z.string().uuid()}).strict(),
 ]);
@@ -21,6 +25,7 @@ export async function POST(request:Request){try{
  const body=schema.parse(JSON.parse(raw)),{client,deployment}=await configuredOrderChain(request);
  let result;
  if(body.action==='prepare'){
+  if(body.pluginPermissions){const permissions=normalizePluginPermissions(body.pluginPermissions),runtime=(await configuredPluginExecutor(request)).descriptor;for(const p of permissions){const plugin=await pluginInstallation(pluginDatabase().database,ownerId,p.pluginId);if(!plugin||plugin.manifestHash!==p.manifestHash||runtime.configHash!==p.runtimeHash||p.maxPriceCents>body.perTaskCents)throw new DomainError('Review installed plugin code, runtime and price before authorizing payment.','FORBIDDEN');pluginToolsAvailable(plugin.manifest,runtime);}}
   const snapshot=await read(ownerId),session=await prepareVaultSession(snapshot.state,ownerId,deployment,client,{...body,buyer:body.buyer as `0x${string}`},crypto.randomUUID());
   result=await updateWorkspace(ownerId,state=>{if((state.vaultSessions?.length??0)>=40)throw new DomainError('Vault session history is full.');return {...state,vaultSessions:[session,...state.vaultSessions??[]]};});
   return Response.json({session:result.state.vaultSessions!.find(s=>s.sessionId===session.sessionId)},{headers:{'Cache-Control':'no-store'}});

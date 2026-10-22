@@ -327,3 +327,11 @@ The complete demo is a final gate after the individual changes. Public workflow 
 新增 demo:cleanup：默认仅预览本仓库旧隔离启动器及子进程，保留当前入口；--apply 才发送 SIGTERM，--models 明确包括模型，--all 明确包括当前和已识别辅助服务。进程目录、限定 Node 命令、父子关系及启动时间/命令指纹共同限制操作；每次信号前重读，跳过已换身份的 PID，不使用 killall 或 SIGKILL，不删除历史。测试/浏览器/完整演示进程存在时拒绝操作。
 
 三个专项测试通过，覆盖当前/模型保护、其他项目与编辑器排除、测试期间拒绝、PID 复用及残留子进程。实际 --apply --models 再核查时没有待清理旧服务，stopped=0、remaining=[]，报告 outputs/process-cleanup-1bb996fa-7afb-44b0-b949-3a4c56334417.json。之前已核验清理的 45 个旧实例进程及 6 个模型进程，分别保留在插件验收目录的 process-cleanup-*.json；清理后当前开发入口及插件/MCP 继续保留，模型待需要时启动。此增量不改变插件/付款逻辑，不冒称重新运行整个 209 项回归。
+
+## 通用插件付费工作流：显式授权与共享额度基础（2026-10-22，香港时间）
+
+完成 Vault pluginPermissions 的 API/SDK 和签名绑定：具体代码、运行时、最高单价、单笔/总额/期限/当前 epoch 均纳入约束；旧签名不自动增加能力，SDK 签名前拒绝不同的权限集合。API 仅允许当前 owner 已安装且工具仍匹配的插件。新增有界 JSON 工作流草稿、已付款父成果输入选择和紧凑费用引用；已注资退款继续占用签名总额，可能广播的取消意图不释放费用。它们是后续持久付费执行器的基础，尚未创建实际插件采购。
+
+214/214 Node、九项 Vault/插件协议/实际 EVM 专项、原有 Vault 界面单项浏览器回归、网站/CRE 类型检查与生产构建通过。实际 HTTP/D1/SDK/本地钱包及 EVM 验收一次签名绑定精确插件权限，错误代码摘要返回 403，零插件采购；测试会话已撤销。新 EVM 用例首次遗漏 viem chain:null 的失败保留，修正后完整回归通过。证据：outputs/validation-plugin-purchases-2026-10-22/authorization-verification.json。
+
+该阶段仅完成支付授权基础，不将签名与类型校验当成付款验收。剩余状态机、实际注资/执行/独立结算、付款/退款与依赖、双语付费界面及完整 demo 见 PLUGIN-PURCHASES.md；总体目标继续进行，公网与托管验收暂缓。模型未启动，本阶段临时 EVM 都在 finally 中断开，当前开发实例保留供下一步复用。

@@ -5,6 +5,7 @@ import {centsToToken,tokenABI} from '../../sdk/chain.ts';
 import type {WalletDeployment} from '../../sdk/wallet.ts';
 import {digest,DomainError} from './engine.ts';
 import type {Skill,Workspace} from './types.ts';
+import {normalizePluginPermissions,type VaultPluginPermission} from './plugin-purchase-protocol.ts';
 
 export const vaultABI=parseAbi([
  'function owner() view returns(address)','function token() view returns(address)','function escrow() view returns(address)',
@@ -15,7 +16,7 @@ export const vaultABI=parseAbi([
  'function allowSeller(address seller,bool allowed)','function revoke(address executor)','function withdraw(uint256 amount)',
  'function execute(bytes32 id,address seller,uint256 amount,uint64 deadline,bytes32 specHash)',
 ]);
-export type VaultBinding={sessionId:string;chainId:number;escrow:Address;token:Address;seller:Address;sellers?:Address[];vault:Address;executor:Address;owner:Address;epoch:string;perTaskCents:number;totalCents:number;dailyCents:number;expires:string;skills:Skill[];scope:string};
+export type VaultBinding={sessionId:string;chainId:number;escrow:Address;token:Address;seller:Address;sellers?:Address[];vault:Address;executor:Address;owner:Address;epoch:string;perTaskCents:number;totalCents:number;dailyCents:number;expires:string;skills:Skill[];scope:string;pluginPermissions?:VaultPluginPermission[]};
 export type VaultSession=VaultBinding&{message:string;challengeExpiresAt:string;signature?:Hex;revokedAt?:string};
 const same=(a:string,b:string)=>a.toLowerCase()===b.toLowerCase();
 export function normalizedVaultSellers(defaultSeller:Address,input?:Address[]):Address[]{
@@ -43,6 +44,7 @@ export async function inspectVault(client:PublicClient,deployment:WalletDeployme
 }
 export async function checkVaultBinding(client:PublicClient,deployment:WalletDeployment,binding:VaultBinding){
  const view=await inspectVault(client,deployment);
+ if(binding.pluginPermissions&&canonical(binding.pluginPermissions)!==canonical(normalizePluginPermissions(binding.pluginPermissions)))throw new DomainError('Vault plugin permissions differ from their signed normalization.','FORBIDDEN');
  if(binding.sellers&&(canonical(binding.sellers)!==canonical(normalizedVaultSellers(deployment.seller,binding.sellers))))throw new DomainError('Vault seller authorization differs from its signed session.','FORBIDDEN');
  if(binding.chainId!==deployment.chainId||!same(binding.escrow,deployment.escrow)||!same(binding.token,deployment.token)||!same(binding.seller,deployment.seller)||!same(binding.vault,view.vault)||!same(binding.executor,view.executor)||!same(binding.owner,view.owner)||binding.epoch!==view.epoch.toString()||binding.expires!==view.grant[2].toString()||!view.seller||view.grant[2]<=view.now||view.grant[0]!==centsToToken(binding.perTaskCents,view.decimals)||view.grant[1]!==centsToToken(binding.dailyCents,view.decimals))throw new DomainError('Vault grant has expired, changed or been revoked.','FORBIDDEN');
  const sellers=binding.sellers??[binding.seller];
@@ -57,11 +59,11 @@ export async function checkVaultSessionAllowance(client:PublicClient,deployment:
  if(view.spent+amount>view.grant[1])throw new DomainError('Remaining onchain daily allowance cannot cover the approved workflow ceilings.','FORBIDDEN');
  return view;
 }
-export async function prepareVaultSession(state:Workspace,ownerId:string,deployment:WalletDeployment,client:PublicClient,input:{buyer:Address;perTaskCents:number;totalCents:number;dailyCents?:number;sellers?:Address[]},id:string,now=new Date().toISOString()){
+export async function prepareVaultSession(state:Workspace,ownerId:string,deployment:WalletDeployment,client:PublicClient,input:{buyer:Address;perTaskCents:number;totalCents:number;dailyCents?:number;sellers?:Address[];pluginPermissions?:VaultPluginPermission[]},id:string,now=new Date().toISOString()){
  const view=await inspectVault(client,deployment);
  const dailyCents=input.dailyCents??input.totalCents;
  if(!same(input.buyer,view.owner)||!state.policy.active||!Number.isSafeInteger(input.perTaskCents)||!Number.isSafeInteger(input.totalCents)||!Number.isSafeInteger(dailyCents)||input.perTaskCents<1||input.totalCents<input.perTaskCents||dailyCents<input.totalCents||dailyCents>1000000)throw new DomainError('Vault limits or owner do not match.','FORBIDDEN');
- const binding:VaultBinding={sessionId:id,chainId:deployment.chainId,escrow:deployment.escrow,token:deployment.token,seller:deployment.seller,...(input.sellers?{sellers:normalizedVaultSellers(deployment.seller,input.sellers)}:{}),vault:view.vault,executor:view.executor,owner:view.owner,epoch:view.epoch.toString(),perTaskCents:input.perTaskCents,totalCents:input.totalCents,dailyCents,expires:view.grant[2].toString(),skills:[...state.policy.allowedSkills],scope:await digest({workspace:ownerId})};
+ const binding:VaultBinding={sessionId:id,chainId:deployment.chainId,escrow:deployment.escrow,token:deployment.token,seller:deployment.seller,...(input.sellers?{sellers:normalizedVaultSellers(deployment.seller,input.sellers)}:{}),...(input.pluginPermissions?{pluginPermissions:normalizePluginPermissions(input.pluginPermissions)}:{}),vault:view.vault,executor:view.executor,owner:view.owner,epoch:view.epoch.toString(),perTaskCents:input.perTaskCents,totalCents:input.totalCents,dailyCents,expires:view.grant[2].toString(),skills:[...state.policy.allowedSkills],scope:await digest({workspace:ownerId})};
  if(view.grant[2]>view.now+86400n)throw new DomainError('Vault sessions may last at most 24 hours.');
  await checkVaultBinding(client,deployment,binding);
  const challengeExpiresAt=new Date(Date.parse(now)+300000).toISOString();
@@ -72,8 +74,16 @@ export function sessionBinding(session:VaultSession):VaultBinding{
  const {message:_,challengeExpiresAt:__,signature:___,revokedAt:____,...binding}=session;return binding;
 }
 export function vaultAllowance(state:Workspace,sessionId:string,buyer:Address,skill:Skill,budget:number,quote:number,now=new Date().toISOString(),excludeOrder?:string){
+ const session=vaultMoneyAllowance(state,sessionId,buyer,budget,quote,now,excludeOrder);
+ if(!session.skills.includes(skill))throw new DomainError('No active Vault session authorizes this purchase.','FORBIDDEN');return session;
+}
+export function pluginVaultAllowance(state:Workspace,sessionId:string,buyer:Address,permission:VaultPluginPermission,budget:number,additionalQuote:number,now=new Date().toISOString()){
+ const session=vaultMoneyAllowance(state,sessionId,buyer,budget,additionalQuote,now);
+ if(!session.pluginPermissions?.some(p=>p.pluginId===permission.pluginId&&p.manifestHash===permission.manifestHash&&p.runtimeHash===permission.runtimeHash&&p.maxPriceCents>=permission.maxPriceCents))throw new DomainError('The signed Vault session does not authorize this plugin, runtime and price.','FORBIDDEN');return session;
+}
+function vaultMoneyAllowance(state:Workspace,sessionId:string,buyer:Address,budget:number,quote:number,now:string,excludeOrder?:string){
  const session=state.vaultSessions?.find(s=>s.sessionId===sessionId);
- if(!session?.signature||session.revokedAt||!same(session.owner,buyer)||!session.skills.includes(skill)||BigInt(session.expires)<=BigInt(Math.floor(Date.parse(now)/1000))||budget>session.perTaskCents)throw new DomainError('No active Vault session authorizes this purchase.','FORBIDDEN');
+ if(!session?.signature||session.revokedAt||!same(session.owner,buyer)||!Number.isSafeInteger(budget)||budget<0||!Number.isSafeInteger(quote)||quote<0||BigInt(session.expires)<=BigInt(Math.floor(Date.parse(now)/1000))||budget>session.perTaskCents)throw new DomainError('No active Vault session authorizes this purchase.','FORBIDDEN');
  // Reserve immutable quotes before any RPC. Refunds consume session allowance.
  const used=(state.chainOrders??[]).filter(o=>o.id!==excludeOrder&&o.vault?.sessionId===sessionId&&(o.funding||o.status!=='cancelled')).reduce((sum,o)=>sum+o.quote,0);
  const future=futurePurchaseReservations(state).filter(r=>r.vaultSessionId===sessionId).reduce((sum,r)=>sum+r.quote,0);
