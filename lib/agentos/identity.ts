@@ -8,12 +8,13 @@ import { findOrder } from './orders.ts';
 import { orderChain } from './order-chain.ts';
 import type { Workspace } from './types.ts';
 
+export type IdentityDeployment=Pick<WalletDeployment,'chainId'|'confirmations'|'identityRegistry'|'reputationRegistry'>;
 export type AgentIdentity={agentId:string;chainId:number;registry:Address;reputationRegistry:Address;registryAgentId:string;owner:Address;wallet:Address;agentURI:string;documentHash:Hex;registrationTx:Hex;registrationBlock:string;registrationBlockHash:Hex;checkedBlock:string;checkedBlockHash:Hex;checkedAt:string;status:'verified'|'stale'};
 export type IdentityChallenge={nonce:string;message:string;identity:AgentIdentity;expiresAt:string;usedAt?:string};
 export type PaidFeedback={orderId:string;identity:AgentIdentity;buyer:Address;score:number;feedbackURI:string;feedbackHash:Hex;tag2:string;endpoint:string;preparedAt:string;status:'awaiting-chain'|'active'|'revoked'|'unavailable';transactionHash?:Hex;blockNumber?:string;blockHash?:Hex;feedbackIndex?:string;checkedAt?:string};
 const same=(a:string,b:string)=>a.toLowerCase()===b.toLowerCase();
 export const dataJSON=registrationDataURI;
-export function registryAddresses(deployment:WalletDeployment){
+export function registryAddresses(deployment:IdentityDeployment){
  const {identityRegistry,reputationRegistry}=deployment;
  if(![identityRegistry,reputationRegistry].every(a=>typeof a==='string'&&/^0x[0-9a-fA-F]{40}$/.test(a)&&!/^0x0{40}$/.test(a)))throw new DomainError('Identity registries are not configured.','UNAVAILABLE');
  return {registry:identityRegistry!,reputationRegistry:reputationRegistry!};
@@ -23,7 +24,7 @@ export async function identityDocument(state:Workspace,ownerId:string,agentId:st
  const document={...registrationDocument({name:agent.name,description:agent.description,image:origin+'/favicon.svg',webEndpoint:origin}),supportedTrust:['reputation'],agentos:{version:1,workspaceHash:await digest({ownerId}),localAgentId:agent.id,skill:agent.skill}};
  return {document,agentURI:dataJSON(document)};
 }
-export async function validateRegistries(client:PublicClient,deployment:WalletDeployment){
+export async function validateRegistries(client:PublicClient,deployment:IdentityDeployment){
  const {registry,reputationRegistry}=registryAddresses(deployment);
  const [chainId,identityCode,reputationCode,linked]=await Promise.all([client.getChainId(),client.getCode({address:registry}),client.getCode({address:reputationRegistry}),client.readContract({address:reputationRegistry,abi:reputationABI,functionName:'getIdentityRegistry'})]);
  if(chainId!==deployment.chainId||!identityCode||identityCode==='0x'||!reputationCode||reputationCode==='0x'||!same(linked,registry))throw new DomainError('Registry deployment identity differs from configuration.','CONFLICT');
@@ -34,7 +35,7 @@ async function canonicalReceipt(client:PublicClient,hash:Hex,confirmations:numbe
  if(receipt.status!=='success'||block.hash!==receipt.blockHash||latest-receipt.blockNumber+1n<BigInt(confirmations))throw new DomainError('A confirmed canonical registry transaction is required.','CONFLICT');
  return receipt;
 }
-export async function inspectIdentity(client:PublicClient,deployment:WalletDeployment,identity:AgentIdentity){
+export async function inspectIdentity(client:PublicClient,deployment:IdentityDeployment,identity:AgentIdentity){
  const addresses=await validateRegistries(client,deployment);
  if(identity.chainId!==deployment.chainId||!same(identity.registry,addresses.registry)||!same(identity.reputationRegistry,addresses.reputationRegistry))throw new DomainError('Identity network differs from configuration.','CONFLICT');
  const block=await client.getBlock(),args=[BigInt(identity.registryAgentId)] as const,base={address:identity.registry,abi:identityABI,args,blockNumber:block.number};
@@ -42,11 +43,13 @@ export async function inspectIdentity(client:PublicClient,deployment:WalletDeplo
  if(registration.hash!==identity.registrationBlockHash||!same(owner,identity.owner)||!same(wallet,identity.wallet)||/^0x0{40}$/.test(wallet)||uri!==identity.agentURI)throw new DomainError('Identity ownership, payment wallet or registration document changed. Rebind before new orders.','CONFLICT');
  return {...identity,status:'verified' as const,checkedAt:new Date().toISOString(),checkedBlock:block.number.toString(),checkedBlockHash:block.hash!};
 }
-export async function verifyRegistration(state:Workspace,ownerId:string,agentId:string,registryAgentId:string,transactionHash:Hex,origin:string,client:PublicClient,deployment:WalletDeployment):Promise<AgentIdentity>{
+export async function verifyRegistration(state:Workspace,ownerId:string,agentId:string,registryAgentId:string,transactionHash:Hex,origin:string,client:PublicClient,deployment:IdentityDeployment,existingRegistration=false):Promise<AgentIdentity>{
  const {registry,reputationRegistry}=await validateRegistries(client,deployment),draft=await identityDocument(state,ownerId,agentId,origin),receipt=await canonicalReceipt(client,transactionHash,deployment.confirmations);
  const agentURI=dataJSON(completeRegistrationDocument(draft.document,deployment.chainId,registry,registryAgentId));
- const event=receipt.logs.filter(l=>same(l.address,registry)).map(l=>{try{return decodeEventLog({abi:identityABI,eventName:'Registered',data:l.data,topics:l.topics}).args;}catch{return null;}}).find(e=>e?.agentId===BigInt(registryAgentId)&&e.agentURI===draft.agentURI);
+ const event=receipt.logs.filter(l=>same(l.address,registry)).map(l=>{try{return decodeEventLog({abi:identityABI,eventName:'Registered',data:l.data,topics:l.topics}).args;}catch{return null;}}).find(e=>e?.agentId===BigInt(registryAgentId)&&(existingRegistration||e.agentURI===draft.agentURI));
  if(!event)throw new DomainError('Registration transaction does not bind this workspace profile.','CONFLICT');
+ // Existing registrations still require the exact current workspace document and owner signature.
+ // Only the historical Registered URI comparison is relaxed; inspectIdentity checks current tokenURI.
  const [owner,wallet]=await Promise.all([client.readContract({address:registry,abi:identityABI,functionName:'ownerOf',args:[BigInt(registryAgentId)]}),client.readContract({address:registry,abi:identityABI,functionName:'getAgentWallet',args:[BigInt(registryAgentId)]})]);
  const identity:AgentIdentity={agentId,chainId:deployment.chainId,registry,reputationRegistry,registryAgentId,owner,wallet,agentURI,documentHash:keccak256(stringToHex(agentURI)),registrationTx:transactionHash,registrationBlock:receipt.blockNumber.toString(),registrationBlockHash:receipt.blockHash,checkedBlock:receipt.blockNumber.toString(),checkedBlockHash:receipt.blockHash,checkedAt:new Date().toISOString(),status:'verified'};
  return inspectIdentity(client,deployment,identity);

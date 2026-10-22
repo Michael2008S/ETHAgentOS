@@ -74,6 +74,7 @@ export default defineConfig(async ({ command }) => {
         ...(process.env.AGENTOS_DEV_STATE_DIRECTORY?{persistState:{path:process.env.AGENTOS_DEV_STATE_DIRECTORY}}:{}),
         config: {
           ...localBindingConfig,
+          ...(command === "serve" && process.env.AGENTOS_IDENTITY_CONFIGURATION ? {vars:{AGENTOS_IDENTITY_CONFIGURATION:process.env.AGENTOS_IDENTITY_CONFIGURATION}} : {}),
           ...(command === "serve"
             ? {
                 services: [

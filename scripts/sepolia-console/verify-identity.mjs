@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import {readFile,writeFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {createPublicClient,http,decodeEventLog,decodeFunctionData} from 'viem';
+import {identityABI} from '../../sdk/identity.ts';
+const directory=resolve(process.argv[2]||'outputs/erc8004-sepolia-2026-10-23');
+const registry='0x8004A818BFB912233c491871b3d84c89A494BD9e';
+const client=createPublicClient({transport:http('https://ethereum-sepolia-rpc.publicnode.com',{timeout:20000,retryCount:1})});
+const records=JSON.parse(await readFile(directory+'/transactions.json','utf8'));
+const registration=records.find(r=>r.kind==='registration'),completion=records.find(r=>r.kind==='registration-document');
+assert.ok(registration?.hash&&completion?.hash,'需要注册与文档补齐两笔交易；目前尚未全部记录。');
+assert.equal(await client.getChainId(),11155111,'必须是 Sepolia');
+const registrationReceipt=await client.getTransactionReceipt({hash:registration.hash}),completionReceipt=await client.getTransactionReceipt({hash:completion.hash});
+for(const receipt of [registrationReceipt,completionReceipt]){
+ assert.equal(receipt.status,'success','交易必须成功');
+ assert.equal((await client.getBlock({blockNumber:receipt.blockNumber})).hash,receipt.blockHash,'回执必须属于规范区块');
+ assert.ok((await client.getBlockNumber())-receipt.blockNumber+1n>=2n,'等待至少两次区块确认后重试');
+}
+const event=registrationReceipt.logs.filter(l=>l.address.toLowerCase()===registry.toLowerCase()).map(l=>{try{return decodeEventLog({abi:identityABI,eventName:'Registered',data:l.data,topics:l.topics}).args;}catch{return null;}}).find(Boolean);
+assert.ok(event,'找不到官方注册表的 Registered 事件');
+const transaction=await client.getTransaction({hash:completion.hash});
+assert.equal(transaction.to?.toLowerCase(),registry.toLowerCase());
+assert.equal(transaction.from.toLowerCase(),event.owner.toLowerCase(),'补齐交易必须来自原注册持有者');
+const decoded=decodeFunctionData({abi:identityABI,data:transaction.input});
+assert.equal(decoded.functionName,'setAgentURI');assert.equal(decoded.args[0],event.agentId);
+const base={address:registry,abi:identityABI,args:[event.agentId]};
+const [owner,wallet,uri]=await Promise.all(['ownerOf','getAgentWallet','tokenURI'].map(functionName=>client.readContract({...base,functionName})));
+assert.equal(owner.toLowerCase(),event.owner.toLowerCase());assert.equal(wallet.toLowerCase(),event.owner.toLowerCase());assert.equal(uri,decoded.args[1]);
+assert.ok(uri.startsWith('data:application/json;base64,'));
+const document=JSON.parse(Buffer.from(uri.split(',')[1],'base64').toString('utf8'));
+assert.equal(document.type,'https://eips.ethereum.org/EIPS/eip-8004#registration-v1');
+assert.equal(document.name,'Atlas — AgentOS Sepolia acceptance');
+assert.ok(document.registrations.some(r=>String(r.agentId)===String(event.agentId)&&r.agentRegistry.toLowerCase()===`eip155:11155111:${registry}`.toLowerCase()),'注册文档必须自引用正确的链、注册表与 token');
+const result={status:'passed',scope:'Sepolia ERC-8004 identity registration and completed document only; no AgentOS workspace binding, order, payment, reputation or DON claim',checkedAt:new Date().toISOString(),chainId:11155111,registry,agentId:String(event.agentId),owner,wallet,document,transactions:[registrationReceipt,completionReceipt],explorer:[registration.hash,completion.hash].map(h=>'https://sepolia.etherscan.io/tx/'+h),pending:['CRE deploy access','Sepolia receiver deployment and actual workflow binding','Public immutable evidence service','AgentOS workspace identity binding and paid-order/reputation acceptance']};
+await writeFile(directory+'/identity-verified.json',JSON.stringify(result,(_,v)=>typeof v==='bigint'?v.toString():v,2));
+console.log(JSON.stringify({status:result.status,agentId:result.agentId,owner,wallet,explorer:result.explorer,evidence:directory+'/identity-verified.json'},null,2));
