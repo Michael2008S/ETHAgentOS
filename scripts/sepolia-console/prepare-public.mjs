@@ -7,7 +7,7 @@ const deployment=JSON.parse(await readFile('outputs/erc8004-sepolia-2026-10-23/d
 if(deployment.chainId!==11155111||deployment.workflowId!=='0x'+'0'.repeat(64)||deployment.installAsActiveChainConfiguration!==false)throw Error('Expected verified unbound Sepolia deployment.');
 if(creWorkflowName('agentos-delivery-staging')!==deployment.workflowName)throw Error('Immutable workflow name mismatch.');
 if(origin){const url=new URL(origin);if(url.origin!==origin||url.protocol!=='https:'||url.username||url.password||/(?:\.example|\.invalid|localhost)$/.test(url.hostname)||/YOUR_|REPLACE_/i.test(origin))throw Error('Use a real plain HTTPS evidence origin.');}
-if(accountId&&!/^[0-9a-f]{32}$/.test(accountId))throw Error('Use the actual Cloudflare account ID.');
+if(accountId&&!/^[0-9a-f]{1,32}$/.test(accountId))throw Error('Use the actual Cloudflare account ID.');
 await mkdir(root+'/cre/workflow',{recursive:true});await mkdir(evidence,{recursive:true});
 const config={mode:'dispatcher',schedule:'*/30 * * * * *',chainName:'ethereum-testnet-sepolia',escrowAddress:deployment.escrow,gasLimit:'500000',evidenceOrigin:origin||'https://YOUR_EVIDENCE_HOST.example'};
 if(origin)validateConfig(config);

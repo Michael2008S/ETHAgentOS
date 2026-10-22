@@ -61,3 +61,17 @@ After CRE approval, recheck private-registry availability and verify the intende
 The focused evidence/config/dispatcher/receipt tests run actual local workerd/R2 and cover authenticated writes, anonymous readback, immutable conflicts and concurrent ready-index updates. SDK handler tests exercise the actual dispatcher under mocked capabilities. Official CLI/Javy builds and Wrangler `deploy --dry-run` package the artifacts.
 
 `scripts/sepolia-console/simulate-public-empty.mjs` attempts a separate official CLI empty-queue dry-run through an owned temporary HTTPS fixture, reads the public Sepolia receiver before/after, never uses `--broadcast`, and closes the fixture on exit. It does not create a real order or prove DON settlement. This run was blocked by Cloudflare Tunnel DNS/network connectivity before CLI simulation; its failed report and tunnel diagnostics remain retained. Retry only after network conditions change or use the actual deployed evidence service.
+
+## Authenticated Cloudflare discovery and deployment runner
+
+The account is now authenticated. Live API discovery found account `a22fa439129d350efa5ae54255082859` and workers.dev subdomain `michael2008s`. The configured evidence origin is `https://agentos-evidence-bd805f9b.michael2008s.workers.dev`. At the last check, R2 returned HTTP 403 / code 10042 asking for Dashboard enablement, so no bucket, Worker or remote writer secret was created. The actual-account/origin Worker packaging dry-run passed.
+
+After R2 is enabled in the Dashboard, use:
+
+```sh
+node scripts/sepolia-console/deploy-public-evidence.mjs
+```
+
+The runner captures existing Wrangler credentials only in memory, discovers accounts/subdomains/R2 readiness, requires one unambiguous account, and stops before writes if prerequisites are missing. Once ready, it prepares actual configuration, creates/reuses the task's named R2 bucket, deploys the evidence Worker, installs the server writer secret through stdin without displaying it, and runs public synthetic-data acceptance. It never deploys CRE, binds a workflow, or funds an escrow.
+
+`verify-public-evidence.mjs` checks anonymous service configuration, rejects unauthorized and browser-origin writes, publishes synthetic input/artifact bytes, verifies anonymous exact readback, checks idempotent retries and immutable conflict refusal, then archives only that run's synthetic queue item while retaining immutable evidence. Reports never contain writer/OAuth credentials. Deployment logs and `cloudflare-service-deployment.json` are retained in the public-preparation evidence directory. `cloudflare-discovery.json` records the exact account readiness/errors.

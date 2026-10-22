@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';import {readFile,writeFile} from 'node:fs/promises';
+import {inputEvidence} from '../../sdk/wallet.ts';import {deliveryArtifact,specHash} from '../../cre/workflow/verify.ts';
+import {expectedOutput} from '../../lib/agentos/engine.ts';import {publishCREFixture} from '../cre-evidence-fixture.mjs';
+const dir='outputs/erc8004-sepolia-2026-10-23/public-preparation',manifest=JSON.parse(await readFile('.sites-runtime/sepolia-public/manifest.json','utf8'));
+assert.ok(manifest.publicOrigin,'Actual public origin required');const origin=manifest.publicOrigin,escrow=manifest.receiver,token=(await readFile('.sites-runtime/sepolia-public/write-token','utf8')).trim();assert.ok(token.length>=32);
+const runId=crypto.randomUUID(),input={dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:[{block:1,from:'synthetic-acceptance-a',to:'synthetic-acceptance-b',cents:123},{block:2,from:'synthetic-acceptance-a',to:'synthetic-acceptance-c',cents:456}]},bytes=inputEvidence({id:'public-evidence-acceptance-'+runId,input,skill:'event-analysis'},manifest.expectedWorkflowOwner),namespace='/v1/11155111/'+escrow;
+const report={status:'running',runId,origin,escrow,taskId:bytes.id,scope:'Public evidence service acceptance using synthetic bytes only; no chain order, workflow binding, funding or payment',requests:[],checks:[]};
+const file=dir+'/public-evidence-acceptance-'+runId+'.json';await writeFile(file,JSON.stringify(report,null,2));
+async function exchange(path,{body,authorized=false,headers={}}={}){const response=await fetch(origin+path,{method:body?'POST':'GET',redirect:'manual',headers:{...(body?{'Content-Type':'application/json'}:{}),...(authorized?{Authorization:'Bearer '+token}:{}),...headers},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(20000)});report.requests.push({path,method:body?'POST':'GET',status:response.status,cfRay:response.headers.get('cf-ray')});return response;}
+try{
+ const configuration=await exchange('/v1/config');assert.equal(configuration.status,200);const cfg=await configuration.json();assert.equal(cfg.chainId,11155111);assert.equal(cfg.escrow,escrow);assert.equal(cfg.publicRead,true);report.checks.push('public deployment config and actual receiver scope');
+ const body={chainId:11155111,escrow,id:bytes.id,datasetText:bytes.datasetText,verification:bytes.verification};
+ const unauth=await exchange('/v1/drafts',{body});assert.equal(unauth.status,401);await unauth.body?.cancel();
+ const browser=await exchange('/v1/drafts',{body,authorized:true,headers:{Origin:'https://synthetic-browser.example'}});assert.equal(browser.status,403);await browser.body?.cancel();report.checks.push('unauthenticated and browser-origin writes rejected');
+ const artifact=JSON.stringify(deliveryArtifact(bytes.id,bytes.verification,bytes.datasetHash,expectedOutput({skill:'event-analysis',input}))),publication=await publishCREFixture({origin,token},escrow,bytes,artifact);report.publication=publication;report.checks.push('authenticated publication and byte-exact anonymous dataset/artifact readback');
+ const ready=await exchange(namespace+'/ready?slot=0');assert.equal(ready.status,200);const feed=await ready.json();assert.ok(feed.items.some(i=>i.taskId===bytes.id));report.checks.push('synthetic artifact appears in ready index');
+ const duplicate=await exchange('/v1/artifacts',{authorized:true,body:{chainId:11155111,escrow,id:bytes.id,specHash:specHash(publication.spec),artifactText:artifact}});assert.equal(duplicate.status,200);await duplicate.body?.cancel();
+ const conflict=await exchange('/v1/artifacts',{authorized:true,body:{chainId:11155111,escrow,id:bytes.id,specHash:specHash(publication.spec),artifactText:JSON.stringify({...JSON.parse(artifact),syntheticTamper:true})}});assert.equal(conflict.status,409);await conflict.body?.cancel();report.checks.push('identical retry succeeds; conflicting bytes rejected');
+ const complete=await exchange('/v1/complete',{authorized:true,body:{chainId:11155111,escrow,id:bytes.id,specHash:specHash(publication.spec)}});assert.equal(complete.status,200);await complete.body?.cancel();
+ const after=await exchange(namespace+'/ready?slot=0');assert.equal(after.status,200);const remaining=await after.json();assert.ok(!remaining.items.some(i=>i.taskId===bytes.id));
+ const stored=await exchange(namespace+'/artifact/'+bytes.id);assert.equal(stored.status,200);assert.equal(await stored.text(),artifact);report.checks.push('only this synthetic acceptance item archived; immutable evidence retained');
+ report.status='passed';report.spec=publication.spec;report.finalReady=remaining;
+}catch(e){report.status='failed';report.error=e.message;process.exitCode=1;console.error(e.message);}
+finally{report.finishedAt=new Date().toISOString();await writeFile(file,JSON.stringify(report,null,2));console.log(JSON.stringify({status:report.status,origin,checks:report.checks,evidence:file},null,2));}
