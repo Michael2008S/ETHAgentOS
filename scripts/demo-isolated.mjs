@@ -28,7 +28,7 @@ async function run(name,args,ready,overrides={}){
  if(!ready){const code=await finished;if(code!==0)throw new Error(name+' failed; inspect '+root+'/'+name+'.log');return;}
  void finished.then(()=>{if(!stopping){console.error(name+' stopped unexpectedly; inspect '+root+'/'+name+'.log');process.exitCode=1;stop();}});
  const deadline=Date.now()+600000;
- for(;;){if(terminal||stopping||Date.now()>deadline)throw new Error(name+' not ready; inspect '+root+'/'+name+'.log');try{const r=await fetch(ready,{signal:AbortSignal.timeout(3000)}),data=await r.json();if(r.ok&&(name==='web'?typeof data.scope==='string'&&Array.isArray(data.state?.tasks):name==='chain'?data.mode==='local'&&!!data.vault:name==='captured-source'||name==='source-proxy'||name.startsWith('supplier')||name==='mcp'||name==='plugins'?data.status==='ok':!!data.queue))break;}catch{}await new Promise(done=>setTimeout(done,500));}
+ for(;;){if(terminal||stopping||Date.now()>deadline)throw new Error(name+' not ready; inspect '+root+'/'+name+'.log');try{const r=await fetch(ready,{signal:AbortSignal.timeout(3000)}),data=await r.json();if(r.ok&&(name==='web'?typeof data.scope==='string'&&Array.isArray(data.state?.tasks):name==='chain'?(x402?data.status==='ok':data.mode==='local'&&!!data.vault):name==='captured-source'||name==='source-proxy'||name.startsWith('supplier')||name==='mcp'||name==='plugins'?data.status==='ok':!!data.queue))break;}catch{}await new Promise(done=>setTimeout(done,500));}
  console.log('READY '+name+' '+ready);
 }
 try{
@@ -38,7 +38,7 @@ try{
  if(!previous)await run('database',['scripts/db-local.mjs']);
  if(capturedSource)await run('captured-source',['scripts/usdc-replay.mjs'],'http://127.0.0.1:'+(ports.capture??ports.data)+'/health');
  if(sourceProxy)await run('source-proxy',['scripts/data-proxy.mjs'],'http://127.0.0.1:'+ports.data+'/health',{AGENTOS_SOURCE_PROXY_PORT:String(ports.data),AGENTOS_SOURCE_PROXY_UPSTREAM:capturedSource?'http://127.0.0.1:'+ports.capture+'/captured-usdc':process.env.AGENTOS_DATA_RPC_URL||'https://ethereum-rpc.publicnode.com',AGENTOS_SOURCE_PROXY_MODE:capturedSource?'captured-finalized-replay':'live-finalized-read'});
- await run('chain',[x402?'scripts/x402/local-chain.mjs':'scripts/local-chain.mjs'],chain+'/config');
+ await run('chain',[x402?'scripts/x402/local-chain.mjs':'scripts/local-chain.mjs'],x402?'http://127.0.0.1:'+ports.x402Supplier+'/health':chain+'/config');
  await run('supplier2',['scripts/supplier-local.mjs'],'http://127.0.0.1:'+ports.supplier2+'/health',{AGENTOS_SUPPLIER_PORT:String(ports.supplier2),AGENTOS_SUPPLIER_STATE:root+'/supplier2',AGENTOS_SUPPLIER_ID:'local-transfer-supplier-2',AGENTOS_SUPPLIER_NAME:'Second independent transfer supplier',AGENTOS_SUPPLIER_WALLET_ROLE:'seller2'});
  await run('supplier',['scripts/supplier-local.mjs'],supplier+'/health',{AGENTOS_SUPPLIER_PEERS:JSON.stringify(['http://127.0.0.1:'+ports.supplier2,...(x402?['http://127.0.0.1:'+ports.x402Supplier]:[])])});
  await run('mcp',['scripts/plugins/mcp-fixture.mjs'],mcpURL+'/health');

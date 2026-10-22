@@ -1459,5 +1459,14 @@
   "Review plugin memory in mixed workflow wallet": "在混合编排钱包面板中审核插件记忆",
   "Plugin memory selected. Review adapters and authorize a new payment session.": "已选择插件成果记忆。请审核适配器并授权新的支付会话。",
   "Business workbench": "业务工作台",
-  "Business status, evidence and next actions in one place.": "集中查看业务状态、交付证据与下一步操作。"
+  "Business status, evidence and next actions in one place.": "集中查看业务状态、交付证据与下一步操作。",
+  "Upstream procurement": "上游采购",
+  "Payment reference": "支付凭证",
+  "Report hash": "报告摘要",
+  "The supplier pays upstream costs. Failed acceptance refunds the full user escrow to Vault.": "上游费用由供应商承担。验收失败时，用户托管本金全额退回 Vault。",
+  "Upstream report limit": "单次上游报告限额",
+  "Paid by supplier; included in the signed quote.": "供应商垫付，已包含在签名报价中。",
+  "Review procurement policy": "审阅采购政策",
+  "I allow these transfer records to be sent to the configured x402 report provider. A Vault session is required.": "我同意将这些转账记录发送给指定的 x402 报告提供方。本次采购需要有效的 Vault 会话。",
+  "x402 payment and report": "x402 支付与报告"
 }
