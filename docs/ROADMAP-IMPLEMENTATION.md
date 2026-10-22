@@ -454,3 +454,5 @@ CLI 验收后停模型（约 2444 MiB RSS），编写浏览器用例期间模型
 首次 41 步 demo 在第 14 步停止，前 13 步通过：编号式两步目标的真实模型返回 unsupported，未创建采购。原报告保留于 outputs/full-demo-f709e278-98aa-4fb9-8138-1025411350a4/，诊断原始响应在 outputs/validation-final-services-2026-10-22/numbered-plan-model.json。模型目录给出了真实输出契约，却没有明确业务工作流已有的已付款投影适配关系。补充 agentos.accepted-artifact.v2 的 allocations/summary-total/ranked-accounts → transfers.v1 说明，保留完整服务描述、真实契约与验证器；超过两步的示例只在请求允许时发送。未把任意 JSON 伪装成转账。
 
 14 项规划单测、两种实际模型目标的四组 HTTP/D1/SDK/EVM 验收（五笔唯一付款）以及受影响浏览器流程均通过。实际报告 outputs/workflow-plan-demo-3d21d59d-0d40-436e-bf88-9697f983755e.json。此前全量浏览器已 25/25 通过，最新说明改动仅复验受影响流程；按用户更新的“快速实现、简单验证”要求不再扩大回归。修改实现后完整 demo 必须从第一步新跑，不能续用旧报告作为新版通过证据。每轮结束确认模型全部退出，当前有用服务及历史保留。
+
+第二次完整 demo 前 23 步通过（含全部新增插件能力），第 24 步暴露资源管理依赖遗漏：demo:queue 的最后一项实际使用基础模型，但管理表未声明。补齐该单一依赖，并给失败断言提供明确字符串诊断。四项管理器单测与实际队列六场景复验通过：outputs/queue-demo-4d2d71eb-03ff-4d80-a1ab-b65fb2b6bee4.json。旧失败订单已规范退款，按明确 scope/ID 只取消旧测试的 manual 任务，队列 pending/leased/dead 均为零；只读与清理证据在 queue-first-readonly.json、queue-first-cleanup.json。原广泛清理命令被自动审批拒绝，没有执行；改为精确编号校验后安全完成。第二次完整报告 outputs/full-demo-22f0652f-cf8b-4af5-9111-2a9ec9029b0a/ 保留，不作为整套通过。资源依赖修复提交后从第一步重跑，不扩大专项验证范围。

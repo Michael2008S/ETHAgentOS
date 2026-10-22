@@ -56,7 +56,7 @@ try {
     ticks.push(await drain());current=(await os.orders()).find(o=>o.id===order.id);
     if(!['completed','refunded','paused'].includes(current.status))await new Promise(resolve=>setTimeout(resolve,1100));
   }
-  assert.equal(current.status,'completed',current.lastError);assert.equal(current.settlement.status,'paid');assert.equal(current.output.totalCents,579);assert.ok(current.modelPlan.usage.completionTokens>0);
+  assert.equal(current.status,'completed',current.lastError??'Funded model order did not complete through the durable queue');assert.equal(current.settlement.status,'paid');assert.equal(current.output.totalCents,579);assert.ok(current.modelPlan.usage.completionTokens>0);
   await Promise.all(Array.from({length:4},drain));
   const logs=await session.client.getContractEvents({address:config.escrow,abi:escrowABI,eventName:'Settled',args:{id:inputEvidence(order,session.account).id},fromBlock:BigInt(funding.blockNumber)});assert.equal(logs.length,1);
   assert.deepEqual((await read()).ledger,ledger);passed('draft excluded; funded model order recovers through multiple queue ticks, one EVM payment',{beforeFunding:beforeFunding.queue,ticks,order:current,settledEvents:logs.length});
