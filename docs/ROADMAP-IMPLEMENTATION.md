@@ -10,7 +10,7 @@ User request: complete improvements in the review order, test and commit each it
 | 4 | Two-step workflow and memory references | Persisted dependencies, previous accepted artifact as next input, recovery without duplicate payment | Implemented; item validation below |
 | 5 | Public testnet and CRE settlement | Real wallet, registered workflow execution, actual forwarder payment/refund transactions; account access verified rather than assumed | In progress; receiver/publisher/reconciliation/reusable dispatcher implemented; public acceptance pending |
 | 6 | Third-party onboarding and hosted operation | New skill onboarding with integration acceptance; authenticated deployed consumer, monitoring and failure recovery | In progress; new skill and scoped consumer operations locally accepted; actual hosted operation remains open |
-| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 37-step HTTP/D1/EVM/model/supplier/plugin/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical passes remain scoped to their tested source. |
+| Local complete-demo gate | Execute the current complete local sequence after implementation commits | Current ordered 37-step HTTP/D1/EVM/model/supplier/plugin/CRE dry-run evidence and final regression | Passed on 4ccad5b with one explicit same-source network recovery; all 37 final steps passed, original DNS failure retained. Current regression: 228 Node, 21 Chromium, 6 CRE SDK. See final acceptance below. |
 
 The complete demo is a final gate after the individual changes. Public workflow deployment depends on actual account capabilities and configured infrastructure; local simulation does not satisfy item 5. No unattended schedule is enabled merely to represent deployment.
 
@@ -374,3 +374,15 @@ The complete demo is a final gate after the individual changes. Public workflow 
 修复后原七组供应商 HTTP/D1/SDK/ERC-8004/Vault/EVM 验收全部通过：outputs/supplier-workflow-demo-d9d61802-b744-4d9b-98b6-9eee486d3889.json。12 笔注资、11 笔付款、1 笔退款、2 笔未注资取消，累计注资 3560 分、付款 3360 分；22 个作业完成，pending/leased/dead 均为零。原失败工作区另行显式恢复三个到期记录，原订单、付款 hash 和 ledger 均未改变；原失败报告保持 failed。
 
 当前完整 228/228 Node、21/21 Chromium、6/6 CRE SDK（92 assertions）、网站/CRE 类型检查及生产构建通过。九项队列专项和两项组合 EVM 专项共 11 项通过。第一次完整 Node 中两项旧领取顺序断言失败的原日志与后续通过记录全部保留，归档到 outputs/validation-terminal-queue-2026-10-22/。此修复单独提交；由于实现发生变化，最终 37 步须从第一步重新执行，不续跑旧源码的失败报告。模型继续仅供此最终验收按需保留，结束清理；公网及托管验收继续暂缓。
+
+## 当前 37 步完整本地验收完成（2026-10-22，香港时间）
+
+使用已提交实现 `4ccad5bb6d5cc944278ede955c156f92e0e04e62`，源码摘要 `c75f679111e8c3028bd0ad9882d41a0aab5f3aa68bd9cac28018d9f790b6a9d0`，同一 6097/9455/8371/8372/6098/6099 实例。10:11 从第一步开始，前 34 步通过；第 35 步官方 WASM 编译成功，但临时 HTTPS 的默认 UDP DNS 边缘发现超时，cases=0。没有将它记为 CLI 场景通过，也没有跳过后续步骤。
+
+只读 HTTPS DNS 查询取得官方公共 SRV/A 记录，四次实际 TCP 检查均连接成功。临时合成夹具用 cloudflared 既有进程级 `TUNNEL_EDGE` 测试参数验证 HTTPS 可达并关闭。随后核对 Git 无改动、提交/源码摘要、runtime 根目录、真实模型别名及同一链部署，通过标准 `--resume` 从第 35 步显式续跑；系统 DNS/代理/防火墙和 TLS 验证均未改变。此选项是连接诊断/本次验收配置，不是承诺生产支持或默认网络已修复；未将静态 IP 写入产品源码。
+
+最终 10:38 完成全部 37 步，报告 `outputs/full-demo-8001b0aa-da62-4655-bf28-b885ad6b3f44/report.json` 为 passed=true，37 项最终 code 均为 0，failedAttempts 保留原 DNS 失败与原日志。第 35 步官方 CLI 五场景通过，正确/错误交付和资金库明细篡改独立复算，承诺不匹配按预期非零退出且不生成报告；dry-run 后任务保持 Funded。第 36 步固定 dispatcher 配置的四组 CLI 场景及独立本地回调通过，覆盖新订单、新技能、错误成果和已结束跳过。第 37 步 doctor 为 ready=true，九项服务全部就绪、warnings=[]。不把模拟或本地测试回调当成 DON/公共链交易。
+
+全部主日志、原失败及第二次 CRE 日志、子报告快照、网络参数/诊断、隧道日志、WASM 摘要、当前回归记录和逐文件 SHA-256 见同目录 verification.json 与 artifacts/。模型在网络诊断期间先停掉，确认为最后自检所需后才恢复；完成后再次停止本项目三个模型及其启动器，共 6 个进程，清理时合计约 3667 MiB RSS，remaining=[]。仅保留当前一套本地服务；D1、链实例、模型与签名历史文件保留，不清理其他项目或编辑器。
+
+本轮插件验收、通用插件付费 API/SDK/消费者/双语网页和完整本地 demo 交付完成。开放市场、通用插件与规划器统一、更多链上权限等平台化能力仍是独立路线图；真实钱包/公共测试网、实际 DON 与托管调度按用户要求继续暂缓。本节是当前本地交付证据，不将早期失败或其他部署提升为当前公网验收。
