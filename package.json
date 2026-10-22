@@ -74,7 +74,8 @@
     "mcp:local": "node scripts/plugins/mcp-fixture.mjs",
     "plugins:local": "node scripts/plugins/service.mjs",
     "demo:plugins": "node scripts/demo-plugins.mjs",
-    "demo:cleanup": "node scripts/demo-cleanup.mjs"
+    "demo:cleanup": "node scripts/demo-cleanup.mjs",
+    "demo:plugin-purchases": "node scripts/demo-plugin-purchases.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

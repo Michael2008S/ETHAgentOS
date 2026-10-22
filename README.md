@@ -212,4 +212,6 @@ Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/
 
 自动改购：`npm run demo:purchase-routes` 验证审核多个签名报价后，确认原订单退款再购买另一家供应商服务；预留全部尝试的总额度，支持崩溃恢复、取消和撤销。SDK、界面与验证边界见 [PURCHASE-ROUTES.md](docs/PURCHASE-ROUTES.md)。
 
-通用插件执行层：智能体页可安装处理通用 JSON 的 JavaScript 清单，审阅独立校验器和只读 MCP 工具后授予次数/期限，再通过持久队列执行。QuickJS WASM 隔离、源码/工具声明绑定、撤权和晚到结果拒绝、工作区隔离及真实 MCP 读取已接通。运行 `npm run mcp:local`、`npm run plugins:local`、`npm run demo:plugins`；协议、迁移和验收边界见 [PLUGINS](docs/PLUGINS.md)。插件作业当前不进入链上付费或原有 DAG 采购工作流。
+通用插件执行层：智能体页可安装处理通用 JSON 的 JavaScript 清单，审阅独立校验器和只读 MCP 工具后授予次数/期限，再通过持久队列执行。QuickJS WASM 隔离、源码/工具声明绑定、撤权和晚到结果拒绝、工作区隔离及真实 MCP 读取已接通。运行 `npm run mcp:local`、`npm run plugins:local`、`npm run demo:plugins`；协议、迁移和验收边界见 [PLUGINS](docs/PLUGINS.md)。免费作业没有付款权，通用插件采购使用下述独立付费控制器；原有业务 DAG 协议保持原语义。
+
+通用插件网页采购：Agents → 付费插件工作流，安装 JSON 示例，审阅代码、工具和费用，分别授权执行次数及本地 Vault 付款，再明确启动。刷新后重新连接本地买方钱包；中断提交沿用原编号。支持逐步付款凭证、签名交付、父成果和显式恢复/取消/撤销。公共模式仍拒绝通用插件采购，完整操作与边界见 [PLUGIN-PURCHASES](docs/PLUGIN-PURCHASES.md)。

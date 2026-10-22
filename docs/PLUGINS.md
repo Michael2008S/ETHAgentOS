@@ -2,7 +2,7 @@
 
 This execution layer accepts general bounded JSON rather than requiring transfer records. A versioned manifest contains JavaScript, a separately reviewed verifier, input/output schemas, exact MCP tool pins and resource limits. Installation grants no execution authority. The Agents page lets the owner review code and capabilities, grant a run quota, submit input, inspect the output/transcript, recover work and revoke permission.
 
-Plugin jobs have no spending authority. They do not create escrow orders, use Vault sessions or produce CRE reports. The existing deterministic paid-skill pipeline remains separate. Generic-plugin composition into paid workflows and independent public-chain settlement are still unfinished work; this layer must not be presented as their acceptance.
+Free plugin jobs have no spending authority. They do not create escrow orders, use Vault sessions or produce CRE reports. Generic-plugin paid JSON workflows now have a separate controller, API/SDK and bilingual browser entry; see [PLUGIN-PURCHASES](PLUGIN-PURCHASES.md). The existing deterministic paid-skill pipeline keeps its original semantics. Public-chain generic-plugin settlement remains unfinished; local EOA acceptance is not DON acceptance.
 
 ## Dependencies and local processes
 
