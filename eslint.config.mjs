@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local runtime snapshots, reports and compiler bundles are generated.
+    ".sites-runtime/**",
+    "outputs/**",
+    ".wrangler/**",
+    "dist/**",
+    "cre/workflow/.cre_build_tmp.*",
   ]),
   {
     files: ["components/ui/**/*.{ts,tsx}", "hooks/use-mobile.ts"],
