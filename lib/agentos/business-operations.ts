@@ -1,6 +1,6 @@
 import {missionList,missionSelection} from './business-missions.ts';import {isArchived} from './business-archives.ts';import type {Workspace} from './types.ts';
 export function businessOperations(input:Workspace){
- const state={...input,usdcMonitors:input.usdcMonitors?.map(m=>({...m,reports:m.reports.map(r=>{let id=r.repairWorkflowId??r.workflowId;const seen=new Set<string>();for(;;){const f=input.mixedWorkflows?.find(f=>f.id===id);if(!f?.repairedBy||seen.has(id))break;seen.add(id);id=f.repairedBy;}return id===r.workflowId?r:{...r,repairWorkflowId:id};})}))};
+ const state=input;
  const monitorChildren=new Set<string>();for(const m of state.usdcMonitors??[])for(const f of missionSelection(state,m.id).flows)monitorChildren.add(f.id);
  return missionList(state).filter(m=>!m.successor&&!isArchived(state,m.kind==='monitor'?'monitor':'mixed',m.id)&&(m.kind==='monitor'||!monitorChildren.has(m.id))).map(m=>{
   const selected=missionSelection(state,m.id),pending=selected.flows.filter(f=>f.status==='completed'&&!state.businessReviews?.some(r=>r.missionId===f.id)).length;
