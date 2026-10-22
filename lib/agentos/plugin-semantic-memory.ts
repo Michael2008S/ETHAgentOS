@@ -1,0 +1,32 @@
+import {z} from 'zod';
+import {canonical} from '../../cre/workflow/verify.ts';
+import {digest,DomainError} from './engine.ts';
+import {boundedJson,type Json} from './plugin-protocol.ts';
+import {pluginPaidRootSchema,pluginPurchaseTerms,type PluginPurchaseWorkflow} from './plugin-purchase-protocol.ts';
+import {pluginRows,type PluginDatabase} from './plugin-store.ts';
+import {canonicalPluginPaidRoot} from './plugin-paid-memory.ts';
+import {verifySemanticSearch,type MemoryDocument,type SemanticSearch} from './semantic-memory.ts';
+import {getMemoryRequest} from './memory-store.ts';
+import type {PluginJob} from './plugin-state.ts';
+import type {PluginPurchaseChain} from './plugin-purchase-chain.ts';
+import type {WalletDeployment} from '../../sdk/wallet.ts';
+const hash=z.string().regex(/^0x[0-9a-f]{64}$/);
+export const selectedPluginMemorySchema=z.object({version:z.literal('agentos.selected-plugin-memory.v1'),scope:hash,searchId:z.string().uuid(),searchDigest:hash,documentId:z.string().max(160),sourceHash:hash,buyer:z.string().regex(/^0x[0-9a-fA-F]{40}$/),deployment:z.custom<WalletDeployment>(v=>!!v&&typeof v==='object'),root:pluginPaidRootSchema,input:z.custom<Json>(v=>{try{boundedJson(v,8192);return true;}catch{return false;}}),createdAt:z.string().datetime(),expiresAt:z.string().datetime(),digest:hash}).strict();
+export type SelectedPluginMemory=z.infer<typeof selectedPluginMemorySchema>;
+/** Index small aggregate summaries only. Full arbitrary JSON output and transfer
+ * rows remain in the original signed execution, committed by its digest. */
+export async function pluginMemoryDocuments(store:PluginDatabase,owner:string):Promise<MemoryDocument[]>{
+ const [rows,jobs]=await Promise.all([store.database.prepare('SELECT data FROM agentos_plugin_purchases WHERE owner_id=? LIMIT 21').bind(owner).all<{data:string}>(),pluginRows<PluginJob>(store.database,owner,'agentos_plugin_executions')]);if(rows.results.length>20)throw new DomainError('Plugin memory history exceeds its bound.');const docs:MemoryDocument[]=[];
+ for(const row of rows.results){const flow=JSON.parse(row.data) as PluginPurchaseWorkflow;if(flow.termsHash!==await digest(pluginPurchaseTerms(flow)))continue;for(const step of flow.steps){const job=jobs.find(j=>j.id===step.jobId);if(step.status!=='paid'||step.settlement?.status!=='paid'||job?.status!=='completed'||!job.execution||job.inputHash!==step.inputHash||job.purchase?.workflowId!==flow.id||job.purchase.step!==step.index)continue;
+ const root={workflowId:flow.id,step:step.index,taskId:step.taskId,settlementTransactionHash:step.settlement.transactionHash,executionDigest:job.execution.digest},value=job.execution.output,aggregate:Record<string,Json>={};if(value&&typeof value==='object'&&!Array.isArray(value))for(const key of ['count','transferCount','totalCents','recipientCount','ready','concentrated'])if(typeof value[key]==='number'||typeof value[key]==='boolean')aggregate[key]=value[key];
+ const summary=JSON.stringify({kind:'paid-plugin',title:flow.title,plugin:step.pluginId,outputType:Array.isArray(value)?'array':typeof value,keys:value&&typeof value==='object'&&!Array.isArray(value)?Object.keys(value).slice(0,20):[],aggregate}),sourceHash=await digest({summary,root,buyer:flow.buyer,deployment:flow.deployment,inputHash:job.inputHash,manifestHash:step.manifestHash,runtimeHash:step.runtimeHash});docs.push({documentId:'plugin:'+flow.requestId+':'+step.index,kind:'paid-plugin',title:flow.title,summary,sourceHash,agentId:step.pluginId,buyer:flow.buyer,pluginRoot:root,updatedAt:flow.updatedAt});}}
+ return docs;
+}
+export async function adoptPluginMemory(store:PluginDatabase,owner:string,search:SemanticSearch,body:{searchId:string;digest:string;documentId:string;buyer:string},scope:string,chain:PluginPurchaseChain,now=new Date().toISOString()):Promise<SelectedPluginMemory>{
+ await verifySemanticSearch(search);if(search.id!==body.searchId||search.digest!==body.digest||search.scope!==scope||search.expiresAt<=now)throw new DomainError('Plugin memory review expired or belongs to another workspace.','FORBIDDEN');const hit=search.items.find(d=>d.documentId===body.documentId),current=(await pluginMemoryDocuments(store,owner)).find(d=>d.documentId===body.documentId);if(!hit||hit.kind!=='paid-plugin'||!current||hit.sourceHash!==current.sourceHash||current.buyer?.toLowerCase()!==body.buyer.toLowerCase()||!current.pluginRoot)throw new DomainError('Only unchanged paid plugin memory owned by this wallet can be adopted.','FORBIDDEN');const paid=await canonicalPluginPaidRoot(store,owner,current.pluginRoot,chain,body.buyer),terms={version:'agentos.selected-plugin-memory.v1' as const,scope,searchId:search.id,searchDigest:search.digest,documentId:current.documentId,sourceHash:current.sourceHash,buyer:body.buyer,deployment:paid.flow.deployment,root:current.pluginRoot,input:paid.execution.output,createdAt:now,expiresAt:search.expiresAt};return {...terms,digest:await digest(terms)};
+}
+export async function verifySelectedPluginMemory(store:PluginDatabase,owner:string,selection:SelectedPluginMemory,scope:string,buyer:string,input:Json,chain:PluginPurchaseChain,review=true){
+ selectedPluginMemorySchema.parse(selection);const {digest:expected,...terms}=selection;if(await digest(terms)!==expected||selection.scope!==scope||selection.buyer.toLowerCase()!==buyer.toLowerCase()||canonical(selection.deployment)!==canonical(chain.deployment)||canonical(selection.input)!==canonical(input))throw new DomainError('Selected plugin memory differs from its reviewed input.','FORBIDDEN');
+ if(review){const record=await getMemoryRequest(store.database,owner,selection.searchId);if(record.status!=='completed'||record.action!=='search')throw new DomainError('Review the completed plugin memory search first.','FORBIDDEN');const fresh=await adoptPluginMemory(store,owner,JSON.parse(record.result_json!),{searchId:selection.searchId,digest:selection.searchDigest,documentId:selection.documentId,buyer},scope,chain);if(canonical(fresh.root)!==canonical(selection.root)||fresh.sourceHash!==selection.sourceHash||canonical(fresh.input)!==canonical(input))throw new DomainError('Plugin memory source changed.','CONFLICT');}
+ const paid=await canonicalPluginPaidRoot(store,owner,selection.root,chain,buyer);if(canonical(paid.execution.output)!==canonical(input))throw new DomainError('Canonical plugin memory output changed.','CONFLICT');return paid;
+}

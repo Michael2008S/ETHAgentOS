@@ -1,3 +1,4 @@
+import {verifySelectedPluginMemory} from './plugin-semantic-memory.ts';
 import {canonical} from '../../cre/workflow/verify.ts';
 import {digest,DomainError,resolveSkillInput} from './engine.ts';
 import {findOrder,createOrder,orderEvent} from './orders.ts';
@@ -29,7 +30,9 @@ async function paidStep(store:MixedStore,owner:string,state:Workspace,f:MixedWor
  await verifyAcceptedOrder(state,order,r.chain);return {json:businessSummary(order.skill,order.output!),business:acceptedArtifactInput(order),proof:{kind:'order' as const,id:order.id,payment:order.settlement!.transactionHash,artifactHash:order.settlement!.outputHash}};
 }
 async function inputFor(store:MixedStore,owner:string,state:Workspace,f:MixedWorkflow,index:number,r:MixedRuntime){
- const step=f.steps[index],source=step.input.from==='step'?await paidStep(store,owner,state,f,step.input.step!,r):undefined;
+ const memory=f.memory?await verifySelectedPluginMemory(store,owner,f.memory,f.scope,f.buyer,f.input,(await r.plugins()).chain,false):undefined;
+ const root=memory?{json:memory.execution.output,business:undefined as TaskInput|undefined,proof:{kind:'plugin' as const,id:memory.flow.id,step:memory.step.index,payment:memory.settlement.transactionHash,artifactHash:memory.execution.digest}}:undefined;
+ const step=f.steps[index],source=step.input.from==='step'?await paidStep(store,owner,state,f,step.input.step!,r):root;
  const value=step.input.adapter==='business-transfers.v1'?source?.business:mixedAdapterValue(step.input,source?.json??f.input);
  if(value===undefined)throw new DomainError('The selected mixed adapter has no compatible paid input.','FORBIDDEN');
  if(step.parent&&canonical(step.parent)!==canonical(source?.proof))throw new DomainError('Mixed canonical parent payment changed.','CONFLICT');

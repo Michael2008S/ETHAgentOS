@@ -1451,5 +1451,11 @@
   "Apply reviewed automatic plugin repair": "采用已审阅的自动插件修复",
   "Use the policy payment session when approving this automatic proposal.": "批准此自动提案时，请使用策略指定的付款会话。",
   "Plugin repair policies unavailable.": "插件修复策略暂不可用。",
-  "Attempts": "尝试次数"
+  "Attempts": "尝试次数",
+  "Paid plugin results": "已付款的插件成果",
+  "Paid plugin result": "已付款的插件成果",
+  "Stored plugin payment snapshot. Reuse verifies the current signed output and canonical payment.": "这里是插件付款快照。复用时会重新核验当前签名产物和链上付款。",
+  "Use paid plugin result in mixed workflow": "将已付款的插件成果用于混合编排",
+  "Review plugin memory in mixed workflow wallet": "在混合编排钱包面板中审核插件记忆",
+  "Plugin memory selected. Review adapters and authorize a new payment session.": "已选择插件成果记忆。请审核适配器并授权新的支付会话。"
 }
