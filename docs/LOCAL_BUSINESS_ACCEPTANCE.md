@@ -72,3 +72,8 @@ node scripts/demo-isolated.mjs --resume /absolute/new-runtime/runtime.json
 ```
 
 Development RPC fallback defaults are publicnode, dRPC and the alternative PublicNode hostname. `AGENTOS_DATA_RPC_FALLBACK_URLS` accepts a server-configured JSON array of plain HTTPS endpoints; production has no implicit fallback list. Local replay/live HTTP transports require explicit development configuration and loopback requests. The proxy exposes only bounded read-only data methods and rejects browser-origin control calls.
+
+
+## Monitor reliability follow-up (2026-10-23)
+
+See [the isolated local monitor acceptance](MONITOR_RELIABILITY_ACCEPTANCE_2026-10-23.md) for the fixed application snapshot, 322 passing tests, separate 17-step replay/live browser demos, actual two-hour live observation, recorded probe gaps, exact receipt reconciliation and preserved-original-instance limitations. Public-chain and hosted deployment are outside this pass.
