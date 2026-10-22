@@ -2,7 +2,7 @@ import solc from 'solc';
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 export function compile(){
- const sources=Object.fromEntries(['AgentEscrow.sol','AgentEscrowReceiver.sol','AgentVault.sol','test/MockToken.sol','test/MockCREForwarder.sol'].map(f=>[f,{content:readFileSync(new URL('../contracts/'+f,import.meta.url),'utf8')}]));
+ const sources=Object.fromEntries(['AgentEscrow.sol','AgentEscrowReceiver.sol','AgentVault.sol','test/MockToken.sol','test/MockAuthorizationToken.sol','test/MockCREForwarder.sol'].map(f=>[f,{content:readFileSync(new URL('../contracts/'+f,import.meta.url),'utf8')}]));
  const output=JSON.parse(solc.compile(JSON.stringify({language:'Solidity',sources,settings:{optimizer:{enabled:true,runs:200},evmVersion:'shanghai',outputSelection:{'*':{'*':['abi','evm.bytecode.object']}}}})));
  const errors=(output.errors||[]).filter(e=>e.severity==='error');if(errors.length)throw new Error(errors.map(e=>e.formattedMessage).join('\n'));
  return Object.fromEntries(Object.values(output.contracts).flatMap(contracts=>Object.entries(contracts).map(([name,c])=>[name,{abi:c.abi,bytecode:'0x'+c.evm.bytecode.object}])));
