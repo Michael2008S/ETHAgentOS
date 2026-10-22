@@ -1,5 +1,7 @@
 # Public CRE receiver, evidence and reconciliation
 
+Historical implementation-stage notes follow. For the later Sepolia identity/receiver deployment, public Workers+D1 deployment and official HTTPS dry-run evidence, use [Sepolia demo acceptance](SEPOLIA_DEMO_ACCEPTANCE.md). Actual DON deployment and funded acceptance remain pending; the historical absence-of-deployment statements below apply to their original stage.
+
 This is implementation progress toward roadmap item 5. **No public testnet transaction, wallet-extension acceptance or DON execution is claimed.** The account's last verified deployment access was `no`; the public workflow and operational acceptance gates remain open.
 
 ## Receiver compatibility

@@ -1,5 +1,7 @@
 # Sepolia identity acceptance
 
+Current consolidated results, receipt index and the CRE approval-to-full-acceptance checklist are in [Sepolia demo acceptance](../../docs/SEPOLIA_DEMO_ACCEPTANCE.md). The stage instructions below retain their original scope; later receiver and D1 service deployment evidence is indexed there. Workflow binding and funding remain blocked until a real workflow ID and compatible report identity have been verified.
+
 Run from the repository root in two terminals:
 
 ```sh

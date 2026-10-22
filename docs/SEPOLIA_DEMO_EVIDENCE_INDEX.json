@@ -1,0 +1,311 @@
+{
+  "version": "agentos.sepolia-evidence-index.v1",
+  "assembledAt": "2026-10-22T22:44:00.904Z",
+  "scope": "Index of retained historical verification reports, not a fresh chain verification or deployment run",
+  "chainId": 11155111,
+  "agentId": "11207",
+  "fullPublicDemoStatus": "partial-pending-cre-deployment-and-funded-acceptance",
+  "policy": {
+    "noBindingBeforeVerifiedRealWorkflowId": true,
+    "noFundingBeforeVerifiedRealWorkflowId": true,
+    "broadcastDuringIndexing": false
+  },
+  "entryReport": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/summary.json",
+  "transactions": [
+    {
+      "kind": "registration",
+      "hash": "0x9ffc9224a108ebb72289bf1dec3aa6b929bd073969bcb2240799cb1ac572972b",
+      "chainId": 11155111,
+      "blockNumber": "11971867",
+      "blockHash": "0x453da71623e135b845e26d8182b20390970bd199c8a3a8dd56b3023ca29a8d8e",
+      "status": "success",
+      "explorer": "https://sepolia.etherscan.io/tx/0x9ffc9224a108ebb72289bf1dec3aa6b929bd073969bcb2240799cb1ac572972b"
+    },
+    {
+      "kind": "registration-document",
+      "hash": "0x47464f9aeb75f635f4196a6d5877ae34892aa46220487ab11978a5665ad68e74",
+      "chainId": 11155111,
+      "blockNumber": "11971874",
+      "blockHash": "0xd1f68fd8f5b32a357905befc1472c6722fdd2da43d2e6a8a22452af754d15c0a",
+      "status": "success",
+      "explorer": "https://sepolia.etherscan.io/tx/0x47464f9aeb75f635f4196a6d5877ae34892aa46220487ab11978a5665ad68e74"
+    },
+    {
+      "kind": "workspace-document",
+      "hash": "0x6affff01efd14e578172d5953301e6ecefc7af94e8ebe0780c04d28a66fb6241",
+      "chainId": 11155111,
+      "blockNumber": "11971928",
+      "blockHash": "0x7958f40932994e650d469eb3462e7725dab04e912fbed260b855a41b60f66661",
+      "status": "success",
+      "explorer": "https://sepolia.etherscan.io/tx/0x6affff01efd14e578172d5953301e6ecefc7af94e8ebe0780c04d28a66fb6241"
+    },
+    {
+      "kind": "test-token",
+      "hash": "0x4c6065ae577a8a4e091bfba700dfae5a7332c433d3385997e717f5816238e934",
+      "chainId": 11155111,
+      "blockNumber": "11971990",
+      "blockHash": "0x023a3a9dc3b4215e8ac239e7206d1e96b2fe6c7f63ee7486c42914dfc181ef93",
+      "status": "success",
+      "explorer": "https://sepolia.etherscan.io/tx/0x4c6065ae577a8a4e091bfba700dfae5a7332c433d3385997e717f5816238e934"
+    },
+    {
+      "kind": "receiver",
+      "hash": "0xde6b4b3139eca7469df64dcfa0f7e50c881c5bac6079088bf184ddddb36ade1c",
+      "chainId": 11155111,
+      "blockNumber": "11971998",
+      "blockHash": "0x0c9e365ae90378b3db68ffbffa7d08ac848cc89aa2e40728c1edee1a64fabf57",
+      "status": "success",
+      "explorer": "https://sepolia.etherscan.io/tx/0xde6b4b3139eca7469df64dcfa0f7e50c881c5bac6079088bf184ddddb36ade1c"
+    }
+  ],
+  "integrity": {
+    "algorithm": "sha256",
+    "retainedDryRunChecksumsVerified": 21,
+    "fileCount": 39
+  },
+  "files": [
+    {
+      "stage": "identity",
+      "path": "outputs/erc8004-sepolia-2026-10-23/transactions.json",
+      "bytes": 18618,
+      "sha256": "ff9ca86fa79b9b011b9cfe065a7eca09ae89a618e5765c3fefacd469164484a3"
+    },
+    {
+      "stage": "identity",
+      "path": "outputs/erc8004-sepolia-2026-10-23/identity-verified.json",
+      "bytes": 11717,
+      "sha256": "2813568b0c2f24dddcb1c9698734d31877008aa666e8b4bed3a0aa2ce746b44e"
+    },
+    {
+      "stage": "identity",
+      "path": "outputs/erc8004-sepolia-2026-10-23/workspace-verified.json",
+      "bytes": 21973,
+      "sha256": "e38adaaa77beca8d99ebb93b94c9c9de477152e1f03c5df6483cef52aed807ec"
+    },
+    {
+      "stage": "identity",
+      "path": "outputs/erc8004-sepolia-2026-10-23/workspace-binding.json",
+      "bytes": 2109,
+      "sha256": "66468e4b4a28d8a73791e919f061e5cf6d3422463f36d53c3904397ed71eeda2"
+    },
+    {
+      "stage": "identity",
+      "path": "outputs/erc8004-sepolia-2026-10-23/workspace-challenge-80c0a2c2-3abf-4898-948b-2d38b2a55bdc.json",
+      "bytes": 2296,
+      "sha256": "53d44afb315bbe223597f7d3f20b7f78082cdd0c67e7f555d16562f2a927df3e"
+    },
+    {
+      "stage": "identity",
+      "path": "outputs/erc8004-sepolia-2026-10-23/d1-binding-evidence.json",
+      "bytes": 6863,
+      "sha256": "0d412b59e606634b51c8b8c37ede75116d0b89aa0a4439b55a50cdf03ea4e776"
+    },
+    {
+      "stage": "identity",
+      "path": "outputs/erc8004-sepolia-2026-10-23/order-identity-preview.json",
+      "bytes": 2598,
+      "sha256": "0f41006c083cd906b1b8d742f2f99a671ae5fbceed4255ea8d1fea40ed1e6370"
+    },
+    {
+      "stage": "contracts",
+      "path": "outputs/erc8004-sepolia-2026-10-23/deployment-plan.json",
+      "bytes": 661,
+      "sha256": "e459df5b249c9eac183ceeaa6f747fbe64ed0e43c3fb36b9e1d2d35e1861baba"
+    },
+    {
+      "stage": "contracts",
+      "path": "outputs/erc8004-sepolia-2026-10-23/deployment-verified.json",
+      "bytes": 20419,
+      "sha256": "f14d67a632e134221ddb89a3ecf0f9d722dfad4f1e4c92af415f958f955fd68c"
+    },
+    {
+      "stage": "contracts",
+      "path": "outputs/erc8004-sepolia-2026-10-23/deployment-unbound.json",
+      "bytes": 777,
+      "sha256": "c0e5df4a4e4a461be88649bee14f8456b07cf8332165026cf3cadc8c95cf1f59"
+    },
+    {
+      "stage": "contracts",
+      "path": "outputs/erc8004-sepolia-2026-10-23/supported-chains-current.json",
+      "bytes": 12652,
+      "sha256": "0b90f3f96a3c410f987f964a0ed9bb627aaaafb67d4dda8bfd8889dd62414d61"
+    },
+    {
+      "stage": "public-evidence",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cloudflare-service-deployment.json",
+      "bytes": 2269,
+      "sha256": "0d3065c19ecd87ad20bc432b72721bec163b16084ba6cf50f4e7959b4a3b228b"
+    },
+    {
+      "stage": "public-evidence",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/worker-deployments.json",
+      "bytes": 873,
+      "sha256": "5822d912ed1734fc69f75ec6d83d346047518886e1132e1a7afcfef95459f1b5"
+    },
+    {
+      "stage": "public-evidence",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/worker-secret-names.json",
+      "bytes": 65,
+      "sha256": "28e7a5e04ccba5924522ae3e5a066cdf4f6f307edd8abea8673a1d8bc5a45376"
+    },
+    {
+      "stage": "public-evidence",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/public-evidence-acceptance-90da0f7f-ba65-4ca3-877f-89ed2148b09b.json",
+      "bytes": 4600,
+      "sha256": "acc098a72f6671def935e2437cf1d00ff9bfd628b5756a5ccc2f243fc4dfbc8a"
+    },
+    {
+      "stage": "public-evidence",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/d1-public-evidence-rows.json",
+      "bytes": 1326,
+      "sha256": "43e04376784c875639eaad5a0480ea178fd0cfbc4d72a5079fa23e5fdcbdb33a"
+    },
+    {
+      "stage": "public-evidence",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/chain-no-funding-after-d1-deploy.json",
+      "bytes": 309,
+      "sha256": "20781c45718e5e32d465dd62b8801d9d5b4e57ae9468cd9d93867611650b71b0"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/01-empty-public-queue.log",
+      "bytes": 1817,
+      "sha256": "83aaee84c4ce0093feaaca026f47499c67a5dd5c1788eb190b00a2e592826e10"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/02-unfunded-public-evidence.log",
+      "bytes": 1929,
+      "sha256": "89f7eb63ee7c640362a144ef0b3451560c4b2f072eb31692d69632726a76484d"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/03-archived-public-queue.log",
+      "bytes": 1817,
+      "sha256": "fbb828f8067fceb4b90ceb19abe2b39631a6d376b894332cefbc3e38ea579c65"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/cre-access.json",
+      "bytes": 176,
+      "sha256": "5a4cf98ee003346ffbf7af481109a1de48d02d8af8093e36b1f66edae053dc45"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/project.yaml",
+      "bytes": 124,
+      "sha256": "110fb3f6be45df2655dea637b6ea3a1bb1e49d9eeabda0b776d05c8919ab9eaf"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/readonly-probe/build.log",
+      "bytes": 366,
+      "sha256": "5c16594df99758ca688828d9971d4eb79d2b00e0a9e87112d24dff0d26b872f5"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/readonly-probe/project.yaml",
+      "bytes": 124,
+      "sha256": "110fb3f6be45df2655dea637b6ea3a1bb1e49d9eeabda0b776d05c8919ab9eaf"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/readonly-probe/report.json",
+      "bytes": 1573,
+      "sha256": "262d767d67d1485fd07daf0bab0057a00f00df5b5bdb7ba060ee89ba3c8b6126"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/readonly-probe/simulation.log",
+      "bytes": 1994,
+      "sha256": "d4890364bd59cc45b9869074d0521bff8818e03415971bd935e04797fbe6f3f9"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/readonly-probe/workflow/.cre_build_tmp.js",
+      "bytes": 750744,
+      "sha256": "4092410e99224f57ce12a14046258125735ec6eb61be3d9a2b4e23f9edfcbbf6"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/readonly-probe/workflow/config.json",
+      "bytes": 991,
+      "sha256": "865d121fbdc8cfe7248d648e0fc57a2f236182f4e4481272f6fa5a3f37023c3b"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/readonly-probe/workflow/main.ts",
+      "bytes": 1511,
+      "sha256": "78ed7b5104cb525e477b46a24f9d80c4c1085cce022e6fde51570c7067cd18de"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/readonly-probe/workflow/workflow.yaml",
+      "bytes": 218,
+      "sha256": "c18b7f0d34357d5bbd0eb7b270ce2bc10859e3c80504b0f11a687240c41f5738"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/readonly-probe/workflow.wasm",
+      "bytes": 2534390,
+      "sha256": "f2af406e714db0ab658e3cd9bf933e342dc4d77d73c395f0fc049680fe1b3846"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/report.json",
+      "bytes": 8196,
+      "sha256": "aa9981935ddbd207c934cdb486142dda45959518b172a287a5a95df23c2e850d"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/summary.json",
+      "bytes": 2203,
+      "sha256": "35f0935f5df96eea8477ae1c516a212abb0c1e3dda0090964b7fa3d5420ea7ac"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/synthetic-artifact.json",
+      "bytes": 556,
+      "sha256": "f581ab08aab2d1945c7b03a249d0ca151f5ca5cdf07f9420a1a075ad786c6b9a"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/synthetic-input.json",
+      "bytes": 145,
+      "sha256": "968ee854729d6c40f2f271b21b4b5632d375a71521debf975e1af2640e8193c6"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/workflow/config.json",
+      "bytes": 272,
+      "sha256": "b0adc497e49e0a52facd0af5e80bb6e140779e93fdb383977605279154faf635"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/workflow/workflow.yaml",
+      "bytes": 245,
+      "sha256": "d6a8dd219281acb28afd8ad563621fc1d92f979b9e3cd87b803777490c6492e2"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/workflow.wasm",
+      "bytes": 2744085,
+      "sha256": "9b8e03977e2e176eeee72afc6ff619d17cb1228bd8d1d12b1f473a73e980b4ce"
+    },
+    {
+      "stage": "official-cre-https-dry-run",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/checksums.sha256.json",
+      "bytes": 2151,
+      "sha256": "11302894e04d51e2b5e255459d601decdaa34adc1ddf4302db569eb12554b4d5"
+    }
+  ],
+  "pending": [
+    "CRE deploy access must be rechecked",
+    "Private-registry actual report metadata compatibility",
+    "Real DON deployment and real workflow ID",
+    "User-signed binding after identity verification",
+    "Active payment runtime/configuration and distinct buyer wallet",
+    "New funded identity-bound orders and actual DON payment/rejection/refund",
+    "Paid ERC-8004 feedback and independent revocation receipt"
+  ]
+}

@@ -1,5 +1,7 @@
 # Sepolia public evidence: Workers + D1, no R2 activation
 
+For the consolidated identity/contract/service evidence index, remaining acceptance gates and separate user-wallet steps, see [Sepolia demo acceptance](SEPOLIA_DEMO_ACCEPTANCE.md).
+
 ## Deployed service
 
 Public configuration: https://agentos-evidence-bd805f9b.michael2008s.workers.dev/v1/config
