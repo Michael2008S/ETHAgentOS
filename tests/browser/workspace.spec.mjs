@@ -1,4 +1,7 @@
 import {test,expect} from '@playwright/test';
+import {createModelManager,browserModels} from '../../scripts/demo-models.mjs';
+const modelManager=process.env.AGENTOS_BROWSER_MANAGE_MODELS==='1'?createModelManager():null;
+if(modelManager){process.once('exit',()=>modelManager.signalOwned());test.afterAll(async()=>{try{await modelManager.close();}finally{await writeFile('outputs/browser-model-management-'+process.pid+'.json',JSON.stringify(modelManager.events,null,2));}});}
 import {encodeFunctionData,formatUnits,parseAbi} from 'viem';
 import {AgentWalletSession,localWalletProvider} from '../../sdk/wallet.ts';
 import {readFile,writeFile} from 'node:fs/promises';
@@ -10,12 +13,13 @@ async function ensureBrowserFunds(){
 }
 test.beforeAll(ensureBrowserFunds);
 test.beforeEach(async({context,page},info)=>{
+ await modelManager?.ensure(browserModels(info.title));
  await ensureBrowserFunds();
  const sandbox='browser-'+crypto.randomUUID();info.annotations.push({type:'sandbox',description:sandbox});
  await context.route(base+'/api/**',route=>route.continue({headers:{...route.request().headers(),'x-agentos-sandbox':sandbox}}));
  const errors=[];page.on('pageerror',error=>errors.push(error.message));info.errorsSeen=errors;
 });
-test.afterEach(async({},info)=>{if(info.errorsSeen)expect(info.errorsSeen).toEqual([]);});
+test.afterEach(async({},info)=>{try{if(info.errorsSeen)expect(info.errorsSeen).toEqual([]);}finally{await modelManager?.close();}});
 const headers=info=>({'x-agentos-sandbox':info.annotations.find(a=>a.type==='sandbox').description});
 test('consumer credential is shown once, stays owner scoped and can be revoked in both languages',async({page},info)=>{
  await page.goto('/#overview');const runtime=page.locator('#runtime-status');await runtime.getByText('恢复消费者访问',{exact:true}).click();await runtime.getByLabel('消费者名称',{exact:true}).fill('Browser recovery consumer');await runtime.getByLabel('凭证有效期',{exact:true}).selectOption('3600');await runtime.getByRole('button',{name:'签发消费者凭证',exact:true}).click();

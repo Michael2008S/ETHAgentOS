@@ -1,4 +1,5 @@
 import {spawn} from 'node:child_process';
+import {createModelManager,demoModels} from './demo-models.mjs';
 import {prepareLocalDemoFunds} from './demo-fixture.mjs';
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {loopbackService} from '../lib/agentos/local-services.ts';
@@ -18,16 +19,22 @@ await mkdir(directory,{recursive:true});
 const report=resumeFile?JSON.parse(await readFile(resumeFile,'utf8')):{startedAt:new Date().toISOString(),scope:'local HTTP/D1/EVM and authenticated CRE dry-run; no broadcast',runtime,steps:[]};
 const steps=['demo:doctor','test:api','demo','demo:deadline','demo:wallet','demo:reconcile','demo:prefund','demo:vault','demo:workflow','demo:workflow-configurable','demo:workflow-parallel','demo:workflow-suppliers','demo:workflow-templates','demo:workflow-planning','demo:memory','demo:plugins','demo:plugin-purchases','demo:service-plans','demo:service-templates','demo:service-replanning','demo:service-auto-repair','demo:workflow-replanning','demo:auto-repair','demo:queue','demo:consumer','demo:chain','demo:data','demo:model','demo:identity','demo:supplier','demo:multi-supplier','demo:quotes','demo:skill','demo:planning','demo:quote-planning','demo:purchase-routes','demo:showcase','demo:evidence','demo:cre','demo:cre-dispatcher','demo:doctor'];
 if(!Array.isArray(report.steps)||report.steps.some((step,index)=>step.command!==steps[index]))throw new Error('Report does not match this demo sequence.');
+const managed=process.argv.includes('--manage-models');
+if(resumeFile&&Boolean(report.managedModels)!==managed)throw Error('Resume must preserve the original model management mode.');
 const failed=report.steps.findIndex(step=>step.code!==0),startIndex=failed>=0?failed:report.steps.length;
 if(failed>=0){report.failedAttempts=[...(report.failedAttempts??[]),...report.steps.slice(failed)];report.steps=report.steps.slice(0,failed);}
 if(resumeFile)report.resumedAt=[...(report.resumedAt??[]),new Date().toISOString()];
 report.passed=false;delete report.finishedAt;
 report.setup=[...(report.setup??[]),await prepareLocalDemoFunds(process.env.AGENTOS_CHAIN_URL)];
 await writeFile(directory+'/report.json',JSON.stringify(report,null,2));
-let active;
-for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>active?.kill(signal));
-for(const [index,name] of steps.entries()){
+report.managedModels=managed;const models=managed?createModelManager({logDirectory:directory+'/models'}):null;
+let active,interrupted=false;
+for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>{interrupted=true;active?.kill(signal);models?.signalOwned();});
+process.once('exit',()=>models?.signalOwned());
+try{for(const [index,name] of steps.entries()){
  if(index<startIndex)continue;
+ if(interrupted){process.exitCode=1;break;}
+ await models?.ensure(demoModels(name));
  const attempt=1+(report.failedAttempts??[]).filter(step=>step.command===name).length;
  const start=Date.now(),log=directory+'/'+String(index+1).padStart(2,'0')+'-'+name.replaceAll(':','-')+(attempt>1?'-attempt-'+attempt:'')+'.log';
  console.log('START '+name);
@@ -40,6 +47,6 @@ for(const [index,name] of steps.entries()){
  await writeFile(directory+'/report.json',JSON.stringify(report,null,2));
  console.log((code===0?'PASS ':'FAIL ')+name+' ('+Math.round((Date.now()-start)/1000)+'s) '+log);
  if(code!==0){process.exitCode=1;break;}
-}
+}}finally{try{await models?.close();}finally{if(models){report.modelEvents=models.events;await writeFile(directory+'/models.json',JSON.stringify(models.events,null,2));}await writeFile(directory+'/report.json',JSON.stringify(report,null,2));}}
 report.finishedAt=new Date().toISOString();report.passed=report.steps.length===steps.length&&report.steps.every(s=>s.code===0);
 await writeFile(directory+'/report.json',JSON.stringify(report,null,2));console.log('Report: '+directory+'/report.json');

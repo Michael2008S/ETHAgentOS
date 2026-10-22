@@ -106,3 +106,11 @@ HTTP demo 使用独立测试工作区。链上集成 demo 使用本地测试代�
 - npm run demo:cleanup -- --apply --all --models：结束整项工作后停止当前实例和已识别辅助服务。下次需要重新启动本地 demo。
 
 清理器通过工作目录、限定启动命令、父子关系及进程启动时间/命令摘要核验归属，逐次重查 PID 后只发送 SIGTERM。运行浏览器、Node 测试或完整演示时拒绝清理；不会停止任意 Node、编辑器或其他仓库进程。模型权重、D1、交易证据与日志均保留，报告保存到 outputs/process-cleanup-*.json。
+
+## 按场景管理模型
+
+完整验收可使用 `npm run demo:full -- --runtime .sites-runtime/isolated-demo/current.json --manage-models`；浏览器使用 `npm run test:browser -- --runtime .sites-runtime/isolated-demo/current.json --manage-models`。原有启动方式保持兼容。
+
+管理器仅启动当前关卡需要的模型并在不再需要时停止；首尾 doctor 仍同时核验三个真实模型，验收关卡没有删减。规划、并行规划和修复使用规划模型，语义记忆使用 embedding，其余模型场景使用基础模型。浏览器每例结束释放本次启动的模型。日志和 PID 启停记录保留在 outputs。
+
+只停止当前管理器实际启动的子进程；匹配的预先运行服务可复用但不停止，未核实的占用端口拒绝替换。启动失败、退出和中断均清理拥有的句柄，中断后不能继续启动模型。续跑必须保留最初的管理模式。运行期间不另行执行 demo:cleanup；验收结束后再核查遗留进程，保留当前应用、链、供应商、插件和 MCP 以及全部历史。
