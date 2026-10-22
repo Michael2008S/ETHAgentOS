@@ -1457,5 +1457,7 @@
   "Stored plugin payment snapshot. Reuse verifies the current signed output and canonical payment.": "这里是插件付款快照。复用时会重新核验当前签名产物和链上付款。",
   "Use paid plugin result in mixed workflow": "将已付款的插件成果用于混合编排",
   "Review plugin memory in mixed workflow wallet": "在混合编排钱包面板中审核插件记忆",
-  "Plugin memory selected. Review adapters and authorize a new payment session.": "已选择插件成果记忆。请审核适配器并授权新的支付会话。"
+  "Plugin memory selected. Review adapters and authorize a new payment session.": "已选择插件成果记忆。请审核适配器并授权新的支付会话。",
+  "Business workbench": "业务工作台",
+  "Business status, evidence and next actions in one place.": "集中查看业务状态、交付证据与下一步操作。"
 }
