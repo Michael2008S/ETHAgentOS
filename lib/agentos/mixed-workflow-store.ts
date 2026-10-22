@@ -1,3 +1,4 @@
+import {handoffMonitor,findMonitor,futureMonitorTickets} from './usdc-monitor-state.ts';
 import {approveMixedPlan,type MixedPlanReview} from './mixed-plans.ts';
 import {verifySelectedPluginMemory} from './plugin-semantic-memory.ts';
 import {futurePurchaseReservations} from './purchase-reservations.ts';
@@ -13,15 +14,17 @@ import type {ServiceDescriptor} from './service-catalog.ts';
 import type {Workspace} from './types.ts';
 export type MixedStore=PluginDatabase&{updateWorkspace:(owner:string,reduce:(state:Workspace)=>Workspace|Promise<Workspace>)=>Promise<{state:Workspace;scope:string;revision:number}>};
 export type MixedCreationContext={plugins:PluginPurchaseContext;catalog:ServiceDescriptor[];bindings:Map<string,WorkflowSupplierBinding>};
-export async function createMixedWorkflow(store:MixedStore,owner:string,raw:MixedWorkflowDraft,getContext:()=>Promise<MixedCreationContext>,now=new Date().toISOString(),review?:MixedPlanReview){
+export async function createMixedWorkflow(store:MixedStore,owner:string,raw:MixedWorkflowDraft,getContext:()=>Promise<MixedCreationContext>,now=new Date().toISOString(),review?:MixedPlanReview,monitor?:{id:string;token:string}){
  const body=mixedWorkflowDraftSchema.parse(raw),draftHash=await digest(body),id='mixed-'+body.requestId;let context:Promise<MixedCreationContext>|undefined;
  const snapshot=await store.updateWorkspace(owner,async state=>{
   const prior=state.mixedWorkflows?.find(f=>f.id===id);if(prior){if(prior.draftHash!==draftHash||canonical(prior.planReview??null)!==canonical(review??null))throw new DomainError('Mixed workflow identifier has different parameters.','IDEMPOTENCY_CONFLICT');return state;}
+  if(!monitor&&state.usdcMonitors?.some(m=>m.pending?.draft.requestId===body.requestId))throw new DomainError('Mixed request identifier is reserved for its monitor.','FORBIDDEN');
+  if(monitor)state=handoffMonitor(state,monitor,body);
   const c=await(context??=getContext()),selected=await validateMixedProgram(body,c.catalog),deployment=c.plugins.deployment;
   const approved=review?await approveMixedPlan(state,review,await digest({workspace:owner}),body,deployment,now):state;
   if(body.memory){if(!c.plugins.chain)throw new DomainError('Canonical plugin memory verification unavailable.','UNAVAILABLE');await verifySelectedPluginMemory(store,owner,body.memory,await digest({workspace:owner}),body.buyer,body.input,c.plugins.chain);}
   if(deployment.mode!=='local')throw new DomainError('Public mixed workflows are deferred.','FORBIDDEN');
-  if(!state.policy.active||(state.mixedWorkflows?.length??0)>=20)throw new DomainError('Mixed workflow permission or history limit reached.','FORBIDDEN');
+  if(!state.policy.active||(state.mixedWorkflows?.length??0)+futureMonitorTickets(state,now).length>=20)throw new DomainError('Mixed workflow permission or history limit reached.','FORBIDDEN');
   if(pluginPurchaseDailyExposure(state,deployment,now)+body.steps.reduce((n,s)=>n+s.maxPriceCents,0)>state.policy.dailyBudget)throw new DomainError('Mixed workflow exceeds the shared daily budget.','FORBIDDEN');
   const pluginCount=selected.filter(s=>s.executor==='plugin').length;
   if((state.pluginJobs?.length??0)+pendingPluginPurchaseSlots(state)+mixedPluginRuns(state)+pluginCount>100)throw new DomainError('Mixed workflow exceeds reserved plugin capacity.','FORBIDDEN');
@@ -33,7 +36,7 @@ export async function createMixedWorkflow(store:MixedStore,owner:string,raw:Mixe
    let grantEpoch:number|undefined,supplierBinding:WorkflowSupplierBinding|undefined;
    if(service.executor==='plugin'){
     const pluginId=service.binding.pluginId!,grant=await pluginGrant(store.database,owner,pluginId),installed=await pluginInstallation(store.database,owner,pluginId),occurrences=selected.filter(s=>s.binding.pluginId===pluginId).length;
-    if(!installed||installed.manifestHash!==service.binding.manifestHash||!grant?.enabled||grant.manifestHash!==installed.manifestHash||grant.runtimeHash!==service.binding.runtimeHash||grant.expiresAt<=now||grant.used+mixedPluginRuns(state,pluginId)+occurrences>grant.maxRuns)throw new DomainError('Mixed workflow requires available exact plugin execution grants.','FORBIDDEN');
+    if(!installed||installed.manifestHash!==service.binding.manifestHash||!grant?.enabled||grant.manifestHash!==installed.manifestHash||grant.runtimeHash!==service.binding.runtimeHash||grant.expiresAt<=now||grant.used+mixedPluginRuns(state,pluginId)+occurrences>grant.maxRuns||monitor&&grant.epoch!==findMonitor(state,monitor.id).grantEpoch)throw new DomainError('Mixed workflow requires available exact plugin execution grants.','FORBIDDEN');
     session=pluginVaultAllowance(state,body.vaultSessionId,body.buyer as `0x${string}`,{pluginId,manifestHash:installed.manifestHash,runtimeHash:service.binding.runtimeHash!,maxPriceCents:definition.maxPriceCents},definition.maxPriceCents,gross,now);grantEpoch=grant.epoch;expiry=Math.min(expiry,Date.parse(grant.expiresAt));
    }else{
     const agent=state.agents.find(a=>a.id===service.binding.agentId);

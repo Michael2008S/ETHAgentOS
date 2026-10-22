@@ -1,3 +1,4 @@
+import {monitorPluginRuns} from './usdc-monitor-state.ts';
 import {usdcTreasurySchema} from './treasury-business.ts';
 import {selectedPluginMemorySchema,type SelectedPluginMemory} from './plugin-semantic-memory.ts';
 import {z} from 'zod';
@@ -24,7 +25,7 @@ export const pendingMixed=(state:Workspace)=>(state.mixedWorkflows??[]).filter(f
 export const mixedDrivesPlugin=(state:Workspace,id:string)=>pendingMixed(state).some(f=>f.steps.some(s=>s.childId===id));
 export const futureMixed=(state:Workspace)=>pendingMixed(state).flatMap(flow=>flow.steps.filter(step=>step.status==='pending'&&!step.childId).map(step=>({flow,step})));
 export const mixedReservations=(state:Workspace)=>futureMixed(state).map(({flow,step})=>({deployment:flow.deployment,vaultSessionId:flow.vaultSessionId,quote:step.quote,budget:step.maxPriceCents}));
-export const mixedPluginRuns=(state:Workspace,id?:string)=>futureMixed(state).filter(({step})=>step.service.executor==='plugin'&&(!id||step.service.binding.pluginId===id)).length;
+export const mixedPluginRuns=(state:Workspace,id?:string)=>monitorPluginRuns(state,id)+futureMixed(state).filter(({step})=>step.service.executor==='plugin'&&(!id||step.service.binding.pluginId===id)).length;
 export async function mixedStepUUID(requestId:string,index:number){const h=(await digest({protocol:'agentos.mixed-step.v1',requestId,index})).slice(2,34);return h.slice(0,8)+'-'+h.slice(8,12)+'-4'+h.slice(13,16)+'-8'+h.slice(17,20)+'-'+h.slice(20);}
 /** Handoff is committed atomically WITH the child. No reservation is released
  * in an earlier workspace revision, even after response loss or CAS retry. */

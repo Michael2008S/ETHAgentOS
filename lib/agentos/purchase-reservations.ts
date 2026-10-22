@@ -1,3 +1,4 @@
+import {monitorReservations} from './usdc-monitor-state.ts';
 import {mixedReservations} from './mixed-workflow.ts';
 import {futureWorkflowSteps} from './workflow-state.ts';
 import {futureRouteOffers} from './purchase-route-state.ts';
@@ -7,6 +8,7 @@ import type {Workspace} from './types.ts';
 export function futurePurchaseReservations(state:Workspace,now=new Date().toISOString()){return [
  ...pluginPurchaseReservations(state,now),
  ...mixedReservations(state),
+ ...monitorReservations(state,now),
  ...futureWorkflowSteps(state).map(({workflow,step})=>({deployment:workflow.deployment,vaultSessionId:workflow.vaultSessionId,quote:step.quote,budget:step.budget})),
  ...futureRouteOffers(state).map(({route,offer})=>({deployment:route.deployment,vaultSessionId:route.vaultSessionId,quote:offer.supplierQuote.payload.priceCents,budget:offer.supplierQuote.payload.priceCents})),
 ];}

@@ -1,3 +1,4 @@
+import {pendingMonitors} from './usdc-monitor-state.ts';
 import {pendingMixed,mixedDrivesPlugin} from './mixed-workflow.ts';
 import {serviceRepairWorkItems} from './service-repair-policy.ts';
 import {repairWorkItems} from './workflow-repair-policy.ts';
@@ -9,10 +10,11 @@ import {pendingPurchaseRoutes} from './purchase-route-state.ts';
 import {pendingWorkflows} from './workflows.ts';
 import {workflowDrivesOrder} from './workflow-state.ts';
 
-export type JobKind = 'task' | 'order' | 'workflow' | 'purchase' | 'repair' | 'plugin' | 'plugin-purchase' | 'service-repair' | 'mixed';
+export type JobKind = 'task' | 'order' | 'workflow' | 'purchase' | 'repair' | 'plugin' | 'plugin-purchase' | 'service-repair' | 'mixed' | 'usdc-monitor';
 export type Job = { id: string; owner_id: string; kind: JobKind; task_id: string; status: string; lease_token: string; attempts: number; failures: number };
 export function workItems(state: Workspace, now = Date.now()) {
   return [
+    ...pendingMonitors(state).map(m=>({kind:'usdc-monitor' as const,taskId:m.id,deadline:undefined,notBefore:Math.max(m.lease?Date.parse(m.lease.until):0,m.nextPollAt?Date.parse(m.nextPollAt):0)})),
     ...pendingMixed(state).map(f=>({kind:'mixed' as const,taskId:f.id,deadline:undefined,notBefore:f.lease?Date.parse(f.lease.until):0})),
     ...(state.pluginPurchases??[]).filter(f=>(f.status==='running'||f.status==='cancelling')&&!mixedDrivesPlugin(state,f.id)).map(f=>({kind:'plugin-purchase' as const,taskId:f.id,deadline:undefined,notBefore:f.leaseUntil?Date.parse(f.leaseUntil):0})),
     ...(state.pluginJobs??[]).filter(j=>j.status==='queued'||j.status==='running').map(j=>({kind:'plugin' as const,taskId:j.id,deadline:j.deadlineAt,notBefore:j.leaseUntil?Math.min(Date.parse(j.leaseUntil),Date.parse(j.deadlineAt)):0})),

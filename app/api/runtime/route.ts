@@ -1,3 +1,6 @@
+import {runUSDCMonitor} from '@/lib/agentos/usdc-monitor-runner';
+import {configuredMonitorRuntime} from '@/lib/agentos/usdc-monitor-runtime';
+import {pendingMonitors} from '@/lib/agentos/usdc-monitor-state';
 import {pendingMixed,mixedDrivesPlugin} from '@/lib/agentos/mixed-workflow';
 import {runMixedWorkflow} from '@/lib/agentos/mixed-workflow-runner';
 import {mixedStore,configuredMixedRuntime} from '@/lib/agentos/mixed-workflow-runtime';
@@ -43,8 +46,9 @@ export async function POST(request: Request) {
     const mixedResults=[];for(const f of pendingMixed((await read(ownerId)).state).slice(0,2))mixedResults.push(await runMixedWorkflow(mixedStore(),ownerId,f.id,()=>configuredMixedRuntime(request,ownerId)));
     const pluginState=(await read(ownerId)).state;
     const pluginPurchases=(pluginState.pluginPurchases??[]).filter(f=>(f.status==='running'||f.status==='cancelling')&&!mixedDrivesPlugin(pluginState,f.id)).slice(0,2),pluginPurchaseResults=[];for(const flow of pluginPurchases)pluginPurchaseResults.push(await runPluginPurchase(pluginDatabase(),ownerId,flow.id,()=>configuredPluginPurchaseRuntime(request)));
+    const monitorResults=[];for(const m of pendingMonitors((await read(ownerId)).state).slice(0,2))monitorResults.push(await runUSDCMonitor(mixedStore(),ownerId,m.id,async()=>configuredMonitorRuntime(request,ownerId)));
     const current = await read(ownerId);
-    return Response.json({...current, runtime:{mixedResults,results,orderResults,workflowResults,routeResults,repairResults,pluginResults,pluginPurchaseResults,pending:pendingMixed(current.state).length+(current.state.pluginPurchases??[]).filter(f=>f.status==='running'||f.status==='cancelling').length+(current.state.pluginJobs??[]).filter(j=>j.status==='queued'||j.status==='running').length+repairWorkItems(current.state).length+pendingTasks(current.state).length+pendingOrders(current.state).length+pendingWorkflows(current.state).length+pendingPurchaseRoutes(current.state).length}}, {headers:{'Cache-Control':'no-store'}});
+    return Response.json({...current, runtime:{monitorResults,mixedResults,results,orderResults,workflowResults,routeResults,repairResults,pluginResults,pluginPurchaseResults,pending:pendingMonitors(current.state).length+pendingMixed(current.state).length+(current.state.pluginPurchases??[]).filter(f=>f.status==='running'||f.status==='cancelling').length+(current.state.pluginJobs??[]).filter(j=>j.status==='queued'||j.status==='running').length+repairWorkItems(current.state).length+pendingTasks(current.state).length+pendingOrders(current.state).length+pendingWorkflows(current.state).length+pendingPurchaseRoutes(current.state).length}}, {headers:{'Cache-Control':'no-store'}});
   } catch (error) {
     return apiFailure(error,'runtime');
   }

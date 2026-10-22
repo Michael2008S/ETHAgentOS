@@ -3,14 +3,14 @@ import {DomainError} from './engine';
 import {importTransfers,verifyTransferSource,type DataQuery} from './chain-data';
 import type {TaskInput} from './types';
 import {isLoopback} from './auth';
-function rpc(request:Request){
+export function configuredDataRpcURL(request:Request){
  const value=env.AGENTOS_DATA_RPC_URL||(import.meta.env.DEV&&isLoopback(new URL(request.url))?'https://ethereum-rpc.publicnode.com':undefined);
  if(!value)throw new DomainError('Ethereum data source is not configured.','UNAVAILABLE');return value;
 }
 export async function importChainData(request:Request,query:DataQuery){
- try{return await importTransfers(rpc(request),query);}catch(error){if(error instanceof DomainError)throw error;throw new DomainError('USDC import unavailable or range invalid. Use 1–25 transfers in a finalized range and retry.','UNAVAILABLE');}
+ try{return await importTransfers(configuredDataRpcURL(request),query);}catch(error){if(error instanceof DomainError)throw error;throw new DomainError('USDC import unavailable or range invalid. Use 1–25 transfers in a finalized range and retry.','UNAVAILABLE');}
 }
 export async function checkInputSource(request:Request,input?:TaskInput){
  if(!input?.source)return;
- try{await verifyTransferSource(rpc(request),input.source);}catch(error){if(error instanceof DomainError)throw error;const reason=error instanceof Error&&(/^(Data RPC (transport failed|HTTP failure|invalid response): (?:[0-9]+ )?eth_[a-zA-Z]+|Source events or canonical blocks have changed\.|The recorded finality checkpoint is no longer canonical\.)$/.test(error.message))?error.message:'Source verification unavailable.';throw new DomainError('USDC source could not be reverified. No new task was authorized. '+reason,'UNAVAILABLE');}
+ try{await verifyTransferSource(configuredDataRpcURL(request),input.source);}catch(error){if(error instanceof DomainError)throw error;const reason=error instanceof Error&&(/^(Data RPC (transport failed|HTTP failure|invalid response): (?:[0-9]+ )?eth_[a-zA-Z]+|Source events or canonical blocks have changed\.|The recorded finality checkpoint is no longer canonical\.)$/.test(error.message))?error.message:'Source verification unavailable.';throw new DomainError('USDC source could not be reverified. No new task was authorized. '+reason,'UNAVAILABLE');}
 }
