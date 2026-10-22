@@ -65,9 +65,9 @@ npm run demo:evidence
 
 ## 验证命令
 
-服务和三个模型准备完成且 CRE 已登录后，当前隔离实例使用 `npm run demo:full -- --runtime .sites-runtime/isolated-demo/current.json` 串行执行完整 37 步。日志及报告保存到 `outputs/full-demo-*/`，单元、类型、构建和浏览器回归另行执行；浏览器也支持同一 `--runtime`。失败立即停止。仅在源码、链部署和服务实例保持不变时，使用相同 `--runtime` 加 `--resume outputs/full-demo-<id>/report.json` 显式续跑，保留 failedAttempts；实现变化后必须从第一步重跑。
+服务和模型文件准备完成且 CRE 已登录后，使用 `npm run demo:full -- --runtime .sites-runtime/isolated-demo/current.json --manage-models` 串行执行完整 41 步，按场景启动和释放模型。日志及报告保存到 `outputs/full-demo-*/`，单元、类型、构建和浏览器回归另行执行；浏览器也支持同一 `--runtime`。失败立即停止。仅在源码、链部署和服务实例保持不变时，使用相同 `--runtime` 加 `--resume outputs/full-demo-<id>/report.json` 显式续跑，保留 failedAttempts；实现变化后必须从第一步重跑。
 
-本次最终记录：`4ccad5b` 的 37 项最终步骤全部通过；完整 228 Node、21 Chromium、6 CRE SDK 回归及类型/构建也通过。第 35 步曾因默认 UDP DNS 失败，在同源码下经进程级网络参数续跑成功，原失败保留。报告及精确配置在 `outputs/full-demo-8001b0aa-da62-4655-bf28-b885ad6b3f44/`，详见 ROADMAP-IMPLEMENTATION.md 的最终验收。
+历史 37 步记录：`4ccad5b` 的 37 项最终步骤全部通过；完整 228 Node、21 Chromium、6 CRE SDK 回归及类型/构建也通过。第 35 步曾因默认 UDP DNS 失败，在同源码下经进程级网络参数续跑成功，原失败保留。报告及精确配置在 `outputs/full-demo-8001b0aa-da62-4655-bf28-b885ad6b3f44/`，详见 ROADMAP-IMPLEMENTATION.md 的最终验收。
 
 本机 DNS 故障没有通过修改系统设置来处理。只读 HTTPS DNS 查询确认 Cloudflare 边缘记录后，本次验收使用既有 `TUNNEL_EDGE` 内部测试选项指定实时解析地址，先独立验证匿名 HTTPS 夹具和正常 TLS，再显式续跑；完整记录在 network-resumption.json。不要将其中的临时地址硬编码为默认值，也不要将此诊断选项当作生产网络方案。正常默认隧道路径是否恢复仍应单独核查；网络参数变化不等于应用实现变化，源码或链部署变化则必须重新从第一步验收。
 
@@ -114,3 +114,7 @@ HTTP demo 使用独立测试工作区。链上集成 demo 使用本地测试代�
 管理器仅启动当前关卡需要的模型并在不再需要时停止；首尾 doctor 仍同时核验三个真实模型，验收关卡没有删减。规划、并行规划和修复使用规划模型，语义记忆使用 embedding，其余模型场景使用基础模型。浏览器每例结束释放本次启动的模型。日志和 PID 启停记录保留在 outputs。
 
 只停止当前管理器实际启动的子进程；匹配的预先运行服务可复用但不停止，未核实的占用端口拒绝替换。启动失败、退出和中断均清理拥有的句柄，中断后不能继续启动模型。续跑必须保留最初的管理模式。运行期间不另行执行 demo:cleanup；验收结束后再核查遗留进程，保留当前应用、链、供应商、插件和 MCP 以及全部历史。
+
+当前 41 步验收：实现提交 709bcd3，最终全部通过，报告与摘要清单在 outputs/full-demo-68ac37bf-7900-4cd9-a6f5-2daf67354a3b/。保留临时 HTTPS 超时、账户 API EOF 及两次同源码续跑。过程使用已核验的进程级 TUNNEL_EDGE，未修改系统 DNS/代理/TLS，不保证默认网络路径可达。
+
+验收后六项本地服务正常，三个模型已停止。网页需要 AI 规划时，在项目目录单独运行 `npm run model:planning`；完整命令的 --manage-models 自行管理模型。公共链、实际 DON 与托管部署/调度继续暂缓。

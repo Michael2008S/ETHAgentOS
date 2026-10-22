@@ -10,7 +10,7 @@ User request: complete improvements in the review order, test and commit each it
 | 4 | Two-step workflow and memory references | Persisted dependencies, previous accepted artifact as next input, recovery without duplicate payment | Implemented; item validation below |
 | 5 | Public testnet and CRE settlement | Real wallet, registered workflow execution, actual forwarder payment/refund transactions; account access verified rather than assumed | In progress; receiver/publisher/reconciliation/reusable dispatcher implemented; public acceptance pending |
 | 6 | Third-party onboarding and hosted operation | New skill onboarding with integration acceptance; authenticated deployed consumer, monitoring and failure recovery | In progress; new skill and scoped consumer operations locally accepted; actual hosted operation remains open |
-| Local complete-demo gate | Execute the current complete local sequence after implementation commits | Current ordered 37-step HTTP/D1/EVM/model/supplier/plugin/CRE dry-run evidence and final regression | Passed on 4ccad5b with one explicit same-source network recovery; all 37 final steps passed, original DNS failure retained. Current regression: 228 Node, 21 Chromium, 6 CRE SDK. See final acceptance below. |
+| Local complete-demo gate | Execute the current complete local sequence after implementation commits | 41-step HTTP/D1/EVM/model/supplier/plugin/CRE dry-run and cleanup | Passed on 709bcd3: 41 final steps code=0 after two explicit same-source network recoveries. Original failures retained. Latest affected checks and 6 CRE SDK tests passed; earlier full browser evidence is scoped separately below. |
 
 The complete demo is a final gate after the individual changes. Public workflow deployment depends on actual account capabilities and configured infrastructure; local simulation does not satisfy item 5. No unattended schedule is enabled merely to represent deployment.
 
@@ -458,3 +458,13 @@ CLI 验收后停模型（约 2444 MiB RSS），编写浏览器用例期间模型
 第二次完整 demo 前 23 步通过（含全部新增插件能力），第 24 步暴露资源管理依赖遗漏：demo:queue 的最后一项实际使用基础模型，但管理表未声明。补齐该单一依赖，并给失败断言提供明确字符串诊断。四项管理器单测与实际队列六场景复验通过：outputs/queue-demo-4d2d71eb-03ff-4d80-a1ab-b65fb2b6bee4.json。旧失败订单已规范退款，按明确 scope/ID 只取消旧测试的 manual 任务，队列 pending/leased/dead 均为零；只读与清理证据在 queue-first-readonly.json、queue-first-cleanup.json。原广泛清理命令被自动审批拒绝，没有执行；改为精确编号校验后安全完成。第二次完整报告 outputs/full-demo-22f0652f-cf8b-4af5-9111-2a9ec9029b0a/ 保留，不作为整套通过。资源依赖修复提交后从第一步重跑，不扩大专项验证范围。
 
 第三次完整 demo 前 29 步通过，供应商场景中的条件式 planner:'llm' 暴露第二处基础模型依赖遗漏，原订单实际退款；报告 outputs/full-demo-ed893670-0efd-4f2f-a128-4c01987ebddf/ 保留。补齐 demo:supplier 依赖，并以独立源码扫描覆盖全部直接或条件式 LLM planner 的演示命令，五项模型管理检查通过。实际供应商十三组专项通过：outputs/supplier-demo-dcf79643-366d-4eaf-9d2c-1f9801c8c36f.json；包含真实模型、签名、错误成果退款、丢响应恢复、离线、取消和撤权。没有改变产品权限或验收条件。按当前代码从头执行最终完整序列；不另加广泛回归。
+
+## 当前 41 步本地交付（2026-10-22）
+
+实现提交 709bcd39ed5c88804fb5cc49948634a01e20f650，源码摘要 6a6b846789adac5402160a68a7471adc0e66e0bc722967c0d02532473fce01bd。香港时间 14:04:26–14:27:21，最终 41/41 code=0；最终 doctor 九项服务 ready=true、warnings=[]。报告 outputs/full-demo-68ac37bf-7900-4cd9-a6f5-2daf67354a3b/report.json；同目录 verification.json 比对全部命令、源码快照、日志、39 份子报告快照及 SHA-256。
+
+第 39 步首次最后场景临时 HTTPS 超时，第 40 步首次最后场景账户 API EOF，均保留 failedAttempts、原日志和失败子报告，同源码/同链/同管理模式显式续跑。不是无中断一次通过。最终官方 CLI 五场景、dispatcher 四场景及本地回调通过，CRE SDK 6/6、92 assertions。TUNNEL_EDGE 仅作用于测试进程，不改系统 DNS、代理、TLS；不承诺默认路径可达或外部服务 SLA。
+
+本轮四项核心交付分别提交：统一服务与插件规划 ae64c32，模板 8072852，规范已付款成果修复 e937b72，有界自动修复提案 287a711；资源管理与阻塞修复另行提交。最新专项：14 项规划单测、5 项资源检查、实际两步/三步目标五笔付款、队列六场景、供应商十三场景及受影响浏览器复验通过。此前 fd631ca 上全量 Chromium 25/25 通过，之后按用户快速 demo 要求只复验受影响流程。未再次扩大全量 Node/类型/构建；历史 259 项记录不作为新提交全量回归。
+
+16 次自有模型启动全部停止，原始及续跑记录分别保存，三个模型端口关闭，临时 CRE CLI/隧道为空；六项保留服务 HTTP 200。清理 stopped=0、remaining=[]，报告 outputs/process-cleanup-74c17cf9-ef8b-4a96-8b24-f25af83c91b3.json，状态 outputs/validation-final-services-2026-10-22/final-processes.json。当前唯一服务、D1/交易历史及模型文件保留，未操作其他项目。本轮本地 demo 目标完成；公共链、实际 DON、托管发布/调度继续暂缓。跨契约混合图、开放市场和生产钱包等仍为后续平台范围。

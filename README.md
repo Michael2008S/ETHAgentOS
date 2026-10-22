@@ -24,7 +24,7 @@
 - 审阅式重规划：保留已付款成果与原凭证，确认退款后为剩余目标生成替代步骤；人工批准时原子替换未支出工作，退款尝试仍占用累计额度。见 [WORKFLOW-REPLANNING](docs/WORKFLOW-REPLANNING.md)。
 - 使用真实 `@chainlink/cre-sdk` 的工作流源码与 TypeScript 客户端 SDK。
 
-- 通用插件付费核心：API/SDK 与持久队列支持通用 JSON 输入、已付款父成果、精确插件支付授权、签名交付、独立重放和实际本地 Vault 付款/退款。双语浏览器付费入口和 37 步本地 demo 已验收；后续新增关卡单独记录，见 [PLUGIN-PURCHASES](docs/PLUGIN-PURCHASES.md)。
+- 通用插件付费核心：API/SDK 与持久队列支持通用 JSON 输入、已付款父成果、精确插件支付授权、签名交付、独立重放和实际本地 Vault 付款/退款。插件规划、模板和失败修复已接通，当前 41 步本地 demo 最终全部通过；两次网络失败和同源码续跑记录保留，见 [PLUGIN-PURCHASES](docs/PLUGIN-PURCHASES.md)。
 
 ## 状态边界
 
