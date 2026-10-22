@@ -89,7 +89,7 @@ export async function runOrder(store:OrderStore,ownerId:string,id:string,chain:O
         const token=crypto.randomUUID(),claimed=await store.updateWorkspace(ownerId,current=>claimSupplierLease(current,id,token,now)),leased=findOrder(claimed.state,id);
         if(leased.status!=='running')continue;if(leased.supplierLease?.token!==token)return {orderId:id,status:'executing'};
         let result:{delivery?:SupplierDelivery;error?:string;retryable?:boolean};
-        try{const supplier=supplierForOrder(options.supplier,leased.supplier);await supplier.authorize(leased);const delivery=await supplier.execute(await supplierRequest(leased));await supplier.authorize(leased);result={delivery};}
+        try{const supplier=supplierForOrder(options.supplier,leased.supplier);await supplier.authorize(leased);const delivery=await supplier.execute(await supplierRequest(leased),{ownerId,order:leased});await supplier.authorize(leased);result={delivery};}
         catch(error){result={error:error instanceof DomainError?error.message:'Supplier request failed. The execution checkpoint is retained.',retryable:!(error instanceof DomainError)||error.code==='SUPPLIER_UNAVAILABLE'};}
         await store.updateWorkspace(ownerId,current=>commitSupplierDelivery(current,id,token,result,options.now?.()??new Date().toISOString()));
         if(result.retryable)throw new DomainError(result.error!,'SUPPLIER_UNAVAILABLE');continue;

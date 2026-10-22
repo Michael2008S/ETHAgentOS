@@ -4,6 +4,8 @@ import {canonical} from '../../cre/workflow/verify.ts';
 import {transferSourceSchema} from './transfer-source.ts';
 
 export const x402Hash=z.string().regex(/^0x[0-9a-f]{64}$/);
+export const x402ReviewSchema=z.object({policyHash:x402Hash,discloseInput:z.literal(true)}).strict();
+export type X402Review=z.infer<typeof x402ReviewSchema>;
 const address=z.string().regex(/^0x[0-9a-fA-F]{40}$/).refine(v=>!/^0x0{40}$/.test(v)).transform(v=>v.toLowerCase() as `0x${string}`);
 const amount=z.string().regex(/^[1-9][0-9]{0,17}$/);
 const origin=z.string().refine(v=>{try{const u=new URL(v);return u.origin===v&&u.protocol==='http:'&&u.hostname==='127.0.0.1'&&!u.username&&!u.password;}catch{return false;}},'A fixed local development origin is required.');

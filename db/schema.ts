@@ -67,3 +67,13 @@ export const pluginExecutions=sqliteTable('agentos_plugin_executions',{
 export const pluginPurchases=sqliteTable('agentos_plugin_purchases',{
  ownerId:text('owner_id').notNull(),id:text('id').notNull(),workspaceHash:text('workspace_hash').notNull(),data:text('data').notNull(),createdAt:integer('created_at').notNull(),
 },table=>[primaryKey({columns:[table.ownerId,table.id]}),index('plugin_purchase_owner').on(table.ownerId,table.createdAt)]);
+
+export const x402Tickets=sqliteTable('agentos_x402_tickets',{
+ tokenHash:text('token_hash').primaryKey(),ownerId:text('owner_id').notNull(),orderId:text('order_id').notNull(),leaseHash:text('lease_hash').notNull(),requestHash:text('request_hash').notNull(),expiresAt:integer('expires_at').notNull(),
+},table=>[index('x402_ticket_expiry').on(table.ownerId,table.expiresAt)]);
+export const x402Intents=sqliteTable('agentos_x402_intents',{
+ ownerId:text('owner_id').notNull(),orderId:text('order_id').notNull(),intentHash:text('intent_hash').notNull(),nonce:text('nonce').notNull(),touchedAt:integer('touched_at').notNull(),
+},table=>[primaryKey({columns:[table.ownerId,table.orderId]})]);
+export const x402Evidence=sqliteTable('agentos_x402_evidence',{
+ ownerId:text('owner_id').notNull(),orderId:text('order_id').notNull(),data:text('data').notNull(),updatedAt:integer('updated_at').notNull(),
+},table=>[primaryKey({columns:[table.ownerId,table.orderId]})]);

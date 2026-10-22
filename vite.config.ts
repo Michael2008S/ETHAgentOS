@@ -1,4 +1,5 @@
 import vinext from "vinext";
+import {isolatedSource} from "./build/isolated-source-plugin.mjs";
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
@@ -63,6 +64,7 @@ export default defineConfig(async ({ command }) => {
       },
     },
     plugins: [
+      ...isolatedSource(),
       vinext(),
       sites({ mockAuth: !managedLinux }),
       connectorPreview(),

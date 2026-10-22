@@ -27,7 +27,7 @@ export function supplierPool(suppliers:OrderSupplier[]):SupplierPool{
  if(!suppliers.length||suppliers.length>MAX_SUPPLIERS||new Set(suppliers.map(s=>s.descriptor.id)).size!==suppliers.length)throw new DomainError('Supplier identifiers must be unique and bounded.','UNAVAILABLE');
  const selectById=(id?:string)=>{const supplier=id===undefined?suppliers[0]:suppliers.find(s=>s.descriptor.id===id);if(!supplier)throw new DomainError('The selected supplier is not configured.','SUPPLIER_REJECTED');return supplier;};
  const selectDescriptor=(descriptor:SupplierDescriptor)=>{const supplier=selectById(descriptor.id);if(canonical(supplier.descriptor)!==canonical(descriptor))throw new DomainError('Supplier configuration differs from the authorized order.','SUPPLIER_REJECTED');return supplier;};
- return {descriptor:suppliers[0].descriptor,suppliers,selectById,selectDescriptor,execute:request=>selectDescriptor(request.supplier).execute(request),authorize:order=>{if(!order.supplier)throw new DomainError('A frozen supplier is required.','SUPPLIER_REJECTED');return selectDescriptor(order.supplier).authorize(order);}};
+ return {descriptor:suppliers[0].descriptor,suppliers,selectById,selectDescriptor,execute:(request,context)=>selectDescriptor(request.supplier).execute(request,context),authorize:order=>{if(!order.supplier)throw new DomainError('A frozen supplier is required.','SUPPLIER_REJECTED');return selectDescriptor(order.supplier).authorize(order);}};
 }
 /** Historical single-supplier test adapters remain compatible; selection never falls back. */
 export function supplierForOrder(supplier:OrderSupplier|undefined,descriptor:SupplierDescriptor|undefined){

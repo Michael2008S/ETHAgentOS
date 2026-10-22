@@ -15,16 +15,16 @@ import { specHash, verifyDelivery, validateVerification } from '../cre/workflow/
 import { deployIdentityRegistries } from './compile-identity.mjs';
 
 const rpcMethods=new Set(['personal_sign','eth_chainId','eth_accounts','eth_blockNumber','eth_call','eth_getBalance','eth_getTransactionReceipt','eth_getTransactionByHash','eth_getBlockByNumber','eth_getBlockByHash','eth_estimateGas','eth_gasPrice','eth_maxPriorityFeePerGas','eth_feeHistory','eth_getTransactionCount','eth_sendTransaction','web3_clientVersion','net_version','eth_getCode','eth_getLogs']);
-export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:5177',identity=true,stateDirectory}={}){
+export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:5177',identity=true,stateDirectory,authorizationToken=false}={}){
   const origin=new URL(appOrigin);if(!['127.0.0.1','localhost','[::1]'].includes(origin.hostname))throw new Error('Local chain requires a loopback app origin.');
-  const statePath=stateDirectory?stateDirectory+'/deployment.bin':undefined;let saved=readLocalState(statePath,null);const fresh=!saved;if(!saved){saved={seed:crypto.randomUUID(),appOrigin:origin.origin,identity};writeLocalState(statePath,saved);}if(saved.appOrigin!==origin.origin||saved.identity!==identity)throw Error('Persistent local chain origin or identity configuration changed.');
+  const statePath=stateDirectory?stateDirectory+'/deployment.bin':undefined;let saved=readLocalState(statePath,null);const fresh=!saved;if(!saved){saved={seed:crypto.randomUUID(),appOrigin:origin.origin,identity,authorizationToken};writeLocalState(statePath,saved);}if(saved.appOrigin!==origin.origin||saved.identity!==identity||Boolean(saved.authorizationToken)!==authorizationToken)throw Error('Persistent local chain origin or identity configuration changed.');
   const provider=ganache.provider({logging:{quiet:true},chain:{hardfork:'shanghai',chainId:31337},...(stateDirectory?{wallet:{seed:saved.seed},database:{dbPath:stateDirectory+'/evm'}}:{})});
   const client=createPublicClient({transport:custom(provider),cacheTime:0}),wallet=createWalletClient({transport:custom(provider),chain:null});
   const [buyer,seller,forwarder,executor,seller2]=await wallet.getAddresses();let config;const metadata=stringToHex('agentos-local-verifier:v1');
   if(!fresh&&!saved.config){await provider.disconnect();throw Error('Incomplete local deployment journal; preserve it and create a separate instance.');}
   if(saved.config){config=saved.config;if(saved.buyer!==buyer){await provider.disconnect();throw Error('Persistent local wallet differs.');}for(const address of [config.token,config.escrow,config.vault,config.identityRegistry,config.reputationRegistry].filter(Boolean))if((await client.getCode({address}))==='0x'||!await client.getCode({address})){await provider.disconnect();throw Error('Persistent deployment is missing contract code.');}}else{const artifacts=compile();
   async function deploy(name,args=[]){const hash=await wallet.deployContract({...artifacts[name],account:buyer,args,gas:6000000n});return(await client.waitForTransactionReceipt({hash})).contractAddress;}
-  const token=await deploy('MockToken'),metadataHash=keccak256(metadata),escrow=await deploy('AgentEscrow',[token,forwarder,metadataHash]);
+  const token=await deploy(authorizationToken?'MockAuthorizationToken':'MockToken'),metadataHash=keccak256(metadata),escrow=await deploy('AgentEscrow',[token,forwarder,metadataHash]);
   await client.waitForTransactionReceipt({hash:await wallet.writeContract({address:token,abi:artifacts.MockToken.abi,functionName:'mint',args:[buyer,100000000n],account:buyer,gas:6000000n})});
   const vault=await deploy('AgentVault',[escrow]);
   const registries=identity?await deployIdentityRegistries(client,wallet,buyer):{};

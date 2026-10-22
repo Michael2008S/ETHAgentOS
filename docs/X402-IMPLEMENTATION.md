@@ -20,3 +20,12 @@ At this checkpoint the existing Vault ordering runtime has not yet been connecte
 - Concurrent retries share one procurement. Canonical nonce/Transfer reconciliation records actual upstream cost independently of the user escrow ledger.
 - Four protocol/procurement tests passed, including a simulated crash after durable signing followed by reopening the database, a real dropped HTTP response, parallel retries, one upstream transfer, changed-intent refusal and cross-workspace/cross-day budget contention.
 - Evidence: `outputs/x402-validation-20261023/procurement-increment-2.log`. This checkpoint is the upstream procurement layer; Vault/owner runtime integration follows separately.
+
+## Increment 3 — Vault, scoped authority and delivery acceptance
+
+- Connected the x402 supplier to the existing order runner without changing ordinary supplier requests. Reviewed policy hash and input disclosure are part of the frozen order and wallet commitment.
+- Short-lived hashed tickets bind the workspace, supplier request and current execution lease. The callback checks current policy, signed Vault session, registry delegation and funded escrow; rereads state after chain checks; and fixes one payment nonce/intent in a dedicated D1 table. No caller-selected owner or owner API credential is passed to the supplier.
+- Signed upstream report and procurement receipts are stored separately from business artifacts, with independently checked canonical payment logs and workspace isolation.
+- An isolated local stack uses the new EIP-3009 token and separate supplier procurement/facilitator/provider accounts. Existing runtime deployments stay unchanged.
+- Nine focused tests passed, including existing supplier/Vault regression, three actual HTTP/EVM order flows, full-result recomputation rejection, full user-principal refund, one escrow/settlement per order, upstream cost borne by supplier, non-replenished gross Vault limits, policy revocation during a callback, expired/wrong-scope tickets, old leases and replacement nonce refusal.
+- Evidence: `outputs/x402-validation-20261023/increment-3-regression.log`. Web/API demo and UI acceptance are the next increment.

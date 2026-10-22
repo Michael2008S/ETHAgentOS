@@ -24,6 +24,7 @@ export class AgentOrderClient {
   async create(input:Omit<OrderDraft,'workflowId'|'buyer'|'requestId'|'spec'|'scenario'|'timeoutSeconds'|'model'|'agentIdentity'|'supplier'> & Partial<Pick<OrderDraft,'requestId'|'spec'|'scenario'|'timeoutSeconds'>> & {supplierId?:string}){
     const requestId=input.requestId??crypto.randomUUID(),order=await this.post({action:'create',...input,requestId,buyer:this.session.account});
     if(input.supplierQuote&&canonical(order.supplierQuote)!==canonical(input.supplierQuote))throw new Error('Server order changed the approved signed quote.');
+    if(canonical(order.x402Review??null)!==canonical(input.x402Review??null))throw new Error('Server order changed the reviewed x402 policy or input disclosure.');
     if(order.supplierQuote){if(order.requestId!==requestId||order.agentId!==input.agentId||order.quote>input.budget||order.budget!==input.budget||input.supplierId&&order.supplier?.id!==input.supplierId)throw new Error('Quoted order differs from the approved purchase.');await verifyOrderQuote(order);}
     if(canonical(order.deployment).toLowerCase()!==canonical(this.session.deployment).toLowerCase()||order.buyer.toLowerCase()!==this.session.account.toLowerCase())throw new Error('Server order differs from the connected wallet deployment.');return order;
   }

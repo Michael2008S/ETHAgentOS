@@ -10,7 +10,7 @@ import {reportMessage} from './report-service.mjs';
 
 const jsonSafe=v=>JSON.parse(JSON.stringify(v,(_k,x)=>typeof x==='bigint'?x.toString():x));
 /** The only component holding the supplier's procurement EOA. Never receives a Vault key. */
-export function procurementClient({policy,account,client,store,authorize,afterPersist=async()=>{}}){
+export function procurementClient({policy,account,client,store,authorize,afterPersist=async()=>{},afterPayment=async()=>{}}){
  const locks=new Map();
  async function execute(request,ticket){
   const id=request.jobId,binding={jobId:id,inputHash:request.inputHash,requestHash:await digest(request),policyHash:await digest(policy),network:policy.network,asset:policy.asset,payer:account.address.toLowerCase()};
@@ -51,7 +51,7 @@ export function procurementClient({policy,account,client,store,authorize,afterPe
     if(!response.ok){await response.body?.cancel();if(response.status<500&&response.status!==429)throw Object.assign(Error('Original x402 payment refused; reconcile without a new authorization.'),{terminal:true});throw Error('x402 response unavailable.');}
     const report=await responseJson(response,65536),t=report.terms;
     if(!t||t.version!=='agentos.x402-report.v1'||t.jobId!==id||t.inputHash!==request.inputHash||t.paymentId!==row.paymentId||t.nonce!==row.payload.payload.authorization.nonce||t.payer!==account.address.toLowerCase()||t.outputHash!==await digest(t.output)||!await verifyMessage({address:policy.providerSigner,message:reportMessage(t),signature:report.signature}))throw Object.assign(Error('x402 report signature or request commitment differs.'),{terminal:true});
-    const payment=await recordPayment();if(!payment)throw Error('x402 payment is not confirmed.');
+    const payment=await recordPayment();if(!payment)throw Error('x402 payment is not confirmed.');await afterPayment(row);
     row=store.update(id,{report,state:'delivered'});return {report,payment};
    }catch(error){
     await recordPayment();

@@ -44,8 +44,10 @@ export async function verifySupplierDelivery(raw:unknown,request:SupplierRequest
  if(p.requestHash!==await digest(request)||p.configHash!==request.supplier.configHash||p.jobId!==supplierJobId(request)||p.outputHash!==await digest(p.output)||!await verifyMessage({address:request.supplier.signer,message:supplierReceiptMessage(p),signature:delivery.signature}).catch(()=>false))throw new DomainError('Supplier delivery signature or commitment differs from the authorized request.','SUPPLIER_REJECTED');
  return delivery;
 }
-export type OrderSupplier={descriptor:SupplierDescriptor;quote?(request:SupplierQuoteRequest):Promise<SupplierQuote>;execute(request:SupplierRequest):Promise<SupplierDelivery>;authorize(order:ChainOrder):Promise<void>};
-export async function createSupplier(config:SupplierConfiguration,authorize:OrderSupplier['authorize'],apiKey?:string,request:typeof fetch=fetch):Promise<OrderSupplier>{
+export type SupplierExecutionContext={ownerId:string;order:ChainOrder};
+export type SupplierExecutionHooks={before:(request:SupplierRequest,context?:SupplierExecutionContext)=>Promise<Record<string,string>>;after:(request:SupplierRequest,context:SupplierExecutionContext|undefined,delivery?:SupplierDelivery)=>Promise<void>};
+export type OrderSupplier={procurementPolicy?:import('./x402-policy.ts').X402Policy;descriptor:SupplierDescriptor;quote?(request:SupplierQuoteRequest):Promise<SupplierQuote>;execute(request:SupplierRequest,context?:SupplierExecutionContext):Promise<SupplierDelivery>;authorize(order:ChainOrder):Promise<void>};
+export async function createSupplier(config:SupplierConfiguration,authorize:OrderSupplier['authorize'],apiKey?:string,request:typeof fetch=fetch,hooks?:SupplierExecutionHooks):Promise<OrderSupplier>{
  const descriptor=await supplierDescriptor(config);
  return {descriptor,authorize,async quote(body){
   if(body.supplierId!==descriptor.id||body.configHash!==descriptor.configHash)throw new DomainError('Quote supplier differs from its configured endpoint.','SUPPLIER_REJECTED');
@@ -53,12 +55,17 @@ export async function createSupplier(config:SupplierConfiguration,authorize:Orde
   if(!response.ok){await response.body?.cancel();throw new DomainError('Supplier quote service is unavailable.','SUPPLIER_UNAVAILABLE');}
   const reader=response.body?.getReader();if(!reader)throw new DomainError('Invalid signed supplier quote.','SUPPLIER_REJECTED');let text='',size=0;const decoder=new TextDecoder();try{for(;;){const {done,value}=await reader.read();if(done)break;if((size+=value.length)>65536){await reader.cancel();throw new DomainError('Supplier quote exceeds the size limit.','SUPPLIER_REJECTED');}text+=decoder.decode(value,{stream:true});}text+=decoder.decode();}finally{reader.releaseLock();}
   let raw:unknown;try{raw=JSON.parse(text);}catch{throw new DomainError('Invalid signed supplier quote.','SUPPLIER_REJECTED');}return verifySupplierQuote(raw,body,descriptor);
- },async execute(body){
+ },async execute(body,context){
   if(canonical(body.supplier)!==canonical(descriptor))throw new DomainError('Supplier configuration differs from the authorized order.','SUPPLIER_REJECTED');
-  let response:Response;try{response=await request(config.url,{method:'POST',redirect:'manual',headers:{'Content-Type':'application/json','Idempotency-Key':supplierJobId(body),...(apiKey?{Authorization:'Bearer '+apiKey}:{})},body:JSON.stringify(body),signal:AbortSignal.timeout(config.timeoutMs)});}catch{throw new DomainError('Supplier is temporarily unavailable. The execution checkpoint is retained.','SUPPLIER_UNAVAILABLE');}
+  const headers=await hooks?.before(body,context)??{};let delivery:SupplierDelivery|undefined,failure:unknown;
+  try{
+  let response:Response;try{response=await request(config.url,{method:'POST',redirect:'manual',headers:{'Content-Type':'application/json','Idempotency-Key':supplierJobId(body),...(apiKey?{Authorization:'Bearer '+apiKey}:{}),...headers},body:JSON.stringify(body),signal:AbortSignal.timeout(config.timeoutMs)});}catch{throw new DomainError('Supplier is temporarily unavailable. The execution checkpoint is retained.','SUPPLIER_UNAVAILABLE');}
   if(!response.ok){await response.body?.cancel();if(response.status===409)throw new DomainError('Supplier rejected a conflicting request commitment.','SUPPLIER_REJECTED');if(response.status>=500||response.status===429)throw new DomainError('Supplier is temporarily unavailable. The execution checkpoint is retained.','SUPPLIER_UNAVAILABLE');throw new DomainError('Supplier rejected the execution request.','SUPPLIER_REJECTED');}
   const reader=response.body?.getReader();if(!reader)throw new DomainError('Supplier returned an empty delivery.','SUPPLIER_REJECTED');let size=0;const chunks:Uint8Array[]=[];
   try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>65536){await reader.cancel();throw new DomainError('Supplier delivery exceeds the size limit.','SUPPLIER_REJECTED');}chunks.push(value);}}finally{reader.releaseLock();}
-  const raw=new Uint8Array(size);let offset=0;for(const chunk of chunks){raw.set(chunk,offset);offset+=chunk.length;}let value:unknown;try{value=JSON.parse(new TextDecoder().decode(raw));}catch{throw new DomainError('Supplier returned malformed JSON.','SUPPLIER_REJECTED');}return verifySupplierDelivery(value,body);
+  const raw=new Uint8Array(size);let offset=0;for(const chunk of chunks){raw.set(chunk,offset);offset+=chunk.length;}let value:unknown;try{value=JSON.parse(new TextDecoder().decode(raw));}catch{throw new DomainError('Supplier returned malformed JSON.','SUPPLIER_REJECTED');}delivery=await verifySupplierDelivery(value,body);
+  }catch(error){failure=error;}
+  try{await hooks?.after(body,context,delivery);}catch(error){if(!failure||error instanceof DomainError&&error.code==='SUPPLIER_REJECTED')failure=error;}
+  if(failure)throw failure;return delivery!;
  }};
 }

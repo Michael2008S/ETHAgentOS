@@ -16,12 +16,13 @@ import { inspectIdentity } from '@/lib/agentos/identity';
 import { canonical } from '@/cre/workflow/verify';
 import { deferInline } from '@/lib/agentos/auth';
 import {checkVaultBinding} from '@/lib/agentos/vault';
+import {x402ReviewSchema} from '@/lib/agentos/x402-policy';
 const id=z.string().min(1).max(128),hash=z.string().regex(/^0x[0-9a-fA-F]{64}$/),address=z.string().regex(/^0x[0-9a-fA-F]{40}$/).refine(s=>!/^0x0{40}$/.test(s));
 const input=chainOrderInputSchema;
 const https=z.string().url().max(4096).refine(s=>{const u=new URL(s);return u.protocol==='https:'&&!u.username&&!u.password&&!u.hash;});
 const verification=deliveryVerificationSchema;
 const schema=z.discriminatedUnion('action',[
-  z.object({action:z.literal('create'),vaultSessionId:z.string().uuid().optional(),executor:z.enum(['builtin','supplier']).default('builtin'),supplierId:z.string().regex(/^[a-z0-9-]{1,64}$/).optional(),supplierQuote:supplierQuoteSchema.optional(),planner:z.enum(['deterministic','llm']).default('deterministic'),requestId:z.string().uuid(),title:z.string().trim().min(1).max(160),agentId:id,budget:z.number().int().positive().max(1000000),buyer:address,input:input.optional(),scenario:z.enum(['success','injection','interruption','invalid-delivery']).default('success'),timeoutSeconds:z.number().int().min(1).max(86400).default(300),spec:z.object({datasetUrl:https,artifactUrl:https,datasetHash:hash,verification:verification.optional()}).strict().optional()}).strict(),
+  z.object({action:z.literal('create'),x402Review:x402ReviewSchema.optional(),vaultSessionId:z.string().uuid().optional(),executor:z.enum(['builtin','supplier']).default('builtin'),supplierId:z.string().regex(/^[a-z0-9-]{1,64}$/).optional(),supplierQuote:supplierQuoteSchema.optional(),planner:z.enum(['deterministic','llm']).default('deterministic'),requestId:z.string().uuid(),title:z.string().trim().min(1).max(160),agentId:id,budget:z.number().int().positive().max(1000000),buyer:address,input:input.optional(),scenario:z.enum(['success','injection','interruption','invalid-delivery']).default('success'),timeoutSeconds:z.number().int().min(1).max(86400).default(300),spec:z.object({datasetUrl:https,artifactUrl:https,datasetHash:hash,verification:verification.optional()}).strict().optional()}).strict(),
   z.object({action:z.literal('challenge'),orderId:id,transactionHash:hash}).strict(),
   z.object({action:z.literal('activate'),orderId:id,nonce:z.string().uuid(),signature:z.string().regex(/^0x[0-9a-fA-F]+$/).min(130).max(8194)}).strict(),
   z.object({action:z.literal('sync'),orderId:id,transactionHash:hash.optional()}).strict(),
