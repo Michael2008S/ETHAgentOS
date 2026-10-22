@@ -36,7 +36,7 @@ export async function reconcilePayment(client,token,payload,transactionHash){
  if(receipt.status!=='success'||block.hash!==receipt.blockHash)throw Error('Canonical successful payment required.');
  const events=receipt.logs.filter(l=>lower(l.address)===lower(token)).flatMap(l=>{try{return [decodeEventLog({abi:authorizationABI,data:l.data,topics:l.topics})];}catch{return [];}});
  if(!events.some(e=>e.eventName==='AuthorizationUsed'&&lower(e.args.authorizer)===lower(a.from)&&e.args.nonce===a.nonce)||!events.some(e=>e.eventName==='Transfer'&&lower(e.args.from)===lower(a.from)&&lower(e.args.to)===lower(a.to)&&e.args.value===BigInt(a.value)))throw Error('x402 transfer differs from its signed intent.');
- return {success:true,transaction:transactionHash,network:'eip155:31337',payer:a.from,amount:a.value,asset:token,payTo:a.to,blockNumber:String(receipt.blockNumber),blockHash:receipt.blockHash};
+ return {success:true,transaction:transactionHash,network:'eip155:31337',payer:a.from,amount:a.value,asset:token,payTo:a.to,blockNumber:String(receipt.blockNumber),blockHash:receipt.blockHash,blockTimestamp:String(block.timestamp)};
 }
 export function facilitator(signer,client,token,journal){
  const scheme=new FacilitatorScheme(signer,{simulateInSettle:true});let pending=Promise.resolve();
