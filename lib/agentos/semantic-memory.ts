@@ -3,7 +3,7 @@ import {z} from 'zod';
 import {digest,DomainError} from './engine.ts';
 import {canonical} from '../../cre/workflow/verify.ts';
 import {acceptedArtifact,acceptedArtifactInput,verifyAcceptedOrder} from './artifact-memory.ts';
-import type {Workspace,TaskInput} from './types.ts';
+import type { Workspace } from './types.ts';
 import type {OrderChain} from './order-chain.ts';
 import type {EmbeddingDescriptor} from './memory-embedding.ts';
 import type {WalletDeployment} from '../../sdk/wallet.ts';

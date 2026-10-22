@@ -8,7 +8,7 @@ import {identityDocument,verifyRegistration} from '../lib/agentos/identity.ts';
 import {identityABI,completeRegistrationDocument,registrationDataURI} from '../sdk/identity.ts';
 import { AgentWalletSession,inputEvidence } from '../sdk/wallet.ts';
 import { encodeSettlementReport,escrowABI } from '../sdk/chain.ts';
-import { specHash,verifyDelivery } from '../cre/workflow/verify.ts';
+import { verifyDelivery } from '../cre/workflow/verify.ts';
 import { privateKeyToAccount,generatePrivateKey } from 'viem/accounts';
 import { createSupplier } from '../lib/agentos/supplier.ts';
 import { seed,DomainError } from '../lib/agentos/engine.ts';

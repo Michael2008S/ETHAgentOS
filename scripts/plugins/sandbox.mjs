@@ -1,5 +1,5 @@
 import {Worker} from 'node:worker_threads';
-import {boundedJson,validatePluginValue,pluginManifestSchema,pluginManifestHash,pluginExecutionTerms} from '../../lib/agentos/plugin-protocol.ts';
+import { boundedJson, validatePluginValue, pluginManifestSchema, pluginManifestHash } from '../../lib/agentos/plugin-protocol.ts';
 import {digest} from '../../lib/agentos/engine.ts';
 
 export async function isolatedJavaScript({code,input,limits,verify=false},callTool){

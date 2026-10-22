@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';import {mkdir,writeFile} from 'node:fs/promises';
-import {AgentWalletSession,localWalletProvider,inputEvidence} from '../sdk/wallet.ts';import {AgentVaultClient} from '../sdk/vault.ts';import {AgentOrderClient} from '../sdk/orders.ts';import {vaultABI} from '../lib/agentos/vault.ts';import {tokenABI,escrowABI} from '../sdk/chain.ts';
+import {AgentWalletSession,localWalletProvider,inputEvidence} from '../sdk/wallet.ts';import {AgentVaultClient} from '../sdk/vault.ts';import {AgentOrderClient} from '../sdk/orders.ts';import {tokenABI,escrowABI} from '../sdk/chain.ts';
 const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5187',chain=process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8555';
 if(!['127.0.0.1','localhost'].includes(new URL(base).hostname)||new URL(chain).hostname!=='127.0.0.1')throw new Error('Use the isolated loopback demo.');
 const id=crypto.randomUUID(),headers={'x-agentos-sandbox':'vault-'+id,'x-agentos-queue-only':'1'},report={id,startedAt:new Date().toISOString(),scope:'HTTP/D1 bounded Vault purchasing on local EVM; one signed session',cases:[]};

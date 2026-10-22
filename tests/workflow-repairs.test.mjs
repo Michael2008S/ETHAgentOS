@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import {seed,digest,DomainError} from '../lib/agentos/engine.ts';
 import {modelDescriptor} from '../lib/agentos/model.ts';
-import {createRepairPolicy,setRepairPolicy,findRepairPolicy,verifyRepairPolicy,repairWorkItems,claimRepairAttempt,repairAttemptRequestId} from '../lib/agentos/workflow-repair-policy.ts';
+import { createRepairPolicy, setRepairPolicy, verifyRepairPolicy, repairWorkItems, repairAttemptRequestId } from '../lib/agentos/workflow-repair-policy.ts';
 import {runWorkflowRepair} from '../lib/agentos/workflow-repair-runner.ts';
 import {workflowPlanChoices,acceptWorkflowProposal} from '../lib/agentos/workflow-plans.ts';
 import {commitWithJobs,claimJob,acknowledgeJob,queueSummary} from '../lib/agentos/queue.ts';

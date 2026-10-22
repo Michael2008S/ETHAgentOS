@@ -7,7 +7,7 @@ import {createPublicClient,createWalletClient,custom,keccak256,stringToHex} from
 import {privateKeyToAccount} from 'viem/accounts';
 import {compile} from '../scripts/compile-contracts.mjs';
 import {seed,normalizeInput} from '../lib/agentos/engine.ts';
-import {findOrder,createOrder,orderPolicy} from '../lib/agentos/orders.ts';
+import { findOrder, orderPolicy } from '../lib/agentos/orders.ts';
 import {createWorkflow,advanceWorkflow,findWorkflow,controlWorkflow} from '../lib/agentos/workflows.ts';
 import {runWorkflow} from '../lib/agentos/workflow-runner.ts';
 import {runOrder} from '../lib/agentos/order-runner.ts';

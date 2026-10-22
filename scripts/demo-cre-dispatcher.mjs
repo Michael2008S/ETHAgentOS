@@ -16,7 +16,7 @@ import {orderChain} from '../lib/agentos/order-chain.ts';
 import {createOrder,findOrder,authorizeOrder,activateOrder,orderArtifact} from '../lib/agentos/orders.ts';
 import {runOrder} from '../lib/agentos/order-runner.ts';
 import {seed,transition,resolveSkillInput} from '../lib/agentos/engine.ts';
-import {canonical,resultHash,specHash,verifyDelivery} from '../cre/workflow/verify.ts';
+import { resultHash, specHash, verifyDelivery } from '../cre/workflow/verify.ts';
 import {evidenceRoot} from '../cre/workflow/dispatcher.ts';
 
 const id=crypto.randomUUID(),root=resolve('.sites-runtime/cre-dispatcher/'+id),report={id,startedAt:new Date().toISOString(),scope:'official CLI dry-run with real temporary HTTPS/workerd/R2 and local EVM 31337; Sepolia selector alias; callbacks use a local test forwarder; no broadcast, registration or DON attestation',cases:[]};

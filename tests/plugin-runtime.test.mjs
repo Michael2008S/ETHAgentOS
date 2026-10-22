@@ -2,9 +2,9 @@ import test from 'node:test';import assert from 'node:assert/strict';import {Dat
 import {seed,digest,DomainError} from '../lib/agentos/engine.ts';
 import {textPluginExample,vaultPluginExample} from '../lib/agentos/plugin-examples.ts';
 import {boundedJson,validatePluginSchema,pluginManifestHash,verifyPluginExecution} from '../lib/agentos/plugin-protocol.ts';
-import {installPlugin,authorizePlugin,createPluginJob,pluginJob,pluginGrant,cancelPluginJob} from '../lib/agentos/plugin-store.ts';
+import { installPlugin, authorizePlugin, createPluginJob, pluginJob, pluginGrant } from '../lib/agentos/plugin-store.ts';
 import {pluginCapability,runPluginJob} from '../lib/agentos/plugin-runner.ts';
-import {pluginExecutionRequest,pluginPublicJob} from '../lib/agentos/plugin-state.ts';
+import { pluginPublicJob } from '../lib/agentos/plugin-state.ts';
 import {isolatedJavaScript,executePlugin} from '../scripts/plugins/sandbox.mjs';
 import {createMcpFixture} from '../scripts/plugins/mcp-fixture.mjs';
 import {parseMcpServers,mcpCatalogue,callMcp} from '../scripts/plugins/mcp-broker.mjs';

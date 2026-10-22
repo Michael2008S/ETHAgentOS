@@ -1,8 +1,8 @@
 import {z} from 'zod';
-import {canonical} from '../../cre/workflow/verify.ts';
+
 import {digest,DomainError} from './engine.ts';
 import {serviceTemplateDefinitionSchema,validateServiceTemplate,verifyServiceTemplate,verifyTemplateApplication,type ServiceTemplate,type ServiceTemplateDefinition} from './service-template-protocol.ts';
-import {verifyServiceProposal,serviceProposalTerms,servicePlan,type ServiceProposal} from './service-plans.ts';
+import { verifyServiceProposal, servicePlan, type ServiceProposal } from './service-plans.ts';
 import {servicePlanParametersSchema,compileServiceProgram} from './service-program.ts';
 import type {ServiceDescriptor} from './service-catalog.ts';
 import type {Workspace} from './types.ts';

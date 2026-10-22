@@ -2,7 +2,7 @@ import {pluginMemoryDocuments} from './plugin-semantic-memory.ts';
 import {canonical} from '../../cre/workflow/verify.ts';
 import {digest,DomainError} from './engine.ts';
 import {embedMemory,cosineSimilarity,type EmbeddingConfiguration,type EmbeddingDescriptor} from './memory-embedding.ts';
-import {memoryDocuments,filterMemoryDocuments,semanticSearchTerms,type SemanticRequest,type SemanticSearch} from './semantic-memory.ts';
+import { memoryDocuments, filterMemoryDocuments, type SemanticRequest, type SemanticSearch } from './semantic-memory.ts';
 import {memoryNotes,memoryVectors,claimMemoryRequest,completeMemoryRequest,failMemoryRequest} from './memory-store.ts';
 import type {Workspace} from './types.ts';
 type Snapshot={state:Workspace;revision:number;scope:string};

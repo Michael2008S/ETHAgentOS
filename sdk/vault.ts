@@ -1,4 +1,4 @@
-import {encodeFunctionData,parseAbi,type Hex} from 'viem';
+import { encodeFunctionData, parseAbi } from 'viem';
 import {AgentWalletSession,type WalletDeployment} from './wallet.ts';
 import {centsToToken} from './chain.ts';
 import {inspectVault,vaultABI,sessionBinding,normalizedVaultSellers,type VaultSession} from '../lib/agentos/vault.ts';

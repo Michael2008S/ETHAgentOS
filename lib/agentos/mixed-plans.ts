@@ -1,5 +1,5 @@
 import {leasedModelRequest} from './model-request.ts';
-import {activeHistory,isArchived} from './business-archives.ts';
+import { activeHistory } from './business-archives.ts';
 import {z} from 'zod';
 import {canonical} from '../../cre/workflow/verify.ts';
 import {digest,DomainError,normalizeInput} from './engine.ts';

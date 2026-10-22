@@ -1,4 +1,4 @@
-import {canonical} from '../../cre/workflow/verify.ts';
+
 import {digest,DomainError} from './engine.ts';
 import {findMixed,mixedTerms,verifyMixed,type MixedWorkflowDraft} from './mixed-workflow.ts';
 import {paidMixedStep,type MixedRuntime} from './mixed-workflow-runner.ts';

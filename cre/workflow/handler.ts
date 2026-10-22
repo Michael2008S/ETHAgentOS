@@ -1,6 +1,6 @@
 import {HTTPClient,EVMClient,getNetwork,consensusIdenticalAggregation,encodeCallMsg,LAST_FINALIZED_BLOCK_NUMBER,LATEST_BLOCK_NUMBER,bytesToHex,hexToBase64,type NodeRuntime,type Runtime} from '@chainlink/cre-sdk';
-import {encodeAbiParameters,parseAbiParameters,parseAbi,encodeFunctionData,decodeFunctionResult,zeroAddress,type Address,type Hex} from 'viem';
-import {specHash,verifyDelivery,type DeliverySpec} from './verify.ts';
+import { encodeAbiParameters, parseAbiParameters, parseAbi, encodeFunctionData, decodeFunctionResult, zeroAddress, type Hex } from 'viem';
+import { specHash, verifyDelivery } from './verify.ts';
 import type {Config} from './config.ts';
 import {evidenceRoot,validateReadyBatch,SLOT_MILLISECONDS,type ReadyItem,type ReadyBatch} from './dispatcher.ts';
 import {EVM_PB} from '@chainlink/cre-sdk/pb';

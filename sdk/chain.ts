@@ -1,4 +1,4 @@
-import { decodeEventLog, encodeAbiParameters, encodeFunctionData, keccak256, parseAbi, parseAbiParameters, stringToHex, type Address, type Hex, type PublicClient } from 'viem';
+import { decodeEventLog, encodeAbiParameters, encodeFunctionData, keccak256, parseAbi, parseAbiParameters, type Address, type Hex, type PublicClient } from 'viem';
 import { specHash, type DeliverySpec } from '../cre/workflow/verify.ts';
 import {creIdentityHash,validateReceiverIdentity,verifyCREReceiver,type CREReceiverIdentity} from './cre-receiver.ts';
 

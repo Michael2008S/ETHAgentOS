@@ -8,7 +8,7 @@ import {AgentOrderClient} from '../sdk/orders.ts';
 import {AgentVaultClient} from '../sdk/vault.ts';
 import {AgentPurchaseRouteClient} from '../sdk/purchase-routes.ts';
 import {escrowABI,tokenABI} from '../sdk/chain.ts';
-import {vaultABI} from '../lib/agentos/vault.ts';
+
 import {loopbackService} from '../lib/agentos/local-services.ts';
 const runtime=process.env.AGENTOS_TEST_URL&&process.env.AGENTOS_CHAIN_URL&&process.env.AGENTOS_SUPPLIER_URL?{}:await readFile('.sites-runtime/isolated-demo/current.json','utf8').then(JSON.parse),base=loopbackService(process.env.AGENTOS_TEST_URL||runtime.baseURL),chain=loopbackService(process.env.AGENTOS_CHAIN_URL||runtime.chainURL),primary=loopbackService(process.env.AGENTOS_SUPPLIER_URL||runtime.supplierURL),secondary=loopbackService(process.env.AGENTOS_SECOND_SUPPLIER_URL||runtime.supplier2URL||'http://127.0.0.1:'+(Number(new URL(primary).port)+1));
 const id=crypto.randomUUID(),headers={'x-agentos-sandbox':'purchase-routes-'+id,'x-agentos-queue-only':'1'},os=new AgentOSClient(base,headers),report={id,startedAt:new Date().toISOString(),scope:'actual local HTTP/D1/SDK/durable queue, independent signed providers and ERC-8004 payees, Vault and EVM; public finality branch has separate unit coverage; no public broadcast or hosted scheduling',cases:[]};

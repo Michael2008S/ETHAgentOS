@@ -1,4 +1,4 @@
-import {activeHistory,isArchived} from './business-archives.ts';
+import { activeHistory } from './business-archives.ts';
 import {inspectMixedRepair} from './mixed-repair.ts';
 import {handoffMonitor,findMonitor,futureMonitorTickets} from './usdc-monitor-state.ts';
 import {approveMixedPlan,type MixedPlanReview} from './mixed-plans.ts';

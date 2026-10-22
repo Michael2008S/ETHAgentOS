@@ -1,7 +1,7 @@
 import {usdcDemoSample} from '@/lib/agentos/usdc-demo-sample';
 import {dataRpc} from '@/lib/agentos/chain-data';
 import {configuredDataRpcURL,configuredDataReplay,configuredDataLocalTransport} from '@/lib/agentos/data-runtime';
-import {USDC_ADDRESS,TRANSFER_TOPIC} from '@/lib/agentos/transfer-source';
+
 import {reconcileMonitorRepair} from '@/lib/agentos/monitor-repair';
 import {configuredMixedRuntime} from '@/lib/agentos/mixed-workflow-runtime';
 import {activeHistory} from '@/lib/agentos/business-archives';

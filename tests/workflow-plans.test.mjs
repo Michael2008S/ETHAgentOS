@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {privateKeyToAccount,generatePrivateKey} from 'viem/accounts';
 import {keccak256,stringToHex} from 'viem';
-import {seed,digest,DomainError} from '../lib/agentos/engine.ts';
+import { seed, digest } from '../lib/agentos/engine.ts';
 import {workflowPlanRequestSchema} from '../lib/agentos/workflow-plan-schema.ts';
 import {normalizePlanParameters,workflowPlanChoices,generateWorkflowProposal,saveWorkflowProposal,acceptWorkflowProposal,dismissWorkflowProposal,verifyWorkflowProposal,workflowProposalTerms,validateWorkflowProgram} from '../lib/agentos/workflow-plans.ts';
 import {supplierQuoteMessage} from '../lib/agentos/supplier-quote.ts';

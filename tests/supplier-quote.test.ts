@@ -5,7 +5,7 @@ import {keccak256,stringToHex} from 'viem';
 import {seed,normalizeInput} from '../lib/agentos/engine.ts';
 import {createOrder,orderCommitment,type OrderDraft} from '../lib/agentos/orders.ts';
 import {inputEvidence} from '../sdk/wallet.ts';
-import {makeSupplierQuoteRequest,verifySupplierQuote,supplierQuoteMessage,verifyOrderQuote,type SupplierQuote,type SupplierQuoteRequest} from '../lib/agentos/supplier-quote.ts';
+import { makeSupplierQuoteRequest, verifySupplierQuote, supplierQuoteMessage, verifyOrderQuote, type SupplierQuoteRequest } from '../lib/agentos/supplier-quote.ts';
 import type {AgentIdentity} from '../lib/agentos/identity.ts';
 import type {SupplierDescriptor} from '../lib/agentos/supplier.ts';
 import type {WalletDeployment} from '../sdk/wallet.ts';

@@ -4,7 +4,7 @@ import {purchaseFixture} from './plugin-purchase-fixture.mjs';import {digest,Dom
 import {labelReportPluginExample} from '../lib/agentos/plugin-examples.ts';import {pluginAttestationMessage} from '../lib/agentos/plugin-protocol.ts';import {executePlugin} from '../scripts/plugins/sandbox.mjs';
 import {prepareVaultSession,checkVaultSessionAllowance,vaultABI} from '../lib/agentos/vault.ts';import {createPluginPurchase,pluginPurchase} from '../lib/agentos/plugin-purchase-store.ts';import {runPluginPurchase} from '../lib/agentos/plugin-purchase-runner.ts';import {createPluginPurchaseChain} from '../lib/agentos/plugin-purchase-chain.ts';
 import {pluginPurchaseTerms,pluginPurchaseSpec} from '../lib/agentos/plugin-purchase-protocol.ts';
-import {buildServiceReplan,verifyServiceReplan} from '../lib/agentos/service-replan.ts';import {canonicalPluginPaidRoot} from '../lib/agentos/plugin-paid-memory.ts';import {serviceCatalog} from '../lib/agentos/service-catalog.ts';import {generateServiceProposal,saveServiceProposal,verifyServiceProposal,serviceProposalTerms} from '../lib/agentos/service-plans.ts';
+import {buildServiceReplan,verifyServiceReplan} from '../lib/agentos/service-replan.ts';import {canonicalPluginPaidRoot} from '../lib/agentos/plugin-paid-memory.ts';import {serviceCatalog} from '../lib/agentos/service-catalog.ts';import { generateServiceProposal, saveServiceProposal, verifyServiceProposal } from '../lib/agentos/service-plans.ts';
 
 test('actual EVM repair preserves the paid parent, counts refunded gross fees, atomically supersedes once and independently verifies cross-purchase input',async()=>{
  const local=await startLocalChain({port:0,identity:false}),signer=privateKeyToAccount(generatePrivateKey());let f;

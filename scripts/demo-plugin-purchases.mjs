@@ -2,7 +2,7 @@ import {spawn} from 'node:child_process';
 import {AgentConsumerClient} from '../sdk/consumers.ts';
 import assert from 'node:assert/strict';import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {AgentPluginClient} from '../sdk/plugins.ts';import {AgentPluginPurchaseClient} from '../sdk/plugin-purchases.ts';import {AgentVaultClient} from '../sdk/vault.ts';import {AgentWalletSession,localWalletProvider} from '../sdk/wallet.ts';
-import {textPluginExample,labelReportPluginExample,vaultPluginExample} from '../lib/agentos/plugin-examples.ts';import {tokenABI} from '../sdk/chain.ts';import {vaultABI} from '../lib/agentos/vault.ts';
+import {textPluginExample,labelReportPluginExample,vaultPluginExample} from '../lib/agentos/plugin-examples.ts';import {tokenABI} from '../sdk/chain.ts';
 const runtime=JSON.parse(await readFile('.sites-runtime/isolated-demo/current.json','utf8')),base=process.env.AGENTOS_TEST_URL||runtime.baseURL,chain=process.env.AGENTOS_CHAIN_URL||runtime.chainURL,id=crypto.randomUUID(),headers={'x-agentos-sandbox':'plugin-buy-'+id,'x-agentos-queue-only':'1'},report={id,startedAt:new Date().toISOString(),scope:'actual HTTP/D1/SDK, signed QuickJS execution, independent replay and local Vault/EVM; no public chain, DON or model inference',cases:[]};
 if(new URL(base).hostname!=='127.0.0.1'||new URL(chain).hostname!=='127.0.0.1')throw Error('Use an isolated local demo.');
 let vault,session,signatures=0,ownerTransactions=0,consumer,consumerFinished,consumerClosed=false,consumerCode,manager,issued,leaked=false;

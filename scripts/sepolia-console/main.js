@@ -1,4 +1,4 @@
-import {createPublicClient,createWalletClient,custom,http,encodeFunctionData,encodeDeployData,decodeEventLog,formatEther} from 'viem';
+import { createPublicClient, createWalletClient, custom, http, encodeFunctionData, encodeDeployData, formatEther } from 'viem';
 import {sepolia} from 'viem/chains';
 import {identityABI,registrationDocument,registrationDataURI,completeRegistrationDocument} from '../../sdk/identity.ts';
 import {creWorkflowName} from '../../sdk/cre-receiver.ts';

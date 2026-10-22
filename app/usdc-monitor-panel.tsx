@@ -10,7 +10,7 @@ import {AgentMixedWorkflowClient} from '@/sdk/mixed-workflows';
 import {AgentPluginClient} from '@/sdk/plugins';
 import {authorizeBusiness,pendingBusinessTransaction,reconcileBusinessTransaction} from '@/sdk/business-authorizations';
 import {saveMonitorIntent,loadMonitorIntent,clearMonitorIntent} from '@/sdk/monitor-intent';
-import {AgentVaultClient} from '@/sdk/vault';
+
 import {treasuryPolicyManifest,percentToBps} from '@/lib/agentos/mixed-wizard';
 import {usdcMonitorDraftSchema,type USDCMonitor,type USDCMonitorDraft} from '@/lib/agentos/usdc-monitor-state';
 import type {AgentWalletSession} from '@/sdk/wallet';

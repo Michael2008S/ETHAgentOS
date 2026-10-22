@@ -5,7 +5,7 @@ import type { Address, Hex } from 'viem';
 import type { WalletDeployment } from '../../sdk/wallet.ts';
 import type { ChainEvidence } from '../../sdk/chain.ts';
 import { canonical,deliveryVerification,deliveryArtifact, type DeliverySpec } from '../../cre/workflow/verify.ts';
-import { authorizeOperation, digest, DomainError, expectedOutput, normalizeInput, resolveSkillInput } from './engine.ts';
+import { authorizeOperation, digest, DomainError, expectedOutput, resolveSkillInput } from './engine.ts';
 import type { Event, Policy, Scenario, Skill, TaskInput, Workspace } from './types.ts';
 import type { ModelDescriptor,ModelPlan } from './model.ts';
 import type { AgentIdentity } from './identity.ts';

@@ -1,4 +1,4 @@
-import {deliveryVerificationSchema,skillDefinitionSchema} from '@/lib/agentos/skill-schema';
+import { deliveryVerificationSchema } from '@/lib/agentos/skill-schema';
 import { env } from 'cloudflare:workers';
 import { z } from 'zod';
 import { owner,checkOrigin,read,updateWorkspace } from '@/lib/agentos/store';

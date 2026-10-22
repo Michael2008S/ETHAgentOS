@@ -5,7 +5,7 @@ import {acceptedArtifactSchema} from './artifact-memory.ts';
 import {transferSourceSchema,sourceSummarySchema} from './transfer-source.ts';
 import { z } from 'zod';
 import { encodeAbiParameters,keccak256,parseAbiParameters,stringToHex,verifyMessage,type Address,type Hex } from 'viem';
-import { canonical,specHash } from '../../cre/workflow/verify.ts';
+import { canonical } from '../../cre/workflow/verify.ts';
 import { digest,DomainError,normalizeInput } from './engine.ts';
 import { inputEvidence } from '../../sdk/wallet.ts';
 import type { ChainOrder } from './orders.ts';

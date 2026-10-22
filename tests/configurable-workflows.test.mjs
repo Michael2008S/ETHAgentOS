@@ -12,7 +12,7 @@ import {workflowRequestSchema} from '../lib/agentos/workflow-schema.ts';
 import {futureWorkflowSteps} from '../lib/agentos/workflow-state.ts';
 import {runWorkflow} from '../lib/agentos/workflow-runner.ts';
 import {orderChain} from '../lib/agentos/order-chain.ts';
-import {acceptedArtifact,acceptedArtifactInput,mergedArtifactInput,verifyMemoryAuthority,verifyAcceptedOrder} from '../lib/agentos/artifact-memory.ts';
+import { acceptedArtifactInput, mergedArtifactInput, verifyMemoryAuthority, verifyAcceptedOrder } from '../lib/agentos/artifact-memory.ts';
 import {inputEvidence} from '../sdk/wallet.ts';
 import {escrowABI,encodeSettlementReport} from '../sdk/chain.ts';
 import {specHash,verifyDelivery,resultHash,acceptedMemoryRecords} from '../cre/workflow/verify.ts';

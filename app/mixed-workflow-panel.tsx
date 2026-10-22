@@ -9,7 +9,7 @@ import {AgentMixedPlanClient} from '@/sdk/mixed-plans';
 import {AgentPluginClient} from '@/sdk/plugins';
 import {AgentPluginPurchaseClient} from '@/sdk/plugin-purchases';
 import {authorizeBusiness,pendingBusinessTransaction,reconcileBusinessTransaction} from '@/sdk/business-authorizations';
-import {AgentVaultClient} from '@/sdk/vault';
+
 import {mixedNewCost} from '@/lib/agentos/mixed-repair';
 import type {ServiceDescriptor} from '@/lib/agentos/service-catalog';
 import {canonical} from '@/cre/workflow/verify';

@@ -14,7 +14,7 @@ import {makeSupplierQuoteRequest,supplierQuoteMessage} from '../lib/agentos/supp
 import {prepareVaultSession,vaultABI,vaultAllowance,checkVaultBinding} from '../lib/agentos/vault.ts';
 import {vaultFunder} from '../lib/agentos/vault-executor.ts';
 import {orderChain} from '../lib/agentos/order-chain.ts';
-import {createOrder,findOrder} from '../lib/agentos/orders.ts';
+import { findOrder } from '../lib/agentos/orders.ts';
 import {runOrder} from '../lib/agentos/order-runner.ts';
 import {createPurchaseRoute,advancePurchaseRoute,findPurchaseRoute,controlPurchaseRoute,routeOrderRequestId} from '../lib/agentos/purchase-routes.ts';
 import {runPurchaseRoute} from '../lib/agentos/purchase-route-runner.ts';
