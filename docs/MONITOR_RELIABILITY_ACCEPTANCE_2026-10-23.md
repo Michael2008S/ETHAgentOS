@@ -98,3 +98,7 @@ The tested monitor has finite terms and budgets: 1–5 reports, up to 24 hours, 
 The crash acceptance covers one real critical point after confirmed funding. It does not cover every transaction boundary, host power loss, disk corruption or arbitrary concurrent writes. All-RPC interruption is injected at the common local read-only gateway; this tests total-source unavailability and retry behavior, not every provider's distinct protocol defect. Endpoint identity/checkpoint/oversized-response edge cases are exercised separately by focused tests.
 
 The preserved original 6097 process is not the isolated acceptance target. During this pass, read-only checks found its workspace endpoint returning HTTP 500 and plugin health returning HTTP 503 after concurrent source changes. A normal frontend configuration reload did not repair that worker error. The original process, chain identity, block and data were kept; this report does not claim that original instance is healthy. Repairing it requires a coordinated change that preserves its legacy in-memory chain rather than blindly restarting the bundle.
+
+## Subsequent original-instance repair
+
+The original 6097 HTTP 500 and plugin HTTP 503 described above were subsequently repaired without restarting its in-memory chain. See [original-instance component recovery](ORIGINAL_6097_RECOVERY_2026-10-23.md) for separate current evidence, preserved workspace rows and the demo actually run on 6097. This does not alter the historical evidence of the earlier isolated acceptance.
