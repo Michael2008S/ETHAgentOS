@@ -29,7 +29,7 @@ export function orderPolicy(state:Workspace,order:ChainOrder,now:string){
   if(!state.policy.allowedSkills.includes(order.skill))return 'Skill is outside the current allowlist.';
   if(order.budget>state.policy.maxTaskBudget)return 'Task budget exceeds the current per-task limit.';
   const used=(state.chainOrders??[]).filter(o=>o.id!==order.id&&o.deployment.chainId===order.deployment.chainId&&o.deployment.token.toLowerCase()===order.deployment.token.toLowerCase()&&(o.funding||o.vault&&o.status==='funding')).reduce((sum,o)=>sum+(o.settlement?.status==='paid'?(o.settledAt?.slice(0,10)===now.slice(0,10)?o.quote:0):!o.settlement?o.budget:0),0);
-  const future=futurePurchaseReservations(state).filter(r=>r.deployment.chainId===order.deployment.chainId&&r.deployment.token.toLowerCase()===order.deployment.token.toLowerCase()).reduce((sum,r)=>sum+r.budget,0);
+  const future=futurePurchaseReservations(state,now).filter(r=>r.deployment.chainId===order.deployment.chainId&&r.deployment.token.toLowerCase()===order.deployment.token.toLowerCase()).reduce((sum,r)=>sum+r.budget,0);
   if(used+future+order.budget>state.policy.dailyBudget)return 'Onchain daily allowance, including funded orders, would be exceeded.';
   return null;
 }
@@ -41,7 +41,7 @@ export async function createOrder(state:Workspace,draft:OrderDraft,deployment:Wa
     const previous={...(prior.purchaseRouteId?{purchaseRouteId:prior.purchaseRouteId}:{}),...(prior.supplierQuote?{supplierQuote:prior.supplierQuote}:{}),...(prior.workflowId?{workflowId:prior.workflowId}:{}),planner:prior.planner??'deterministic',model:prior.model??null,agentIdentity:prior.agentIdentity??null,executor:prior.executor??'builtin',supplier:prior.supplier??null,...(prior.vaultSessionId?{vaultSessionId:prior.vaultSessionId}:{}),requestId:prior.requestId,title:prior.title,agentId:prior.agentId,budget:prior.budget,buyer:prior.buyer,spec:prior.spec,input:prior.input,scenario:prior.scenario,timeoutSeconds:prior.timeoutSeconds};
     if(canonical(previous)!==canonical(parameters)||canonical(prior.deployment)!==canonical(deployment))throw new DomainError('Request ID was already used with different chain order parameters.','IDEMPOTENCY_CONFLICT');return state;
   }
-  if((state.chainOrders?.length??0)+futurePurchaseReservations(state).length>=300)throw new DomainError('This prototype supports up to 300 onchain orders per workspace.');
+  if((state.chainOrders?.length??0)+futurePurchaseReservations(state,now).length>=300)throw new DomainError('This prototype supports up to 300 onchain orders per workspace.');
   const agent=state.agents.find(a=>a.id===draft.agentId);
   if(!agent?.enabled)throw new DomainError('An enabled service is required.');
   if(canonical(draft.spec.verification)!==canonical(deliveryVerification(agent.skill,input)))throw new DomainError('A complete versioned delivery commitment matching the selected skill and input is required.');

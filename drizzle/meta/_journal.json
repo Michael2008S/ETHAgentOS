@@ -43,6 +43,13 @@
       "when": 1792621681137,
       "tag": "0005_little_garia",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792628057766,
+      "tag": "0006_natural_archangel",
+      "breakpoints": true
     }
   ]
 }

@@ -69,7 +69,7 @@ export function validateWorkflowProgram(raw:unknown,choices:PlanChoice[],p:PlanP
 }
 export function validatePlanCapacity(state:Workspace,p:PlanParameters,selected:PlanChoice[],deployment:WalletDeployment,now=new Date().toISOString()){
  planSession(state,p,now);if((state.workflows?.length??0)>=100)throw new DomainError('Workspace workflow limit reached.');
- const future=futurePurchaseReservations(state);if((state.chainOrders?.length??0)+future.length+selected.length>300)throw new DomainError('Workflow plan exceeds remaining order capacity.','FORBIDDEN');
+ const future=futurePurchaseReservations(state,now);if((state.chainOrders?.length??0)+future.length+selected.length>300)throw new DomainError('Workflow plan exceeds remaining order capacity.','FORBIDDEN');
  for(const c of selected){const agent=state.agents.find(a=>a.id===c.agentId);if(!agent?.enabled||agent.skill!==c.skill||!state.policy.allowedSkills.includes(c.skill)||c.budget>state.policy.maxTaskBudget||c.executor==='builtin'&&agent.price!==c.budget)throw new DomainError('Workflow plan service, price or permission changed. Generate a new plan.','FORBIDDEN');const input=resolveSkillInput(state,c.skill,p.input);if((input.skillDefinition?skillDefinitionHash(input.skillDefinition):undefined)!==c.skillHash)throw new DomainError('Workflow plan skill definition changed.','FORBIDDEN');}
  const fees=selected.reduce((n,c)=>n+c.budget,0),session=vaultAllowance(state,p.vaultSessionId,p.buyer,selected[0].skill,Math.max(...selected.map(c=>c.budget)),fees,now);
  if(selected.some(c=>!session.skills.includes(c.skill)))throw new DomainError('Workflow plan skill is outside the signed session.','FORBIDDEN');

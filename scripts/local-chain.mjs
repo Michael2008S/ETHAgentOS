@@ -1,3 +1,4 @@
+import {pluginPurchaseRoutes} from './plugins/purchase-chain-routes.mjs';
 import {inputEvidence} from '../sdk/wallet.ts';
 import {vaultFunder} from '../lib/agentos/vault-executor.ts';
 import { createServer } from 'node:http';
@@ -23,6 +24,7 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
   const vault=await deploy('AgentVault',[escrow]);
   const registries=identity?await deployIdentityRegistries(client,wallet,buyer):{};
   const config={mode:'local',chainId:31337,token,escrow,forwarder,metadataHash,confirmations:1,seller,vault,vaultExecutor:executor,deployedBlock:'0',...registries},deliveries=new Map(),settlements=new Map();
+  const pluginRoutes=pluginPurchaseRoutes({client,wallet,config,metadata,buyer,executor,forwarder});
   let base;
   const server=createServer(async(req,res)=>{
     const json=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data));};
@@ -37,7 +39,8 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
       const match=path.match(/^\/(dataset|artifact)\/(0x[0-9a-f]{64})$/);
       if(req.method==='GET'&&match){const record=deliveries.get(match[2]);if(!record||match[1]==='artifact'&&!record.artifactText)return json(404,{error:'Delivery not ready.'});res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(match[1]==='dataset'?record.datasetText:record.artifactText);return;}
       if(req.method!=='POST')return json(404,{error:'Route not found.'});
-      let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>65536)throw new Error('Local request too large.');}const body=JSON.parse(raw);
+      let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>(path.startsWith('/plugin-purchase/')?524288:65536))throw new Error('Local request too large.');}const body=JSON.parse(raw);
+      if(path.startsWith('/plugin-purchase/')){if(req.headers.origin)throw new Error('Plugin purchase execution is server-to-server only.');const result=await pluginRoutes.handle(path,body);return result?json(200,result):json(404,{error:'Plugin purchase route not found.'});}
       if(path==='/rpc'||path==='/seller-rpc'||path==='/seller2-rpc'){
         const {id,method,params=[]}=body;
         const actor=path==='/rpc'?buyer:path==='/seller-rpc'?seller:seller2;

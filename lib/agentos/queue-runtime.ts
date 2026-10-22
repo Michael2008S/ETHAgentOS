@@ -1,3 +1,5 @@
+import {runPluginPurchase} from './plugin-purchase-runner';
+import {configuredPluginPurchaseRuntime} from './plugin-purchase-runtime';
 import {runPluginJob} from './plugin-runner';
 import {pluginDatabase,configuredPluginExecutor} from './plugin-runtime';
 import {configuredRepairRuntime} from './workflow-repair-runtime';
@@ -30,7 +32,7 @@ export async function drainQueue(request: Request, ownerId?: string, intervalMs=
     counts.claimed++;
     let failed=false;
     try {
-      if(job.kind==='plugin'){const result=await runPluginJob(pluginDatabase(),job.owner_id,job.task_id,()=>configuredPluginExecutor(request));failed=result.status==='retryable';}else if(job.kind==='task') {
+      if(job.kind==='plugin-purchase'){const result=await runPluginPurchase(pluginDatabase(),job.owner_id,job.task_id,()=>configuredPluginPurchaseRuntime(request),{maxTransitions:8});failed=result.status==='retryable';}else if(job.kind==='plugin'){const result=await runPluginJob(pluginDatabase(),job.owner_id,job.task_id,()=>configuredPluginExecutor(request));failed=result.status==='retryable';}else if(job.kind==='task') {
         const snapshot=await store.read(job.owner_id);
         // Never promote a test/manual task, even if a stale or corrupted queue row exists.
         const task=snapshot.state.tasks.find(t=>t.id===job.task_id);

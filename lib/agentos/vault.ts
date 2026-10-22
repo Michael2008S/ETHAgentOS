@@ -86,7 +86,7 @@ function vaultMoneyAllowance(state:Workspace,sessionId:string,buyer:Address,budg
  if(!session?.signature||session.revokedAt||!same(session.owner,buyer)||!Number.isSafeInteger(budget)||budget<0||!Number.isSafeInteger(quote)||quote<0||BigInt(session.expires)<=BigInt(Math.floor(Date.parse(now)/1000))||budget>session.perTaskCents)throw new DomainError('No active Vault session authorizes this purchase.','FORBIDDEN');
  // Reserve immutable quotes before any RPC. Refunds consume session allowance.
  const used=(state.chainOrders??[]).filter(o=>o.id!==excludeOrder&&o.vault?.sessionId===sessionId&&(o.funding||o.status!=='cancelled')).reduce((sum,o)=>sum+o.quote,0);
- const future=futurePurchaseReservations(state).filter(r=>r.vaultSessionId===sessionId).reduce((sum,r)=>sum+r.quote,0);
+ const future=futurePurchaseReservations(state,now).filter(r=>r.vaultSessionId===sessionId).reduce((sum,r)=>sum+r.quote,0);
  if(used+future+quote>session.totalCents)throw new DomainError('Vault session total allowance would be exceeded.','FORBIDDEN');
  return session;
 }

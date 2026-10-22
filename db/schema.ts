@@ -63,3 +63,7 @@ export const pluginGrantRequests=sqliteTable('agentos_plugin_grant_requests',{
 export const pluginExecutions=sqliteTable('agentos_plugin_executions',{
  ownerId:text('owner_id').notNull(),id:text('id').notNull(),workspaceHash:text('workspace_hash').notNull(),data:text('data').notNull(),createdAt:integer('created_at').notNull(),
 },table=>[primaryKey({columns:[table.ownerId,table.id]}),index('plugin_execution_scope').on(table.workspaceHash,table.id),index('plugin_execution_owner').on(table.ownerId,table.createdAt)]);
+
+export const pluginPurchases=sqliteTable('agentos_plugin_purchases',{
+ ownerId:text('owner_id').notNull(),id:text('id').notNull(),workspaceHash:text('workspace_hash').notNull(),data:text('data').notNull(),createdAt:integer('created_at').notNull(),
+},table=>[primaryKey({columns:[table.ownerId,table.id]}),index('plugin_purchase_owner').on(table.ownerId,table.createdAt)]);

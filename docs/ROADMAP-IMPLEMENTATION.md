@@ -10,7 +10,7 @@ User request: complete improvements in the review order, test and commit each it
 | 4 | Two-step workflow and memory references | Persisted dependencies, previous accepted artifact as next input, recovery without duplicate payment | Implemented; item validation below |
 | 5 | Public testnet and CRE settlement | Real wallet, registered workflow execution, actual forwarder payment/refund transactions; account access verified rather than assumed | In progress; receiver/publisher/reconciliation/reusable dispatcher implemented; public acceptance pending |
 | 6 | Third-party onboarding and hosted operation | New skill onboarding with integration acceptance; authenticated deployed consumer, monitoring and failure recovery | In progress; new skill and scoped consumer operations locally accepted; actual hosted operation remains open |
-| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 36-step HTTP/D1/EVM/model/supplier/plugin/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical passes remain scoped to their tested source. |
+| Local complete-demo gate | Execute the current complete local sequence after all remaining implementation commits | Current ordered 37-step HTTP/D1/EVM/model/supplier/plugin/CRE dry-run evidence and final regression | Open for current source; the latest 28-stage attempt passed 25 steps before external HTTPS failure. Historical passes remain scoped to their tested source. |
 
 The complete demo is a final gate after the individual changes. Public workflow deployment depends on actual account capabilities and configured infrastructure; local simulation does not satisfy item 5. No unattended schedule is enabled merely to represent deployment.
 
@@ -335,3 +335,20 @@ The complete demo is a final gate after the individual changes. Public workflow 
 214/214 Node、九项 Vault/插件协议/实际 EVM 专项、原有 Vault 界面单项浏览器回归、网站/CRE 类型检查与生产构建通过。实际 HTTP/D1/SDK/本地钱包及 EVM 验收一次签名绑定精确插件权限，错误代码摘要返回 403，零插件采购；测试会话已撤销。新 EVM 用例首次遗漏 viem chain:null 的失败保留，修正后完整回归通过。证据：outputs/validation-plugin-purchases-2026-10-22/authorization-verification.json。
 
 该阶段仅完成支付授权基础，不将签名与类型校验当成付款验收。剩余状态机、实际注资/执行/独立结算、付款/退款与依赖、双语付费界面及完整 demo 见 PLUGIN-PURCHASES.md；总体目标继续进行，公网与托管验收暂缓。模型未启动，本阶段临时 EVM 都在 finally 中断开，当前开发实例保留供下一步复用。
+
+## 通用插件付费核心：持久采购、签名交付与真实结算（2026-10-22，香港时间）
+
+- [x] 通用 JSON 一至八步程序、owner API/SDK、已付款父成果及路径选择、单价冻结、精确 Vault 插件权限；与旧订单/工作流共享真实 Vault、Escrow、费用计算和队列，不伪造转账数据。公共采购模式明确拒绝，旧 CRE 协议不冒充通用代码验收。
+- [x] 追加生成迁移 0006 和完整采购侧表；同一次 CAS 预留全部执行次数、费用、作业槽和持久作业。注资意图先持久提交，规范回执确认前不运行 guest。丢响应查回原事件；撤权/取消不能重用旧 epoch，未知广播持续占用额度，期限后的未注资证明才能释放。
+- [x] 私有专用交付身份、原子签名日志和 runtimeHash 绑定；独立进程验证完整签名后重放代码/输入/有序工具记录与 owner verifier。拒绝自报 accepted、重算哈希、错误输出、额外凭证字段及高-S/v/hex/signer 拼写可塑性。MCP 原数据仍依赖已授权服务，不声称任意语义、TEE、zkML 或 DON 证明。
+- [x] 实际 local Vault 付款、错误成果退款、注资中取消补偿、已矿交易丢响应恢复、父成果规范付款重查、独立认证消费者推进及资源收尾。
+
+最终六组真实 HTTP/D1/SDK/QuickJS/官方 MCP/独立重放/Vault/EVM 验收通过：outputs/plugin-purchase-demo-f4e8e053-f9ea-45bb-bf8e-186523145183.json。五份工作流共六笔注资、五笔付款、一笔退款；累计注资 600 个测试代币分，实际付款 500、退款 100。仅一次 owner 会话签名，另三笔存款/白名单/授权交易单独计数。只读 MCP 在实际注资后取规范 Vault 区块，独立重放不再请求 MCP；无效 verifier 退款并停止依赖。独立消费者在 owner 只读轮询期间完成两次付款，进程退出码为 0，凭证和测试钱包会话均已撤销。11 个队列作业完成，pending/leased/dead 均为零，余额增量吻合，沙盒 ledger 和旧 chainOrders 不变。
+
+226/226 Node 回归、网站/CRE 类型检查、生产构建通过。随后资金端补充完整 runtime/程序总额再校验，另跑十项 SQLite/签名/实际 EVM 专项及上述六组完整 HTTP 验收均通过。原钱包授权和免费插件的两项 Chromium 兼容回归通过，移动截图已查看；这不是新的付费浏览器入口验收，也不冒称当前全部浏览器重跑。
+
+保留失败及修复证据：SDK 参数属性不兼容 Node strip-only、Workers redirect:error 不兼容、同对象 reducer 条款比较，以及凭证附加字段/真实高-S 等价签名的先失败回归。第一次 HTTP 的原未发送意图保留并取消，测试链推进 35 秒取得原 deadline 后的未注资证明，再完成原队列；无历史删除或重新创建代替恢复。此前六组通过报告也保留，不合并为最终同一次执行。
+
+最终本地实例为 6097/9455/8371/8372/6098/6099；升级前先停止旧实例，保留历史目录，始终只保留一套所需服务。三个模型本阶段一直关闭；所有临时 EVM 与验收消费者均已退出。协议、API 和剩余浏览器要求见 PLUGIN-PURCHASES.md，归档见 outputs/validation-plugin-purchases-2026-10-22/execution-core/。
+
+本项提交完成付费核心/API/SDK，不代表整体目标完成：浏览器付费表单、双语审阅/刷新重试/移动端与新版完整 demo 仍须继续。完整序列已加入 demo:plugin-purchases，现为 37 步；公网与托管验收继续暂缓。

@@ -7,10 +7,11 @@ import {pendingPurchaseRoutes} from './purchase-route-state.ts';
 import {pendingWorkflows} from './workflows.ts';
 import {workflowDrivesOrder} from './workflow-state.ts';
 
-export type JobKind = 'task' | 'order' | 'workflow' | 'purchase' | 'repair' | 'plugin';
+export type JobKind = 'task' | 'order' | 'workflow' | 'purchase' | 'repair' | 'plugin' | 'plugin-purchase';
 export type Job = { id: string; owner_id: string; kind: JobKind; task_id: string; status: string; lease_token: string; attempts: number; failures: number };
 export function workItems(state: Workspace, now = Date.now()) {
   return [
+    ...(state.pluginPurchases??[]).filter(f=>f.status==='running'||f.status==='cancelling').map(f=>({kind:'plugin-purchase' as const,taskId:f.id,deadline:undefined,notBefore:f.leaseUntil?Date.parse(f.leaseUntil):0})),
     ...(state.pluginJobs??[]).filter(j=>j.status==='queued'||j.status==='running').map(j=>({kind:'plugin' as const,taskId:j.id,deadline:j.deadlineAt,notBefore:j.leaseUntil?Math.min(Date.parse(j.leaseUntil),Date.parse(j.deadlineAt)):0})),
     ...repairWorkItems(state,now),
     ...pendingTasks(state, undefined, new Date(now).toISOString()).map(t => ({kind: 'task' as const, taskId: t.id, deadline: taskDeadline(t), notBefore: 0})),

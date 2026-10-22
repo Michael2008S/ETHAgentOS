@@ -1,0 +1,27 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {purchaseFixture} from './plugin-purchase-fixture.mjs';
+import {createPluginPurchase,pluginPurchase,changePluginPurchase,cancelPluginPurchase,pluginPurchaseDailyExposure} from '../lib/agentos/plugin-purchase-store.ts';
+import {pluginGrant,createPluginJob,authorizePlugin} from '../lib/agentos/plugin-store.ts';
+import {pluginPurchaseReservations,pendingPluginPurchaseSlots} from '../lib/agentos/plugin-purchase-protocol.ts';
+import {workItems} from '../lib/agentos/queue.ts';
+test('actual SQLite atomically reserves all plugin quotas, shared fees and one durable workflow through failed CAS and concurrent replay',async()=>{
+ const f=await purchaseFixture();try{const draft=f.draft();f.loseCommit();const flows=await Promise.all([createPluginPurchase(f.store,f.owner,draft,f.context),createPluginPurchase(f.store,f.owner,draft,f.context)]);assert.equal(flows[0].id,flows[1].id);assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM agentos_plugin_purchases').get().n,1);assert.equal((await pluginGrant(f.store.database,f.owner,f.installed.manifest.id)).used,2);assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM agentos_runtime_jobs WHERE kind='plugin-purchase'").get().n,1);const s=(await f.store.read(f.owner)).state;assert.equal(s.pluginJobs?.length??0,0,'no plugin can execute before confirmed funding');assert.equal(pendingPluginPurchaseSlots(s),2);assert.equal(pluginPurchaseReservations(s).reduce((n,r)=>n+r.quote,0),200);assert.equal(pluginPurchaseDailyExposure(s,f.deployment,f.iso()),200);assert.ok(f.checks()>=1);
+  assert.equal((await createPluginPurchase(f.store,f.owner,draft,async()=>{throw Error('Runtime is now offline');})).id,flows[0].id);await assert.rejects(createPluginPurchase(f.store,f.owner,{...draft,title:'Different'},f.context),/different parameters/);
+  const step=flows[0].steps[0];await assert.rejects(createPluginJob(f.store,f.owner,{action:'create',requestId:step.requestId,pluginId:step.pluginId,manifestHash:step.manifestHash,runtimeHash:step.runtimeHash,input:draft.input,timeoutSeconds:300},f.runtime),/reserved/);
+ }finally{f.close();}
+});
+test('cancelling an unsent workflow releases money and slots, retains consumed run quotas and preserves immutable review terms',async()=>{
+ const f=await purchaseFixture();try{const flow=await createPluginPurchase(f.store,f.owner,f.draft(),f.context),revision=(await f.store.read(f.owner)).revision;await assert.rejects(changePluginPurchase(f.store,f.owner,flow.id,async(_s,prior)=>{prior.steps[0].priceCents++;return {flow:prior,value:true};}),/reviewed terms/);assert.equal((await f.store.read(f.owner)).revision,revision);const done=await cancelPluginPurchase(f.store,f.owner,flow.id),state=(await f.store.read(f.owner)).state;assert.equal(done.status,'cancelled');assert.equal(pluginPurchaseReservations(state).length,0);assert.equal(pendingPluginPurchaseSlots(state),0);assert.equal((await pluginGrant(f.store.database,f.owner,f.installed.manifest.id)).used,2);assert.equal(workItems(state).filter(j=>j.kind==='plugin-purchase').length,0);await assert.rejects(pluginPurchase(f.store,'another-owner',flow.id),/not found/);
+ }finally{f.close();}
+});
+test('shared policy and signature ceilings refuse overcommit before quota or jobs change',async()=>{
+ const f=await purchaseFixture();try{await f.mutate(s=>({...s,policy:{...s.policy,dailyBudget:199}}));await assert.rejects(createPluginPurchase(f.store,f.owner,f.draft(),f.context),/daily budget/);assert.equal((await pluginGrant(f.store.database,f.owner,f.installed.manifest.id)).used,0);assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM agentos_plugin_purchases').get().n,0);await f.mutate(s=>({...s,policy:{...s.policy,dailyBudget:10000},vaultSessions:s.vaultSessions.map(v=>({...v,totalCents:199}))}));await assert.rejects(createPluginPurchase(f.store,f.owner,f.draft(),f.context),/total allowance/);assert.equal((await pluginGrant(f.store.database,f.owner,f.installed.manifest.id)).used,0);
+ }finally{f.close();}
+});
+test('a new grant cannot revive the old purchase reservation, and a funding intent alone cannot start guest code',async()=>{
+ const f=await purchaseFixture();try{const flow=await createPluginPurchase(f.store,f.owner,f.draft(),f.context),step=flow.steps[0],body={action:'create',requestId:step.requestId,pluginId:step.pluginId,manifestHash:step.manifestHash,runtimeHash:step.runtimeHash,input:flow.input,timeoutSeconds:300},purchase={workflowId:flow.id,step:0};await assert.rejects(createPluginJob(f.store,f.owner,body,f.runtime,f.iso(),purchase),/confirmed reserved/);
+  await changePluginPurchase(f.store,f.owner,flow.id,async(_s,prior)=>{prior.steps[0].status='funding';prior.steps[0].fundingIntent={deadline:'9999999999',token:'controlled',until:new Date(f.now()+90000).toISOString()};return {flow:prior,value:true};});await assert.rejects(createPluginJob(f.store,f.owner,body,f.runtime,f.iso(),purchase),/confirmed reserved/);
+  await authorizePlugin(f.store,f.owner,{action:'grant',requestId:crypto.randomUUID(),pluginId:step.pluginId,manifestHash:step.manifestHash,runtimeHash:step.runtimeHash,maxRuns:10,durationSeconds:3600},f.runtime);
+  await changePluginPurchase(f.store,f.owner,flow.id,async(_s,prior)=>{prior.steps[0].status='funded';prior.steps[0].funding={status:'funded'};return {flow:prior,value:true};});await assert.rejects(createPluginJob(f.store,f.owner,body,f.runtime,f.iso(),purchase),/reviewed plugin grant/);
+ }finally{f.close();}
+});
