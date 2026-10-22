@@ -1,4 +1,6 @@
 'use client';
+import {ClientScope} from './client-scope';
+import type {ComponentProps} from 'react';
 import {useNow} from './use-now';
 import {useEffect,useRef,useState} from 'react';
 import type {AgentWalletSession} from '@/sdk/wallet';
@@ -11,13 +13,14 @@ import {submissionIntent} from '@/lib/agentos/client-intent';
 import {useLanguage} from '@/lib/i18n/context';
 type Form={source:string;session:string;goal:string;goalBudget:string;planBudget:string;perStep:string;maxSteps:string;attempts:string;duration:string;execution:'builtin'|'supplier'|'any'};
 const initial=():Form=>({source:'',session:'',goal:'Finish remaining work using already paid accepted results.',goalBudget:'12',planBudget:'6',perStep:'4',maxSteps:'2',attempts:'2',duration:'3600',execution:'builtin'});
-export function WorkflowRepairPanel({scope,session,sessions,workflows,orders,busy,perform}:{scope:string;session:AgentWalletSession;sessions:VaultSession[];workflows:AgentWorkflow[];orders:ChainOrder[];busy:boolean;perform:(action:()=>Promise<void>)=>Promise<void>}){
+function WorkflowRepairPanelContent({scope,session,sessions,workflows,orders,busy,perform}:{scope:string;session:AgentWalletSession;sessions:VaultSession[];workflows:AgentWorkflow[];orders:ChainOrder[];busy:boolean;perform:(action:()=>Promise<void>)=>Promise<void>}){
+ const key='agentos.workflow-repair.v1:'+scope+':'+session.account.toLowerCase();
  const now=useNow();
- const {tr}=useLanguage(),[form,setForm]=useState<Form>(initial),[policies,setPolicies]=useState<WorkflowRepairPolicy[]>([]),[loaded,setLoaded]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),epoch=useRef(0),key='agentos.workflow-repair.v1:'+scope+':'+session.account.toLowerCase(),client=new AgentWorkflowRepairClient(session),sources=workflows.filter(w=>['running','blocked'].includes(w.status)&&!w.supersededBy&&w.buyer.toLowerCase()===session.account.toLowerCase()),active=sessions.filter(s=>s.signature&&!s.revokedAt&&Number(s.expires)*1000>now&&s.owner.toLowerCase()===session.account.toLowerCase());
+ const {tr}=useLanguage(),[form,setForm]=useState<Form>(()=>{let next=initial();try{const raw=sessionStorage.getItem(key);if(raw&&raw.length<65536){const value=JSON.parse(raw);if(value&&Object.keys(initial()).every(k=>typeof value[k]==='string')&&['builtin','supplier','any'].includes(value.execution))next=value;}}catch{}return next;}),[policies,setPolicies]=useState<WorkflowRepairPolicy[]>([]),[loaded]=useState(key),[error,setError]=useState(''),[notice,setNotice]=useState(''),epoch=useRef(0),client=new AgentWorkflowRepairClient(session),sources=workflows.filter(w=>['running','blocked'].includes(w.status)&&!w.supersededBy&&w.buyer.toLowerCase()===session.account.toLowerCase()),active=sessions.filter(s=>s.signature&&!s.revokedAt&&Number(s.expires)*1000>now&&s.owner.toLowerCase()===session.account.toLowerCase());
  function save(next:Form){setForm(next);try{sessionStorage.setItem(key,JSON.stringify(next));}catch{}}
  async function refresh(expected=epoch.current){const list=await client.list();if(expected===epoch.current)setPolicies(list);}
- useEffect(()=>{const expected=++epoch.current;setPolicies([]);setError('');setNotice('');void refresh(expected).catch(()=>{if(expected===epoch.current)setError('Automatic repair configuration is unavailable.');});const timer=setInterval(()=>void refresh(expected).catch(()=>{}),2500);return()=>{epoch.current++;clearInterval(timer);};},[scope,session.account,session.deployment.escrow]); // eslint-disable-line react-hooks/exhaustive-deps
- useEffect(()=>{let next=initial();try{const raw=sessionStorage.getItem(key);if(raw&&raw.length<65536){const value=JSON.parse(raw);if(value&&Object.keys(initial()).every(k=>typeof value[k]==='string')&&['builtin','supplier','any'].includes(value.execution))next=value;}}catch{}setForm(next);setLoaded(key);},[key]);
+ useEffect(()=>{const expected=++epoch.current;void refresh(expected).catch(()=>{if(expected===epoch.current)setError('Automatic repair configuration is unavailable.');});const timer=setInterval(()=>void refresh(expected).catch(()=>{}),2500);return()=>{epoch.current++;clearInterval(timer);};},[scope,session.account,session.deployment.escrow]); // eslint-disable-line react-hooks/exhaustive-deps
+
  const act=(action:(generation:number)=>Promise<void>)=>perform(async()=>{const expected=epoch.current;setError('');setNotice('');try{await action(expected);if(expected===epoch.current)await refresh(expected);}catch(reason){if(expected===epoch.current)setError(reason instanceof Error?reason.message:'Automatic repair configuration is unavailable.');}});
  function choose(id:string){const w=sources.find(w=>w.id===id);if(!w){save({...form,source:''});return;}const chain=new Set([w.id,...w.replan?.lineage??[]]),spent=orders.filter(o=>o.workflowId&&chain.has(o.workflowId)&&o.funding).reduce((n,o)=>n+o.quote,0),cap=w.replan?.goalBudget??w.totalBudget;save({...form,source:id,goalBudget:(cap/100).toFixed(2),planBudget:cap>spent?((cap-spent)/100).toFixed(2):'',goal:'Finish remaining work for '+w.title+' using already paid accepted results.'});}
  return <section className="chain-proof" id="workflow-repair-panel" aria-label={tr('Automatic repair proposals')}>
@@ -40,3 +43,5 @@ export function WorkflowRepairPanel({scope,session,sessions,workflows,orders,bus
   </article>)}
  </section>;
 }
+
+export function WorkflowRepairPanel(props:ComponentProps<typeof WorkflowRepairPanelContent>){return <ClientScope><WorkflowRepairPanelContent key={JSON.stringify([props.scope,props.session.account.toLowerCase(),props.session.deployment])} {...props}/></ClientScope>;}

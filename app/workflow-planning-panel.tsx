@@ -1,4 +1,6 @@
 'use client';
+import {ClientScope} from './client-scope';
+import type {ComponentProps} from 'react';
 import {useNow} from './use-now';
 import {useEffect,useRef,useState} from 'react';
 import type {AgentWalletSession} from '@/sdk/wallet';
@@ -13,16 +15,17 @@ import {useLanguage} from '@/lib/i18n/context';
 
 type Form={parallelism:string;sourceId:string;goalBudget:string;goal:string;sessionId:string;total:string;perStep:string;maxSteps:string;conditions:'disabled'|'enabled';execution:'builtin'|'supplier'|'any'};
 const initial=():Form=>({parallelism:'sequential',sourceId:'',goalBudget:'10',goal:'Create a recipient allocation report, then summarize the accepted report.',sessionId:'',total:'10',perStep:'5',maxSteps:'4',conditions:'disabled',execution:'builtin'});
-export function WorkflowPlanningPanel({scope,session,sessions,workflows,orders,input,inputReady,busy,perform,onAccepted}:{scope:string;session:AgentWalletSession;sessions:VaultSession[];workflows:AgentWorkflow[];orders:ChainOrder[];input:string;inputReady:boolean;busy:boolean;perform:(action:()=>Promise<void>)=>Promise<void>;onAccepted:()=>Promise<void>}){
+function WorkflowPlanningPanelContent({scope,session,sessions,workflows,orders,input,inputReady,busy,perform,onAccepted}:{scope:string;session:AgentWalletSession;sessions:VaultSession[];workflows:AgentWorkflow[];orders:ChainOrder[];input:string;inputReady:boolean;busy:boolean;perform:(action:()=>Promise<void>)=>Promise<void>;onAccepted:()=>Promise<void>}){
+ const key='agentos.workflow-planning.v1:'+scope+':'+session.account.toLowerCase();
  const now=useNow();
- const {tr}=useLanguage(),[form,setForm]=useState<Form>(initial),[plans,setPlans]=useState<WorkflowProposal[]>([]),[loaded,setLoaded]=useState(''),[error,setError]=useState(''),[listError,setListError]=useState(''),generation=useRef(0),pending=useRef<{id:string;action:'propose'|'accept';digest?:string}|null>(null),recovering=useRef(false),key='agentos.workflow-planning.v1:'+scope+':'+session.account.toLowerCase(),client=new AgentWorkflowPlanClient(session),active=sessions.filter(s=>s.signature&&!s.revokedAt&&s.owner.toLowerCase()===session.account.toLowerCase()&&Number(s.expires)*1000>now);
+ const {tr}=useLanguage(),[form,setForm]=useState<Form>(()=>{let next=initial();try{const raw=sessionStorage.getItem(key);if(raw&&raw.length<65536){const value=JSON.parse(raw);if(value&&['goal','sessionId','total','perStep','maxSteps','execution'].every(k=>typeof value[k]==='string')&&['builtin','supplier','any'].includes(value.execution))next={...initial(),...value};}}catch{}return next;}),[plans,setPlans]=useState<WorkflowProposal[]>([]),[loaded]=useState(key),[error,setError]=useState(''),[listError,setListError]=useState(''),generation=useRef(0),pending=useRef<{id:string;action:'propose'|'accept';digest?:string}|null>(null),recovering=useRef(false),client=new AgentWorkflowPlanClient(session),active=sessions.filter(s=>s.signature&&!s.revokedAt&&s.owner.toLowerCase()===session.account.toLowerCase()&&Number(s.expires)*1000>now);
  const sources=workflows.filter(w=>w.status!=='completed'&&!w.supersededBy&&w.buyer.toLowerCase()===session.account.toLowerCase());
  function chooseSource(id:string){const w=sources.find(w=>w.id===id);if(!w){save({...form,sourceId:'',maxSteps:form.maxSteps==='1'?'2':form.maxSteps});return;}const ids=new Set([w.id,...w.replan?.lineage??[]]),gross=orders.filter(o=>o.workflowId&&ids.has(o.workflowId)&&o.funding).reduce((n,o)=>n+o.quote,0),ceiling=w.replan?.goalBudget??w.totalBudget;save({...form,sourceId:id,goalBudget:(ceiling/100).toFixed(2),total:ceiling>gross?((ceiling-gross)/100).toFixed(2):'',goal:'Complete the remaining work for '+w.title+' using already paid accepted results.',maxSteps:'2'});}
  function save(next:Form){setForm(next);try{sessionStorage.setItem(key,JSON.stringify(next));}catch{}}
  async function refresh(expected=generation.current){try{const list=await client.list();if(expected===generation.current){setPlans(list);setListError('');const intent=pending.current;if(recovering.current&&intent&&list.some(p=>p.id===intent.id&&(intent.action==='propose'||p.status==='accepted'&&p.digest===intent.digest))){setError('');pending.current=null;}}}catch{if(expected===generation.current)setListError('Workflow plan history is unavailable.');}}
  const act=(action:(epoch:number)=>Promise<void>)=>perform(async()=>{const epoch=generation.current;setError('');try{await action(epoch);if(epoch===generation.current)pending.current=null;}catch(reason){if(epoch!==generation.current)return;setError(reason instanceof Error?reason.message:'Workflow planning is unavailable. No purchase was created.');if(reason instanceof TypeError||reason instanceof DOMException&&['AbortError','TimeoutError'].includes(reason.name)){recovering.current=true;await refresh(epoch);recovering.current=false;}}});
- useEffect(()=>{const epoch=++generation.current;pending.current=null;setPlans([]);setError('');void refresh(epoch);const timer=setInterval(()=>void refresh(epoch),2500);return()=>{generation.current++;clearInterval(timer);};},[scope,session.account,session.deployment.escrow]); // eslint-disable-line react-hooks/exhaustive-deps
- useEffect(()=>{let next=initial();try{const raw=sessionStorage.getItem(key);if(raw&&raw.length<65536){const value=JSON.parse(raw);if(value&&['goal','sessionId','total','perStep','maxSteps','execution'].every(k=>typeof value[k]==='string')&&['builtin','supplier','any'].includes(value.execution))next={...initial(),...value};}}catch{}setForm(next);setLoaded(key);},[key]);
+ useEffect(()=>{const epoch=++generation.current;pending.current=null;void refresh(epoch);const timer=setInterval(()=>void refresh(epoch),2500);return()=>{generation.current++;clearInterval(timer);};},[scope,session.account,session.deployment.escrow]); // eslint-disable-line react-hooks/exhaustive-deps
+
  return <section className="chain-proof" id="workflow-planning-panel" aria-label={tr('Goal-driven workflow planning')}>
   <h3>{tr('Goal-driven workflow planning')}</h3><p>{tr('Generate a reviewable plan from authorized skills. Planning creates no orders or spending reservations; approval starts the exact reviewed workflow.')}</p>
   <form onSubmit={event=>{event.preventDefault();void act(async epoch=>{
@@ -56,3 +59,5 @@ export function WorkflowPlanningPanel({scope,session,sessions,workflows,orders,i
   </article>;})}
  </section>;
 }
+
+export function WorkflowPlanningPanel(props:ComponentProps<typeof WorkflowPlanningPanelContent>){return <ClientScope><WorkflowPlanningPanelContent key={JSON.stringify([props.scope,props.session.account.toLowerCase(),props.session.deployment])} {...props}/></ClientScope>;}

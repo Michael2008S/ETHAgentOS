@@ -1,14 +1,16 @@
 'use client';
+import {ClientScope} from './client-scope';
+import type {ComponentProps} from 'react';
 import {useEffect,useRef,useState} from 'react';
 import {AgentServiceTemplateClient} from '@/sdk/service-templates';
 import type {ServiceTemplate} from '@/lib/agentos/service-template-protocol';
 import type {ServiceProposal} from '@/lib/agentos/service-plans';
 import {submissionIntent} from '@/lib/agentos/client-intent';
 import {useLanguage} from '@/lib/i18n/context';
-export function ServiceTemplatePanel({scope,source,input,totalBudget,perStepBudget,disabled,onProposal}:{scope:string;source:ServiceProposal|null;input:string;totalBudget:number;perStepBudget:number;disabled:boolean;onProposal:(p:ServiceProposal)=>void}){
+function ServiceTemplatePanelContent({scope,source,input,totalBudget,perStepBudget,disabled,onProposal}:{scope:string;source:ServiceProposal|null;input:string;totalBudget:number;perStepBudget:number;disabled:boolean;onProposal:(p:ServiceProposal)=>void}){
  const {tr}=useLanguage(),[templates,setTemplates]=useState<ServiceTemplate[]>([]),[selected,setSelected]=useState(''),[name,setName]=useState('Reusable JSON plugin workflow'),[revision,setRevision]=useState('1.0.0'),[description,setDescription]=useState(''),[raw,setRaw]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');const generation=useRef(0),lock=useRef(false),api=()=>new AgentServiceTemplateClient(scope),record=templates.find(t=>t.id===selected);
  async function refresh(current=generation.current){const rows=await api().list();if(current===generation.current)setTemplates(rows);}
- useEffect(()=>{const current=++generation.current;setTemplates([]);setSelected('');setRaw('');setError('');setNotice('');setBusy(false);lock.current=false;void refresh(current).catch(()=>{if(current===generation.current)setError('Service templates unavailable.');});return()=>{generation.current++;};},[scope]); // eslint-disable-line react-hooks/exhaustive-deps
+ useEffect(()=>{const current=++generation.current;void refresh(current).catch(()=>{if(current===generation.current)setError('Service templates unavailable.');});return()=>{generation.current++;};},[scope]); // eslint-disable-line react-hooks/exhaustive-deps
  function act(fn:(current:number)=>Promise<void>){if(disabled||lock.current)return;lock.current=true;setBusy(true);setError('');setNotice('');const current=generation.current;void fn(current).catch(reason=>{if(current===generation.current)setError(reason instanceof Error?reason.message:'Service templates unavailable.');}).finally(()=>{if(current===generation.current){lock.current=false;setBusy(false);}});}
  const off=disabled||busy;
  return <section className="chain-proof" id="service-template-panel" aria-label={tr('Reusable plugin service templates')}><h4>{tr('Reusable plugin service templates')}</h4><p>{tr('Templates keep plugin versions, data contracts, dependencies and fee ceilings. Original JSON, runtime authority, wallets and signatures are never exported. Reuse creates a new review proposal without running a model or a plugin.')}</p>
@@ -24,3 +26,5 @@ export function ServiceTemplatePanel({scope,source,input,totalBudget,perStepBudg
   {notice&&<p role="status">{tr(notice)}</p>}{error&&<p role="alert" className="chain-error">{tr(error)}</p>}
  </section>;
 }
+
+export function ServiceTemplatePanel(props:ComponentProps<typeof ServiceTemplatePanelContent>){return <ClientScope><ServiceTemplatePanelContent key={JSON.stringify([props.scope])} {...props}/></ClientScope>;}

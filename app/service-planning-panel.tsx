@@ -1,4 +1,7 @@
 'use client';
+import {useBoundReview} from './use-bound-review';
+import {ClientScope} from './client-scope';
+import type {ComponentProps} from 'react';
 import {useEffect,useRef,useState} from 'react';
 import {AgentServicePlanClient} from '@/sdk/service-plans';
 import {type ServiceProposal} from '@/lib/agentos/service-plans';
@@ -6,11 +9,11 @@ import {type ServiceDescriptor} from '@/lib/agentos/service-catalog';
 import {submissionIntent} from '@/lib/agentos/client-intent';
 import {ServiceTemplatePanel} from './service-template-panel';
 import {useLanguage} from '@/lib/i18n/context';
-export function ServicePlanningPanel({scope,input,totalBudget,perStepBudget,onApply,disabled=false}:{disabled?:boolean;scope:string;input:string;totalBudget:number;perStepBudget:number;onApply:(plan:ServiceProposal)=>void}){
- const {tr}=useLanguage(),[goal,setGoal]=useState('Normalize unique labels, then write a compact text report.'),[maxSteps,setMaxSteps]=useState(4),[entries,setEntries]=useState<ServiceDescriptor[]>([]),[plans,setPlans]=useState<ServiceProposal[]>([]),[selected,setSelected]=useState<ServiceProposal|null>(null),[reviewed,setReviewed]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
+function ServicePlanningPanelContent({scope,input,totalBudget,perStepBudget,onApply,disabled=false}:{disabled?:boolean;scope:string;input:string;totalBudget:number;perStepBudget:number;onApply:(plan:ServiceProposal)=>void}){
+ const {tr}=useLanguage(),[goal,setGoal]=useState('Normalize unique labels, then write a compact text report.'),[maxSteps,setMaxSteps]=useState(4),[entries,setEntries]=useState<ServiceDescriptor[]>([]),[plans,setPlans]=useState<ServiceProposal[]>([]),[selected,setSelected]=useState<ServiceProposal|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const generation=useRef(0),lock=useRef(false),api=()=>new AgentServicePlanClient(scope);
- useEffect(()=>{const current=++generation.current;setEntries([]);setPlans([]);setSelected(null);setReviewed(false);setError('');setBusy(false);lock.current=false;void Promise.all([api().catalogue(),api().list()]).then(([catalog,history])=>{if(current===generation.current){setEntries(catalog);setPlans(history);}}).catch(()=>{if(current===generation.current)setError('Refresh the service catalogue after starting the local runtime.');});return()=>{generation.current++;};},[scope]); // eslint-disable-line react-hooks/exhaustive-deps
- useEffect(()=>{setReviewed(false);},[input,totalBudget,perStepBudget,goal,maxSteps]);
+ useEffect(()=>{const current=++generation.current;void Promise.all([api().catalogue(),api().list()]).then(([catalog,history])=>{if(current===generation.current){setEntries(catalog);setPlans(history);}}).catch(()=>{if(current===generation.current)setError('Refresh the service catalogue after starting the local runtime.');});return()=>{generation.current++;};},[scope]); // eslint-disable-line react-hooks/exhaustive-deps
+ const [reviewed,setReviewed]=useBoundReview(JSON.stringify([input,totalBudget,perStepBudget,goal,maxSteps]));
  function act(action:(current:number)=>Promise<void>){if(lock.current)return;lock.current=true;setBusy(true);setError('');const current=generation.current;void action(current).catch(reason=>{if(current===generation.current)setError(reason instanceof Error?reason.message:'Service planning unavailable.');}).finally(()=>{if(current===generation.current){lock.current=false;setBusy(false);}});}
  return <article className="chain-proof" id="service-planning-panel"><h3>{tr('Unified services and plugin planning')}</h3><p>{tr('Business skills and JSON plugins share versioned service descriptions. Their execution adapters keep explicit data contracts. Planning never grants execution or payment permission.')}</p>
   <button type="button" className="btn secondary small" disabled={disabled||busy} onClick={()=>act(async current=>{const [catalog,history]=await Promise.all([api().catalogue(),api().list()]);if(current===generation.current){setEntries(catalog);setPlans(history);}})}>{tr('Refresh unified service catalogue')}</button>
@@ -27,3 +30,5 @@ export function ServicePlanningPanel({scope,input,totalBudget,perStepBudget,onAp
   </div>}{error&&<p role="alert" className="chain-error">{tr(error)}</p>}
  </article>;
 }
+
+export function ServicePlanningPanel(props:ComponentProps<typeof ServicePlanningPanelContent>){return <ClientScope><ServicePlanningPanelContent key={JSON.stringify([props.scope])} {...props}/></ClientScope>;}

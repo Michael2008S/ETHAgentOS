@@ -1,4 +1,6 @@
 'use client';
+import {ClientScope} from './client-scope';
+import type {ComponentProps} from 'react';
 import {useEffect,useRef,useState} from 'react';
 import {AgentWorkflowTemplateClient,type TemplateDraft} from '@/sdk/workflow-templates';
 import type {WorkflowTemplate,TemplateBinding} from '@/lib/agentos/workflow-templates';
@@ -8,10 +10,10 @@ import type {SupplierDescriptor} from '@/lib/agentos/supplier';
 import {submissionIntent} from '@/lib/agentos/client-intent';
 import {useLanguage} from '@/lib/i18n/context';
 
-export function WorkflowTemplatePanel({scope,agents,suppliers,busy,ready,perform,source,onApply}:{scope:string;agents:Agent[];suppliers:SupplierDescriptor[];busy:boolean;ready:boolean;perform:(action:()=>Promise<void>)=>Promise<void>;source:()=>{steps:WorkflowStepDraft[];timeoutSeconds:number;parallelism?:number};onApply:(draft:TemplateDraft)=>void}){
+function WorkflowTemplatePanelContent({scope,agents,suppliers,busy,ready,perform,source,onApply}:{scope:string;agents:Agent[];suppliers:SupplierDescriptor[];busy:boolean;ready:boolean;perform:(action:()=>Promise<void>)=>Promise<void>;source:()=>{steps:WorkflowStepDraft[];timeoutSeconds:number;parallelism?:number};onApply:(draft:TemplateDraft)=>void}){
  const {tr}=useLanguage(),[templates,setTemplates]=useState<WorkflowTemplate[]>([]),[selected,setSelected]=useState(''),[bindings,setBindings]=useState<TemplateBinding[]>([]),[name,setName]=useState('Reusable treasury workflow'),[revision,setRevision]=useState('1.0.0'),[description,setDescription]=useState(''),[importText,setImportText]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),generation=useRef(0),client=new AgentWorkflowTemplateClient('',{},scope),record=templates.find(t=>t.id===selected);
  async function refresh(epoch=generation.current){const list=await client.list();if(epoch===generation.current)setTemplates(list);}
- useEffect(()=>{const epoch=++generation.current;setTemplates([]);setSelected('');setBindings([]);setError('');setNotice('');void refresh(epoch).catch(()=>{if(epoch===generation.current)setError('Workflow template service is unavailable.');});return()=>{generation.current++;};},[scope]); // eslint-disable-line react-hooks/exhaustive-deps
+ useEffect(()=>{const epoch=++generation.current;void refresh(epoch).catch(()=>{if(epoch===generation.current)setError('Workflow template service is unavailable.');});return()=>{generation.current++;};},[scope]); // eslint-disable-line react-hooks/exhaustive-deps
  function choose(value:string){setSelected(value);const target=templates.find(t=>t.id===value);setBindings(target?.definition.steps.map(()=>({agentId:''}))??[]);setNotice('');}
  const act=(action:(epoch:number)=>Promise<void>)=>perform(async()=>{const epoch=generation.current;setError('');setNotice('');try{await action(epoch);}catch(reason){if(epoch===generation.current)setError(reason instanceof Error?reason.message:'Workflow template service is unavailable.');}});
  return <section className="chain-proof" id="workflow-template-panel" aria-label={tr('Reusable workflow templates')}>
@@ -37,3 +39,5 @@ export function WorkflowTemplatePanel({scope,agents,suppliers,busy,ready,perform
   {notice&&<p role="status">{tr(notice)}</p>}{error&&<p role="alert">{tr(error)}</p>}
  </section>;
 }
+
+export function WorkflowTemplatePanel(props:ComponentProps<typeof WorkflowTemplatePanelContent>){return <ClientScope><WorkflowTemplatePanelContent key={JSON.stringify([props.scope])} {...props}/></ClientScope>;}

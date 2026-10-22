@@ -1,4 +1,6 @@
 'use client';
+import {ClientScope} from './client-scope';
+import type {ComponentProps} from 'react';
 import {useEffect,useRef,useState} from 'react';
 import {AgentServiceReplanClient} from '@/sdk/service-replans';
 import type {PublicPluginPurchase} from '@/lib/agentos/plugin-purchase-protocol';
@@ -7,10 +9,13 @@ import type {ServiceReplanContext} from '@/lib/agentos/service-replan';
 import {submissionIntent} from '@/lib/agentos/client-intent';
 import {useLanguage} from '@/lib/i18n/context';
 const cents=(s:string)=>/^\d+(\.\d{1,2})?$/.test(s)?Math.round(Number(s)*100):NaN;
-export function ServiceRepairPanel({scope,flow,disabled,onApply}:{scope:string;flow:PublicPluginPurchase;disabled:boolean;onApply:(p:ServiceProposal)=>void}){
- const {tr}=useLanguage(),[goal,setGoal]=useState('Write the remaining report using the selected paid result. Do not repeat completed work.'),[goalBudget,setGoalBudget]=useState('3.00'),[planBudget,setPlanBudget]=useState('1.00'),[perStep,setPerStep]=useState('1.00'),[maxSteps,setMaxSteps]=useState(1),[root,setRoot]=useState(''),[context,setContext]=useState<ServiceReplanContext|null>(null),[choices,setChoices]=useState<ServiceReplanContext['rootChoices']>([]),[proposal,setProposal]=useState<ServiceProposal|null>(null),[reviewed,setReviewed]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');const generation=useRef(0),lock=useRef(false),api=()=>new AgentServiceReplanClient(scope);
- useEffect(()=>{generation.current++;lock.current=false;setBusy(false);setContext(null);setChoices([]);setProposal(null);setReviewed(false);setRoot('');setError('');const price=flow.steps.at(-1)?.priceCents??100;setGoalBudget(((flow.repair?.goalBudget??flow.totalBudget+price)/100).toFixed(2));setPlanBudget((price/100).toFixed(2));setPerStep((price/100).toFixed(2));return()=>{generation.current++;};},[scope,flow.id]); // eslint-disable-line react-hooks/exhaustive-deps
- useEffect(()=>{setReviewed(false);setProposal(null);setContext(null);},[root,goal,goalBudget,planBudget,perStep,maxSteps]);
+function ServiceRepairPanelContent({scope,flow,disabled,onApply}:{scope:string;flow:PublicPluginPurchase;disabled:boolean;onApply:(p:ServiceProposal)=>void}){
+ const price=flow.steps.at(-1)?.priceCents??100;
+ const {tr}=useLanguage(),[goal,setGoal]=useState('Write the remaining report using the selected paid result. Do not repeat completed work.'),[goalBudget,setGoalBudget]=useState(()=>((flow.repair?.goalBudget??flow.totalBudget+price)/100).toFixed(2)),[planBudget,setPlanBudget]=useState(()=>(price/100).toFixed(2)),[perStep,setPerStep]=useState(()=>(price/100).toFixed(2)),[maxSteps,setMaxSteps]=useState(1),[root,setRoot]=useState(''),[context,setContext]=useState<ServiceReplanContext|null>(null),[choices,setChoices]=useState<ServiceReplanContext['rootChoices']>([]),[proposal,setProposal]=useState<ServiceProposal|null>(null),[reviewed,setReviewed]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');const generation=useRef(0),lock=useRef(false),api=()=>new AgentServiceReplanClient(scope);
+ useEffect(()=>{generation.current++;return()=>{generation.current++;};},[scope,flow.id]); // eslint-disable-line react-hooks/exhaustive-deps
+ const repairKey=JSON.stringify([root,goal,goalBudget,planBudget,perStep,maxSteps]);
+ const [previousRepairKey,setPreviousRepairKey]=useState(repairKey);
+ if(previousRepairKey!==repairKey){setPreviousRepairKey(repairKey);setReviewed(false);setProposal(null);setContext(null);}
  function act(fn:(current:number)=>Promise<void>){if(disabled||lock.current)return;lock.current=true;setBusy(true);setError('');const current=generation.current;void fn(current).catch(reason=>{if(current===generation.current)setError(reason instanceof Error?reason.message:'Plugin repair unavailable.');}).finally(()=>{if(current===generation.current){lock.current=false;setBusy(false);}});}
  const eligible=['failed','cancelled'].includes(flow.status)&&!flow.supersededBy,off=disabled||busy||!eligible;
  function selection(){const [workflowId,index]=root.split('#');return {sourceWorkflowId:flow.id,buyer:flow.buyer,goalBudget:cents(goalBudget),root:root?{workflowId,step:Number(index)}:null};}
@@ -26,3 +31,5 @@ export function ServiceRepairPanel({scope,flow,disabled,onApply}:{scope:string;f
   {error&&<p role="alert" className="chain-error">{tr(error)}</p>}
  </section>;
 }
+
+export function ServiceRepairPanel(props:ComponentProps<typeof ServiceRepairPanelContent>){return <ClientScope><ServiceRepairPanelContent key={JSON.stringify([props.scope,props.flow.id])} {...props}/></ClientScope>;}

@@ -1,4 +1,7 @@
 'use client';
+import {useBoundReview} from './use-bound-review';
+import {ClientScope} from './client-scope';
+import type {ComponentProps} from 'react';
 import {useEffect,useRef,useState} from 'react';
 import {AgentPluginClient,type PluginCatalogue} from '@/sdk/plugins';
 import {pluginManifestSchema,type PluginManifest,type Json} from '@/lib/agentos/plugin-protocol';
@@ -9,14 +12,15 @@ import {useLanguage} from '@/lib/i18n/context';
 type Draft={manifest:string;selected:string;input:string;maxRuns:string;duration:string;jobId:string};
 const inputFor=(id:string)=>JSON.stringify(id.startsWith('plugin:vault-readiness@')?{targetBaseUnits:'1000000'}:{labels:['Research',' research ','Operations']},null,2);
 const initial=():Draft=>({manifest:JSON.stringify(textPluginExample(),null,2),selected:'',input:inputFor(''),maxRuns:'5',duration:'3600',jobId:''});
-export function PluginPanel({scope}:{scope:string}){
- const {tr}=useLanguage(),[draft,setDraft]=useState<Draft>(initial),[catalogue,setCatalogue]=useState<PluginCatalogue|null>(null),[job,setJob]=useState<PluginJob|null>(null),[reviewed,setReviewed]=useState(false),[working,setWorking]=useState(false),[loaded,setLoaded]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),generation=useRef(0),lock=useRef(false),draftRef=useRef(draft),key='agentos.plugins.v1:'+scope,client=new AgentPluginClient('',{},scope);
+function PluginPanelContent({scope}:{scope:string}){
+ const key='agentos.plugins.v1:'+scope;
+ const {tr}=useLanguage(),[draft,setDraft]=useState<Draft>(()=>{let value=initial();try{const raw=sessionStorage.getItem(key);if(raw&&raw.length<65536){const saved=JSON.parse(raw);if(saved&&Object.keys(value).every(k=>typeof saved[k]==='string'))value={...value,...saved};}}catch{}return value;}),[catalogue,setCatalogue]=useState<PluginCatalogue|null>(null),[job,setJob]=useState<PluginJob|null>(null),[working,setWorking]=useState(false),[loaded]=useState(key),[error,setError]=useState(''),[notice,setNotice]=useState(''),generation=useRef(0),lock=useRef(false),draftRef=useRef(draft),client=new AgentPluginClient('',{},scope);
  function save(next:Draft){draftRef.current=next;setDraft(next);try{sessionStorage.setItem(key,JSON.stringify(next));}catch{}}
  async function refresh(expected=generation.current,runtime=false){const incoming=await client.catalogue(runtime);if(expected!==generation.current)return;setCatalogue(old=>({...incoming,...(incoming.runtime===undefined&&old?.runtime!==undefined?{runtime:old.runtime}:{})}));const selected=draftRef.current.jobId;if(selected){const current=await client.job(selected,incoming.plugins.find(p=>p.manifest.id===incoming.jobs.find(j=>j.id===selected)?.pluginId));if(expected===generation.current)setJob(current);}}
  function act(action:(expected:number)=>Promise<void>){if(lock.current)return;lock.current=true;setWorking(true);setError('');setNotice('');const expected=generation.current;void action(expected).catch(reason=>{if(expected===generation.current)setError(reason instanceof Error?reason.message:'Plugin service is unavailable.');}).finally(()=>{if(expected===generation.current){lock.current=false;setWorking(false);}});}
- useEffect(()=>{const expected=++generation.current;let value=initial();try{const raw=sessionStorage.getItem(key);if(raw&&raw.length<65536){const saved=JSON.parse(raw);if(saved&&Object.keys(value).every(k=>typeof saved[k]==='string'))value={...value,...saved};}}catch{}draftRef.current=value;setDraft(value);setCatalogue(null);setJob(null);setError('');setNotice('');setReviewed(false);setWorking(false);setLoaded(key);lock.current=false;void refresh(expected,true).catch(()=>{if(expected===generation.current)setError('Plugin service is unavailable.');});const timer=setInterval(()=>{if(!lock.current)void refresh(expected).catch(()=>{});},2500);return()=>{generation.current++;clearInterval(timer);};},[key]); // eslint-disable-line react-hooks/exhaustive-deps
+ useEffect(()=>{const expected=++generation.current;void refresh(expected,true).catch(()=>{if(expected===generation.current)setError('Plugin service is unavailable.');});const timer=setInterval(()=>{if(!lock.current)void refresh(expected).catch(()=>{});},2500);return()=>{generation.current++;clearInterval(timer);};},[key]); // eslint-disable-line react-hooks/exhaustive-deps
  const installed=catalogue?.plugins.find(p=>p.manifest.id===draft.selected),grant=catalogue?.grants.find(g=>g.pluginId===draft.selected),runtime=catalogue?.runtime,active=Boolean(grant?.enabled&&grant.manifestHash===installed?.manifestHash&&grant.runtimeHash===runtime?.configHash&&grant.expiresAt>new Date().toISOString()),unavailable=working||loaded!==key;
- useEffect(()=>{setReviewed(false);},[scope,installed?.manifestHash,runtime?.configHash]);
+ const [reviewed,setReviewed]=useBoundReview(JSON.stringify([scope,installed?.manifestHash,runtime?.configHash]));
  let preview:PluginManifest|undefined;try{preview=pluginManifestSchema.parse(JSON.parse(draft.manifest));}catch{}
  return <section className="panel" id="plugin-panel" aria-label={tr('Isolated plugins and MCP tools')}>
   <div className="panel-heading"><div><h2>{tr('Isolated plugins and MCP tools')}</h2><p>{tr('Install JavaScript for arbitrary bounded JSON input, review its verifier and grant only the declared read-only MCP tools.')}</p></div></div>
@@ -43,3 +47,5 @@ export function PluginPanel({scope}:{scope:string}){
   </div>
  </section>;
 }
+
+export function PluginPanel(props:ComponentProps<typeof PluginPanelContent>){return <ClientScope><PluginPanelContent key={JSON.stringify([props.scope])} {...props}/></ClientScope>;}

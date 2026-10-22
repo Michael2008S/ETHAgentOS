@@ -1,4 +1,6 @@
 'use client';
+import {ClientScope} from './client-scope';
+import type {ComponentProps} from 'react';
 import {MixedWorkflowPanel} from './mixed-workflow-panel';
 import { useEffect, useRef, useState } from 'react';
 import { formatUnits, type EIP1193Provider, type Hex } from 'viem';
@@ -23,15 +25,18 @@ import type { ChainOrder } from '@/lib/agentos/orders';
 const localBase=localServices().chain;
 type Balance=Awaited<ReturnType<AgentWalletSession['balances']>>;
 type ChainTask=Awaited<ReturnType<AgentWalletSession['task']>>;
-export function ChainPanel({scope,tasks,receipts=[],agents,orders=[],feedback=[],onSaved}:{scope:string;tasks:Task[];receipts?:SavedChainReceipt[];agents:Agent[];orders?:ChainOrder[];feedback?:PaidFeedback[];onSaved?:()=>Promise<void>}){
+function ChainPanelContent({scope,tasks,receipts=[],agents,orders=[],feedback=[],onSaved}:{scope:string;tasks:Task[];receipts?:SavedChainReceipt[];agents:Agent[];orders?:ChainOrder[];feedback?:PaidFeedback[];onSaved?:()=>Promise<void>}){
   const {tr}=useLanguage(),lock=useRef(false);
   const [vaultSessions,setVaultSessions]=useState<VaultSession[]>([]);
-  const [loopback,setLoopback]=useState(false),[session,setSession]=useState<AgentWalletSession|null>(null),[config,setConfig]=useState('');
+  const [loopback]=useState(()=>['localhost','127.0.0.1','[::1]'].includes(location.hostname)),[session,setSession]=useState<AgentWalletSession|null>(null),[config,setConfig]=useState('');
   const [selected,setSelected]=useState(''),[balances,setBalances]=useState<Balance|null>(null),[current,setCurrent]=useState<ChainTask|null>(null),[proof,setProof]=useState<ChainEvidence|null>(null);
   const [datasetUrl,setDatasetUrl]=useState(''),[artifactUrl,setArtifactUrl]=useState(''),[windowSeconds,setWindowSeconds]=useState(3600),[spec,setSpec]=useState<DeliverySpec|undefined>();
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[tx,setTx]=useState(''),[phase,setPhase]=useState<'funding'|'settlement'>('settlement'),[saved,setSaved]=useState(false);
   const candidates=tasks.filter(task=>task.status==='completed'),task=candidates.find(task=>task.id===selected)??candidates[0];
-  useEffect(()=>setLoopback(['localhost','127.0.0.1','[::1]'].includes(location.hostname)),[]);
+  const proofBinding=JSON.stringify([session?.account,session?.deployment,task?.id]);
+  const [previousProofBinding,setPreviousProofBinding]=useState(proofBinding);
+  if(previousProofBinding!==proofBinding){setPreviousProofBinding(proofBinding);setProof(null);setSpec(undefined);setTx('');setCurrent(null);setSaved(false);}
+
   useEffect(()=>{
     let cancelled=false;
     void (async()=>{try{const raw=sessionStorage.getItem('agentos.wallet.v1:'+scope);if(!raw)return;const saved=JSON.parse(raw),deployment=walletDeployment(saved.deployment);let provider:EIP1193Provider;
@@ -43,7 +48,7 @@ export function ChainPanel({scope,tasks,receipts=[],agents,orders=[],feedback=[]
   async function local<T=unknown>(path:string,body?:unknown):Promise<T>{const r=await fetch(localBase+path,{method:body?'POST':'GET',...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(20000)});const data=await r.json() as T & {error?:string};if(!r.ok)throw new Error(data.error??'Local chain request failed.');return data;}
   async function refresh(active=session,chosen=task){if(!active)return;const [balance,status]=await Promise.all([active.balances(),chosen?active.task(chosen):Promise.resolve(null)]);setBalances(balance);setCurrent(status);}
   useEffect(()=>{
-    setProof(null);setSpec(undefined);setTx('');setCurrent(null);setSaved(false);if(!session)return;
+    if(!session)return;
     let stopped=false;const poll=async()=>{try{const [balance,status]=await Promise.all([session.balances(),task?session.task(task):Promise.resolve(null)]);if(!stopped){setBalances(balance);setCurrent(status);}}catch(reason){if(!stopped)setError(reason instanceof Error?reason.message:'Wallet refresh failed.');}};
     void poll();const timer=setInterval(()=>void poll(),5000);return()=>{stopped=true;clearInterval(timer);};
   },[session,task?.id]);
@@ -78,3 +83,5 @@ export function ChainPanel({scope,tasks,receipts=[],agents,orders=[],feedback=[]
       <details className="chain-history"><summary>{tr('Saved chain receipts')} · {receipts.length}</summary><a className="text-button" href="/api/exports?kind=chain-receipts" download>{tr('Export chain receipts')}</a><p className="form-note">{tr('Server-verified snapshots. Recheck onchain before relying on an old receipt. Sandbox credits are unchanged.')}</p>{receipts.length===0?<p className="form-note">{tr('No chain receipts saved yet.')}</p>:[...receipts].reverse().map(item=><article key={item.id} className="chain-proof"><b>{tasks.find(t=>t.id===item.webTaskId)?.title??orders.find(o=>o.id===item.webTaskId)?.title??item.webTaskId} · {tr(item.evidence.status[0].toUpperCase()+item.evidence.status.slice(1))}</b><p>{item.deployment.mode==='local'?tr('Local EVM · 31337'):tr('Sepolia · 11155111')} · {tr('Block')} {item.evidence.blockNumber} · {new Date(item.verifiedAt).toLocaleString()}</p><code>{item.evidence.transactionHash}</code><details><summary>{tr('Inspect chain evidence')}</summary><pre className="artifact-json">{JSON.stringify(item,null,2)}</pre></details></article>)}</details>
     </div></section>;
 }
+
+export function ChainPanel(props:ComponentProps<typeof ChainPanelContent>){return <ClientScope><ChainPanelContent key={JSON.stringify([props.scope])} {...props}/></ClientScope>;}

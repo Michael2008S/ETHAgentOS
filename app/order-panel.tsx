@@ -1,4 +1,6 @@
 'use client';
+import {ClientScope} from './client-scope';
+import type {ComponentProps} from 'react';
 import {checkX402Policy,isX402Supplier,type X402Policy} from '@/lib/agentos/x402-policy';
 import {canonical} from '@/cre/workflow/verify';
 import type {PurchaseChoice} from '@/lib/agentos/purchase-plan';
@@ -25,9 +27,9 @@ import { routeFromHash,routeHash } from '@/lib/agentos/navigation';
 import { submissionIntent } from '@/lib/agentos/client-intent';
 const statusLabels:Record<OrderStatus,string>={'funding':'Vault funding','awaiting-funding':'Awaiting funding',queued:'Queued',running:'Running','awaiting-settlement':'Awaiting chain settlement',paused:'Needs recovery',completed:'Completed',refunded:'Refunded',cancelled:'Cancelled'};
 type PurchaseProposal=Awaited<ReturnType<typeof proposePurchase>>&{expiresAt:string;budget:number;choices:PurchaseChoice[];excluded:ExcludedPurchaseChoice[];formContext:string};
-export function OrderPanel({scope,session,agents,orders,vaultSessions=[],feedback=[],busy,perform,onChanged}:{scope:string;session:AgentWalletSession|null;agents:Agent[];orders:ChainOrder[];vaultSessions?:VaultSession[];feedback?:PaidFeedback[];busy:boolean;perform:(action:()=>Promise<void>)=>Promise<void>;onChanged?:()=>Promise<void>}){
+function OrderPanelContent({scope,session,agents,orders,vaultSessions=[],feedback=[],busy,perform,onChanged}:{scope:string;session:AgentWalletSession|null;agents:Agent[];orders:ChainOrder[];vaultSessions?:VaultSession[];feedback?:PaidFeedback[];busy:boolean;perform:(action:()=>Promise<void>)=>Promise<void>;onChanged?:()=>Promise<void>}){
   const [automaticEvidence,setAutomaticEvidence]=useState(false),[signedQuote,setSignedQuote]=useState<SupplierQuote|null>(null),[executorMode,setExecutorMode]=useState<'builtin'|'supplier'>('builtin');
-  useEffect(()=>{setAutomaticEvidence(false);if(session?.deployment.mode!=='testnet')return;const controller=new AbortController();void fetch('/api/orders/config',{signal:controller.signal,cache:'no-store'}).then(async response=>{if(!response.ok)return;const data=await response.json() as {deployment?:{chainId?:number;escrow?:string};evidencePublishing?:boolean};if(!controller.signal.aborted&&data.deployment?.chainId===session.deployment.chainId&&data.deployment?.escrow?.toLowerCase()===session.deployment.escrow.toLowerCase())setAutomaticEvidence(data.evidencePublishing===true);}).catch(()=>{});return()=>controller.abort();},[session?.account,session?.deployment.escrow,session?.deployment.mode]);
+  useEffect(()=>{if(session?.deployment.mode!=='testnet')return;const controller=new AbortController();void fetch('/api/orders/config',{signal:controller.signal,cache:'no-store'}).then(async response=>{if(!response.ok)return;const data=await response.json() as {deployment?:{chainId?:number;escrow?:string};evidencePublishing?:boolean};if(!controller.signal.aborted&&data.deployment?.chainId===session.deployment.chainId&&data.deployment?.escrow?.toLowerCase()===session.deployment.escrow.toLowerCase())setAutomaticEvidence(data.evidencePublishing===true);}).catch(()=>{});return()=>controller.abort();},[session?.account,session?.deployment.chainId,session?.deployment.escrow,session?.deployment.mode]);
   const {tr}=useLanguage(),[mode,setMode]=useState('fixture'),[chainInput,setChainInput]=useState(''),[fundingMode,setFundingMode]=useState('buyer'),[hashes,setHashes]=useState<Record<string,string>>({}),[limit,setLimit]=useState(10);
   const [proposal,setProposal]=useState<PurchaseProposal|null>(null),[planning,setPlanning]=useState(false),[planError,setPlanError]=useState('');
   const [model,setModel]=useState<ModelDescriptor|null>(null);
@@ -120,3 +122,5 @@ export function OrderPanel({scope,session,agents,orders,vaultSessions=[],feedbac
     {orders.length>limit&&<button className="text-button" onClick={()=>setLimit(limit+10)}>{tr('Show older orders')}</button>}
   </div>;
 }
+
+export function OrderPanel(props:ComponentProps<typeof OrderPanelContent>){return <ClientScope><OrderPanelContent key={JSON.stringify([props.scope,props.session?.account.toLowerCase(),props.session?.deployment])} {...props}/></ClientScope>;}

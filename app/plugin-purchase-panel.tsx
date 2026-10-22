@@ -1,4 +1,7 @@
 'use client';
+import {useBoundReview} from './use-bound-review';
+import {ClientScope} from './client-scope';
+import type {ComponentProps} from 'react';
 import {useNow} from './use-now';
 import {useEffect,useRef,useState} from 'react';
 import {AgentPluginClient,type PluginCatalogue} from '@/sdk/plugins';
@@ -26,10 +29,11 @@ function restore(raw:string|null):Draft{
  const empty=initial();if(!raw||raw.length>40000)return empty;
  try{const d={acceptedRoot:'',timeout:'600',planId:'',planDigest:'',...JSON.parse(raw)};if(Object.keys(empty).filter(k=>k!=='steps').some(k=>typeof d[k]!=='string')||!Array.isArray(d.steps)||d.steps.length<1||d.steps.length>8||d.steps.some((s:Step)=>!s||['pluginId','source','path','cap'].some(k=>typeof (s as unknown as Record<string,unknown>)[k]!=='string')))return empty;return Object.fromEntries(Object.keys(empty).map(k=>[k,d[k]])) as Draft;}catch{return empty;}
 }
-export function PluginPurchasePanel({scope}:{scope:string}){
+function PluginPurchasePanelContent({scope}:{scope:string}){
+ const key='agentos.plugin-purchases.v1:'+scope;
  const now=useNow();
- const {tr}=useLanguage(),[draft,setDraft]=useState<Draft>(initial),[plugins,setPlugins]=useState<PluginCatalogue|null>(null),[catalogue,setCatalogue]=useState<PluginPurchaseCatalogue|null>(null),[detail,setDetail]=useState<PluginPurchaseDetail|null>(null),[wallet,setWallet]=useState<AgentWalletSession|null>(null),[sessions,setSessions]=useState<VaultSession[]>([]),[epoch,setEpoch]=useState(''),[reviewed,setReviewed]=useState(false),[busy,setBusy]=useState(false),[loaded,setLoaded]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[loopback,setLoopback]=useState(false);
- const generation=useRef(0),locked=useRef(false),draftRef=useRef(draft),walletRef=useRef(wallet),polling=useRef(false),key='agentos.plugin-purchases.v1:'+scope;
+ const {tr}=useLanguage(),[draft,setDraft]=useState<Draft>(()=>{let value=initial();try{value=restore(sessionStorage.getItem(key));}catch{}return value;}),[plugins,setPlugins]=useState<PluginCatalogue|null>(null),[catalogue,setCatalogue]=useState<PluginPurchaseCatalogue|null>(null),[detail,setDetail]=useState<PluginPurchaseDetail|null>(null),[wallet,setWallet]=useState<AgentWalletSession|null>(null),[sessions,setSessions]=useState<VaultSession[]>([]),[epoch,setEpoch]=useState(''),[busy,setBusy]=useState(false),[loaded]=useState(key),[error,setError]=useState(''),[notice,setNotice]=useState(''),[loopback]=useState(()=>['localhost','127.0.0.1','[::1]'].includes(location.hostname));
+ const generation=useRef(0),locked=useRef(false),draftRef=useRef(draft),walletRef=useRef(wallet),polling=useRef(false);
  function save(next:Draft){draftRef.current=next;setDraft(next);try{sessionStorage.setItem(key,JSON.stringify(next));}catch{}}
  function edit(next:Draft){setReviewed(false);save({...next,sessionId:'',planId:'',planDigest:'',acceptedRoot:''});setNotice('');}
  const client=(active=walletRef.current)=>new AgentPluginPurchaseClient('',{},scope,active??undefined);
@@ -40,11 +44,11 @@ export function PluginPurchasePanel({scope}:{scope:string}){
   if(walletRef.current){const s=await new AgentVaultClient(walletRef.current).sessions();if(expected===generation.current){setSessions(s.sessions);setEpoch(String((s.view as {epoch?:string}|null)?.epoch??''));}}
  }
  function act(action:(expected:number)=>Promise<void>){if(locked.current)return;locked.current=true;setBusy(true);setError('');setNotice('');const expected=generation.current;void action(expected).catch(reason=>{if(expected===generation.current)setError(reason instanceof Error?reason.message:'Plugin purchase is unavailable.');}).finally(()=>{if(expected===generation.current){locked.current=false;setBusy(false);}});}
- useEffect(()=>{const expected=++generation.current;let value=initial();try{value=restore(sessionStorage.getItem(key));}catch{}draftRef.current=value;walletRef.current=null;setDraft(value);setWallet(null);setSessions([]);setPlugins(null);setCatalogue(null);setDetail(null);setReviewed(false);setBusy(false);setError('');setNotice('');setLoaded(key);locked.current=false;setLoopback(['localhost','127.0.0.1','[::1]'].includes(location.hostname));void refresh(expected,true).catch(()=>{if(expected===generation.current)setError('Paid plugin runtime is unavailable. Refresh the catalogue after starting the local demo.');});
+ useEffect(()=>{const expected=++generation.current;void refresh(expected,true).catch(()=>{if(expected===generation.current)setError('Paid plugin runtime is unavailable. Refresh the catalogue after starting the local demo.');});
   const timer=setInterval(()=>{if(!locked.current&&!polling.current){polling.current=true;void refresh(expected).catch(reason=>{if(expected===generation.current)setError(reason instanceof Error?reason.message:'Plugin purchase is unavailable.');}).finally(()=>{polling.current=false;});}},3500);return()=>{generation.current++;clearInterval(timer);};
  },[key]); // eslint-disable-line react-hooks/exhaustive-deps
  const configuration=catalogue?.configuration,runtime=configuration?.runtime,disabled=busy||loaded!==key;
- useEffect(()=>{setReviewed(false);},[scope,runtime?.configHash,configuration?.priceCents,plugins?.plugins.map(p=>p.manifestHash).join(',')]);
+ const [reviewed,setReviewed]=useBoundReview(JSON.stringify([scope,runtime?.configHash,configuration?.priceCents,plugins?.plugins.map(p=>p.manifestHash).join(',')]));
  const selected=draft.steps.map(s=>plugins?.plugins.find(p=>p.manifest.id===s.pluginId));
  let permissions:VaultPluginPermission[]=[];try{if(runtime&&selected.every(Boolean))permissions=normalizePluginPermissions([...new Set(draft.steps.map(s=>s.pluginId))].map(pluginId=>({pluginId,manifestHash:selected.find(p=>p?.manifest.id===pluginId)!.manifestHash,runtimeHash:runtime.configHash,maxPriceCents:Math.max(...draft.steps.filter(s=>s.pluginId===pluginId).map(s=>cents(s.cap)))})));}catch{}
  const eligible=sessions.filter(s=>s.signature&&!s.revokedAt&&s.epoch===epoch&&s.scope===scope&&Number(s.expires)*1000>now&&wallet&&s.owner.toLowerCase()===wallet.account.toLowerCase()&&permissions.length>0&&permissions.every(p=>s.pluginPermissions?.some(a=>a.pluginId===p.pluginId&&a.manifestHash===p.manifestHash&&a.runtimeHash===p.runtimeHash&&a.maxPriceCents>=p.maxPriceCents)));
@@ -98,3 +102,5 @@ export function PluginPurchasePanel({scope}:{scope:string}){
   </div>
  </section>;
 }
+
+export function PluginPurchasePanel(props:ComponentProps<typeof PluginPurchasePanelContent>){return <ClientScope><PluginPurchasePanelContent key={JSON.stringify([props.scope])} {...props}/></ClientScope>;}
