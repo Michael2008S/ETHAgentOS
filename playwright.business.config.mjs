@@ -1,0 +1,2 @@
+import {defineConfig} from '@playwright/test';
+export default defineConfig({testDir:'./tests/browser',testMatch:'full-local-business.spec.mjs',timeout:900000,expect:{timeout:20000},workers:1,retries:0,reporter:[['list'],['html',{outputFolder:'outputs/full-business-browser-report',open:'never'}]],use:{actionTimeout:20000,navigationTimeout:30000,baseURL:process.env.AGENTOS_TEST_URL||'http://127.0.0.1:6297',browserName:'chromium',channel:'chromium',trace:'off',screenshot:'off'}});
