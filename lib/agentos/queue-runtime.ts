@@ -1,4 +1,5 @@
 import {drainIndependent} from './parallel-drain';
+import {monitorDrivesMixed} from './usdc-monitor-state';
 import {runUSDCMonitor} from './usdc-monitor-runner';
 import {configuredMonitorRuntime} from './usdc-monitor-runtime';
 import {runMixedWorkflow} from './mixed-workflow-runner';
@@ -17,7 +18,7 @@ import {workflowSupplierAccess} from './workflow-supplier-runtime';
 import {digest} from './engine';
 import { env } from 'cloudflare:workers';
 import * as store from './store';
-import { claimJob, acknowledgeJob, queueSummary, workItems } from './queue';
+import { claimJob, acknowledgeLatest, queueSummary, workItems } from './queue';
 import { runTask } from './runner';
 import { runOrder } from './order-runner';
 import { configuredOrderChain } from './order-runtime';
@@ -38,7 +39,7 @@ export async function drainQueue(request: Request, ownerId?: string, intervalMs=
     counts.claimed++;
     let failed=false;
     try {
-      if(job.kind==='usdc-monitor'){const result=await runUSDCMonitor(mixedStore(),job.owner_id,job.task_id,async()=>configuredMonitorRuntime(request,job.owner_id));failed=result.status==='retryable';}else if(job.kind==='mixed'){const result=await runMixedWorkflow(mixedStore(),job.owner_id,job.task_id,()=>configuredMixedRuntime(request,job.owner_id));failed=result.status==='retryable';}else if(job.kind==='service-repair'){await runServiceRepair(store,job.owner_id,job.task_id,()=>configuredServiceRepairRuntime(request,job.owner_id));}else if(job.kind==='plugin-purchase'){if(!mixedDrivesPlugin((await store.read(job.owner_id)).state,job.task_id)){const result=await runPluginPurchase(pluginDatabase(),job.owner_id,job.task_id,()=>configuredPluginPurchaseRuntime(request),{maxTransitions:8});failed=result.status==='retryable';}}else if(job.kind==='plugin'){const result=await runPluginJob(pluginDatabase(),job.owner_id,job.task_id,()=>configuredPluginExecutor(request));failed=result.status==='retryable';}else if(job.kind==='task') {
+      if(job.kind==='usdc-monitor'){const result=await runUSDCMonitor(mixedStore(),job.owner_id,job.task_id,async()=>configuredMonitorRuntime(request,job.owner_id));failed=result.status==='retryable';}else if(job.kind==='mixed'){if(!monitorDrivesMixed((await store.read(job.owner_id)).state,job.task_id)){const result=await runMixedWorkflow(mixedStore(),job.owner_id,job.task_id,()=>configuredMixedRuntime(request,job.owner_id));failed=result.status==='retryable';}}else if(job.kind==='service-repair'){await runServiceRepair(store,job.owner_id,job.task_id,()=>configuredServiceRepairRuntime(request,job.owner_id));}else if(job.kind==='plugin-purchase'){if(!mixedDrivesPlugin((await store.read(job.owner_id)).state,job.task_id)){const result=await runPluginPurchase(pluginDatabase(),job.owner_id,job.task_id,()=>configuredPluginPurchaseRuntime(request),{maxTransitions:8});failed=result.status==='retryable';}}else if(job.kind==='plugin'){const result=await runPluginJob(pluginDatabase(),job.owner_id,job.task_id,()=>configuredPluginExecutor(request));failed=result.status==='retryable';}else if(job.kind==='task') {
         const snapshot=await store.read(job.owner_id);
         // Never promote a test/manual task, even if a stale or corrupted queue row exists.
         const task=snapshot.state.tasks.find(t=>t.id===job.task_id);
@@ -61,8 +62,7 @@ export async function drainQueue(request: Request, ownerId?: string, intervalMs=
       } else failed=true;
     } catch { failed=true; }
     // A read/ack failure leaves the lease for crash recovery; never claim completion.
-    const snapshot=await store.read(job.owner_id);
-    const acked=await acknowledgeJob(env.DB!,job,snapshot,failed);
+    const {snapshot,acked}=await acknowledgeLatest(env.DB!,job,()=>store.read(job.owner_id),failed);
     if(failed) counts.failed++;
     if(acked) {
       const terminal=!workItems(snapshot.state).some(j=>j.kind===job.kind&&j.taskId===job.task_id);

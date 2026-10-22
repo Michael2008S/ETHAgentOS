@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { seed,transition } from '../lib/agentos/engine.ts';
-import { commitWithJobs,claimJob,acknowledgeJob,queueSummary,jobId } from '../lib/agentos/queue.ts';
+import { commitWithJobs,claimJob,acknowledgeJob,queueSummary,jobId,workItems,acknowledgeLatest } from '../lib/agentos/queue.ts';
 import { runTask } from '../lib/agentos/runner.ts';
 import { drainScope } from '../lib/agentos/auth.ts';
 
@@ -134,4 +134,15 @@ test('retirement is fenced by the workspace CAS and owner, preserves active leas
  assert.equal(await acknowledgeJob(d.database,leased,{revision:1,state:active},false,now+3),false);assert.equal(await acknowledgeJob(d.database,leased,await d.read('a'),false,now+3),true);
  assert.equal(await commitWithJobs(d.database,'a',2,terminal,active,now+4),true);assert.equal((await queueSummary(d.database,'a')).pending,1);assert.equal(d.sqlite.prepare('SELECT COUNT(*) AS n FROM agentos_runtime_jobs WHERE owner_id=?').get('a').n,1);assert.equal((await queueSummary(d.database,'b')).pending,1);
  d.sqlite.close();
+});
+
+test('monitor parent is the only queue driver of an active report, including stopping reconciliation',()=>{
+ const state=seed();state.mixedWorkflows=[{id:'report',status:'running',steps:[]},{id:'independent',status:'running',steps:[]}];state.usdcMonitors=[{id:'watch',status:'running',reports:[{workflowId:'report',status:'active'}],expiresAt:new Date(Date.now()+600000).toISOString()}];
+ for(const status of ['running','paused','stopping']){state.usdcMonitors[0].status=status;assert.deepEqual(workItems(state).map(j=>j.taskId),['watch','independent']);}
+ state.usdcMonitors[0].status='failed';assert.deepEqual(workItems(state).map(j=>j.taskId),['report','independent']);
+});
+test('acknowledgement rereads after concurrent workspace changes but cannot consume a new lease',async()=>{
+ const d=database();d.insert('a');await commitWithJobs(d.database,'a',0,seed(),await transition(seed(),draft()));const job=await claimJob(d.database,'a');let reads=0;
+ const result=await acknowledgeLatest(d.database,job,async()=>{const s=await d.read('a');if(reads++===0)await commitWithJobs(d.database,'a',s.revision,s.state,{...s.state,policy:{...s.state.policy,dailyBudget:12345}});return s;},true);assert.equal(result.acked,true);assert.equal(reads,2);assert.equal(d.sqlite.prepare('SELECT failures FROM agentos_runtime_jobs').get().failures,1);
+ assert.equal((await acknowledgeLatest(d.database,job,()=>d.read('a'),true)).acked,false);d.sqlite.close();
 });
