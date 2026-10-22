@@ -11,10 +11,11 @@ type Page = ReturnType<typeof queryMemory>;
 export function MemoryPanel({scope,agents,revision,onInspect}:{scope:string;agents:Agent[];revision:number;onInspect:(id:string)=>void}) {
   const {tr}=useLanguage();
   const [q,setQ]=useState(''),[agentId,setAgentId]=useState(''),[status,setStatus]=useState(''),[artifactsOnly,setArtifactsOnly]=useState(false),[offset,setOffset]=useState(0);
-  const [data,setData]=useState<Page|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[retry,setRetry]=useState(0);
+  const [data,setData]=useState<Page|null>(null),[settled,setSettled]=useState(''),[failure,setFailure]=useState({key:'',message:''}),[retry,setRetry]=useState(0);
   const params=new URLSearchParams({q,agentId,status,artifactsOnly:String(artifactsOnly),offset:String(offset),limit:'20'}).toString();
+  const requestKey=JSON.stringify([scope,params,revision,retry]),loading=settled!==requestKey,error=failure.key===requestKey?failure.message:'';
   useEffect(()=>{
-    const controller=new AbortController();setLoading(true);setError('');
+    const controller=new AbortController();
     const timer=setTimeout(()=>{
       void (async()=>{
         try {
@@ -22,12 +23,12 @@ export function MemoryPanel({scope,agents,revision,onInspect}:{scope:string;agen
           const result=await response.json() as Page & {error?:string};
           if(!response.ok)throw new Error(result.error??'Memory search failed.');
           if(!controller.signal.aborted)setData(result);
-        }catch(reason){if(!controller.signal.aborted)setError(reason instanceof Error?reason.message:'Memory search failed.');}
-        finally{if(!controller.signal.aborted)setLoading(false);}
+        }catch(reason){if(!controller.signal.aborted)setFailure({key:requestKey,message:reason instanceof Error?reason.message:'Memory search failed.'});}
+        finally{if(!controller.signal.aborted)setSettled(requestKey);}
       })();
     },200);
     return()=>{clearTimeout(timer);controller.abort();};
-  },[params,revision,retry]);
+  },[params,requestKey]);
   return <><SemanticMemoryPanel scope={scope} agents={agents} allowNotes/><section className="panel">
     <div className="panel-heading"><h2>{tr('Task memory')}</h2><a className="btn secondary small" href={'/api/memory?'+params+'&format=export'} download><Download size={14}/>{tr('Export matching context')}</a></div>
     <div className="memory-filters">

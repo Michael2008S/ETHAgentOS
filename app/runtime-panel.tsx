@@ -6,7 +6,7 @@ import {LocalModelPanel} from './local-model-panel';
 import {ConsumerPanel} from './consumer-panel';
 export function useRuntimeHealth(){
  const [health,setHealth]=useState<RuntimeHealth|null>(null);
- const refresh=useCallback(async()=>{try{const r=await fetch('/api/runtime/health',{cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok)throw new Error();setHealth(await r.json() as RuntimeHealth);}catch{setHealth(null);}},[]);
+ const refresh=useCallback(()=>fetch('/api/runtime/health',{cache:'no-store',signal:AbortSignal.timeout(12000)}).then(async r=>{if(!r.ok)throw new Error();setHealth(await r.json() as RuntimeHealth);}).catch(()=>{setHealth(null);}),[]);
  useEffect(()=>{void refresh();const timer=setInterval(()=>void refresh(),5000);return()=>clearInterval(timer);},[refresh]);return {health,refresh};
 }
 export function RuntimePanel({health,refresh}:{health:RuntimeHealth|null;refresh:()=>Promise<void>}){

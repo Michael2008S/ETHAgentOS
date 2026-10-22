@@ -63,7 +63,7 @@ export default function Home() {
   if(hash!==lastHash){setLastHash(hash);const route=routeFromHash(hash);setPage(route.page);setSelected(route.task);}
   const state = snapshot?.state;
   const accept = useCallback((next: Snapshot) => setSnapshot(prev => !prev || next.revision >= prev.revision ? next : prev), []);
-  const refresh = useCallback(async () => { try { const r = await fetch('/api/workspace', { cache: 'no-store' }); const b = await r.json() as Snapshot & { error?: string }; if (!r.ok) throw new Error(b.error); accept(b); setError(''); } catch (e) { setError(e instanceof Error ? e.message : 'Unable to connect.'); } }, [accept]);
+  const refresh = useCallback(() => fetch('/api/workspace', { cache: 'no-store' }).then(async r => { const b = await r.json() as Snapshot & { error?: string }; if (!r.ok) throw new Error(b.error); accept(b); setError(''); }).catch(e => { setError(e instanceof Error ? e.message : 'Unable to connect.'); }), [accept]);
   useEffect(() => { void refresh(); const id = setInterval(() => { if (!lock.current) void refresh(); }, 5000); return () => clearInterval(id); }, [refresh]);
   useEffect(() => { const h = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); searchRef.current?.focus(); } if (e.key === 'Escape') { setSelected(null); setActivity(false); setSearch(''); } }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, []);
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(''), 5000); return () => clearTimeout(id); }, [toast]);
