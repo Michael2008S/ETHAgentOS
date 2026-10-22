@@ -16,6 +16,6 @@ export class AgentMixedWorkflowClient{
  async inspect(id:string){return this.check((await this.call(undefined,'?id='+encodeURIComponent(id))).flow,id);}
  async create(raw:MixedWorkflowDraft,review?:import('../lib/agentos/mixed-plans.ts').MixedPlanReview){const draft=mixedWorkflowDraftSchema.parse(raw),f=await this.check((await this.call({action:'create',draft,...(review?{review}:{})})).flow,'mixed-'+draft.requestId);if(canonical(f.planReview??null)!==canonical(review??null)||f.draftHash!==await digest(draft)||f.buyer.toLowerCase()!==draft.buyer.toLowerCase()||f.vaultSessionId!==draft.vaultSessionId||canonical(f.input)!==canonical(draft.input))throw Error('Mixed terms differ from the reviewed draft.');return f;}
  async repairPreview(id:string,replacement?:string){return mixedWorkflowDraftSchema.parse((await this.call({action:'repair-preview',id,...(replacement?{replacement}:{})})).draft);}
- async recover(id:string){return this.check((await this.call({action:'recover',id})).flow,id);}
+ async recover(id:string,maxTransitions?:number){return this.check((await this.call({action:'recover',id,...(maxTransitions?{maxTransitions}:{})})).flow,id);}
  async cancel(id:string){return this.check((await this.call({action:'cancel',id})).flow,id);}
 }

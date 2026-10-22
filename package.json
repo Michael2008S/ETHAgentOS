@@ -92,7 +92,8 @@
     "demo:monitor-renewal": "node scripts/demo-monitor-renewal.mjs",
     "demo:business-review": "node scripts/demo-business-review.mjs",
     "demo:business-archives": "node scripts/demo-business-archives.mjs",
-    "demo:local-business": "node scripts/demo-local-business-loop.mjs"
+    "demo:local-business": "node scripts/demo-local-business-loop.mjs",
+    "demo:monitor-repair": "node scripts/demo-monitor-repair.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

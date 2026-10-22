@@ -9,5 +9,5 @@ export class AgentUSDCMonitorClient{
  async get(id:string){const m=(await this.call(undefined,id)).monitor;if(m.id!==id)throw Error('Monitor identifier differs.');return m;}
  async create(raw:USDCMonitorDraft){const draft=usdcMonitorDraftSchema.parse(raw),m=(await this.call({action:'create',scope:this.scope,draft})).monitor;if(m.id!=='usdc-monitor-'+draft.requestId||canonical(m.draft)!==canonical(draft))throw Error('Monitor differs from the reviewed proposal.');return m;}
  async renewal(id:string){const r=(await this.call({action:'renew-preview',scope:this.scope,id})).renewal,m=await this.get(id);if(r.sourceId!==id||r.snapshotHash!==await renewalSnapshot(m)||r.cursor!==m.cursor||r.account!==m.draft.account)throw Error('Renewal source differs.');return r;}
- async control(id:string,action:'pause'|'resume'|'stop'|'recover'){const m=(await this.call({action,scope:this.scope,id})).monitor;if(m.id!==id)throw Error('Monitor identifier differs.');return m;}
+ async control(id:string,action:'pause'|'resume'|'stop'|'recover'|'adopt-repair'){const m=(await this.call({action,scope:this.scope,id})).monitor;if(m.id!==id)throw Error('Monitor identifier differs.');return m;}
 }
