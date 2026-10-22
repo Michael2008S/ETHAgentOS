@@ -1,3 +1,4 @@
+import {leasedModelRequest} from './model-request.ts';
 import { digest,DomainError } from './engine.ts';
 import type { ChainOrder } from './orders.ts';
 export type ModelDescriptor={provider:'chat-completions';model:string;revision:string;configHash:string};
@@ -31,7 +32,7 @@ export async function createModelPlanner(config:ModelConfiguration,apiKey?:strin
     ],response_format:{type:'json_schema',json_schema:{name:'agentos_tool_plan',strict:true,schema:{type:'object',additionalProperties:false,properties:{operations:{type:'array',minItems:1,maxItems:4,items:{type:'string',enum:MODEL_OPERATIONS}}},required:['operations']}}}};
     const promptHash=await digest(body);
     let response:Response;
-    try{response=await request(config.url,{method:'POST',redirect:'manual',headers:{'Content-Type':'application/json','Idempotency-Key':'agentos-'+order.id+'-'+promptHash.slice(2,18),...(apiKey?{Authorization:'Bearer '+apiKey}:{})},body:JSON.stringify(body),signal:AbortSignal.timeout(config.timeoutMs)});}catch{throw new DomainError('Model inference is unavailable. No skill operation was executed.','MODEL_UNAVAILABLE');}
+    try{response=await leasedModelRequest(config.url,{method:'POST',redirect:'manual',headers:{'Content-Type':'application/json','Idempotency-Key':'agentos-'+order.id+'-'+promptHash.slice(2,18),...(apiKey?{Authorization:'Bearer '+apiKey}:{})},body:JSON.stringify(body),signal:AbortSignal.timeout(config.timeoutMs)},request);}catch{throw new DomainError('Model inference is unavailable. No skill operation was executed.','MODEL_UNAVAILABLE');}
     if(!response.ok){await response.body?.cancel();throw new DomainError('Model inference is unavailable. No skill operation was executed.','MODEL_UNAVAILABLE');}
     const raw=await boundedText(response);let envelope:{choices?:{finish_reason?:string;message?:{content?:unknown;tool_calls?:unknown}}[];id?:unknown;usage?:{prompt_tokens?:unknown;completion_tokens?:unknown}};
     try{envelope=JSON.parse(raw);}catch{throw new DomainError('Model returned malformed JSON.','MODEL_REJECTED');}
