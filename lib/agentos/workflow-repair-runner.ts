@@ -15,7 +15,7 @@ function stateOf(state:Workspace,id:string,status:RepairPolicyStatus,reason:stri
 }
 /** Queue/owner ticks share this runner; the durable policy lease fences external model calls. */
 export async function runWorkflowRepair(store:Store,ownerId:string,id:string,runtime:RepairRuntime,options:{now?:()=>string;request?:typeof fetch;leaseMs?:number}={}){
- const now=()=>options.now?.()??new Date().toISOString();let snapshot=await store.read(ownerId),policy=findRepairPolicy(snapshot.state,id);await verifyRepairPolicy(policy);
+ const now=()=>options.now?.()??new Date().toISOString();const snapshot=await store.read(ownerId);let policy=findRepairPolicy(snapshot.state,id);await verifyRepairPolicy(policy);
  if(!['armed','waiting','running'].includes(policy.status))return {policyId:id,status:policy.status};
  if(policy.expiresAt<=now()){await store.updateWorkspace(ownerId,s=>stateOf(s,id,'expired','expired',now(),policy));return {policyId:id,status:'expired'};}
  if(policy.lease){if(policy.lease.leaseUntil>now())return {policyId:id,status:'busy'};await store.updateWorkspace(ownerId,s=>finishRepairAttempt(s,id,policy.lease!.token,'lease-expired','lease-expired',undefined,now()));return {policyId:id,status:'waiting'};}

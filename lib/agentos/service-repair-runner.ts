@@ -20,7 +20,7 @@ function status(state:Workspace,id:string,next:RepairStatus,reason:string|undefi
 }
 /** Only queue/explicit owner ticks call this; reads cannot generate or approve. */
 export async function runServiceRepair(store:Store,owner:string,id:string,configuration:ServiceRepairRuntime|(()=>Promise<ServiceRepairRuntime>),options:{now?:()=>string;request?:typeof fetch;leaseMs?:number}={}){
- const now=()=>options.now?.()??new Date().toISOString();let snapshot=await store.read(owner),policy=serviceRepairPolicy(snapshot.state,id);await verifyServiceRepairPolicy(policy);
+ const now=()=>options.now?.()??new Date().toISOString();const snapshot=await store.read(owner);let policy=serviceRepairPolicy(snapshot.state,id);await verifyServiceRepairPolicy(policy);
  if(!['armed','waiting','running'].includes(policy.status))return {status:policy.status};
  if(policy.expiresAt<=now()){await store.updateWorkspace(owner,s=>status(s,id,'expired','expired',now(),policy));return {status:'expired'};}
  if(policy.lease){if(policy.lease.leaseUntil>now())return {status:'busy'};await store.updateWorkspace(owner,s=>finishServiceRepair(s,id,policy.lease!.token,'lease-expired','lease-expired',undefined,now()));return {status:'waiting'};}

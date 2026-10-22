@@ -9,14 +9,14 @@ test('session authority rejects wrong buyer, skill, budget, expiry and revocatio
  assert.throws(()=>vaultAllowance(state,session.sessionId,owner,'event-analysis',300,240,'2026-10-22T08:00:00.000Z'),/authorizes/);session.revokedAt=now;assert.throws(()=>vaultAllowance(state,session.sessionId,owner,'event-analysis',300,240,now),/authorizes/);
 });
 test('unfunded quotes reserve total capacity atomically, cancelling an unsent draft releases it, funding leases fence duplicate consumers',async()=>{
- let {state,session}=fixture();
+ let {state}=fixture();const session=state.vaultSessions![0];
  const create=async()=>{const requestId=crypto.randomUUID(),input={dataset:'custom-transfers-v1',blockFrom:1,blockTo:1,records:[{block:1,from:'a',to:'b',cents:123}]},bytes=inputEvidence({id:'chain-'+requestId,input,skill:'event-analysis'},owner),spec={datasetUrl:'https://a.example',artifactUrl:'https://b.example',datasetHash:bytes.datasetHash,verification:bytes.verification};state=await createOrder(state,{requestId,vaultSessionId:session.sessionId,buyer:owner,agentId:'atlas',title:'Reserve quote',budget:300,input,spec,scenario:'success',timeoutSeconds:300},deployment,now);return state.chainOrders![0];};
  const first=await create();await create();await create();await assert.rejects(create(),/total allowance/);findOrder(state,first.id).status='cancelled';const replacement=await create();
  const deadline=BigInt(Date.parse(now)/1000+300),leased=claimVaultFunding(state,replacement.id,'first',deadline,now);assert.equal(findOrder(leased,replacement.id).vaultFunding!.token,'first');assert.equal(claimVaultFunding(leased,replacement.id,'second',deadline,now),leased);
  leased.vaultSessions![0].revokedAt=now;const recovered=claimVaultFunding(leased,replacement.id,'receipt-recovery',deadline+100n,now,true);assert.equal(findOrder(recovered,replacement.id).vaultFunding!.deadline,deadline.toString());assert.equal(findOrder(recovered,replacement.id).vaultFunding!.token,'receipt-recovery');
 });
 test('automatic Vault drafts reserve the workspace daily budget before any chain transfer',async()=>{
- let {state,session}=fixture();state.policy.dailyBudget=300;
+ let {state}=fixture();const session=state.vaultSessions![0];state.policy.dailyBudget=300;
  const input={dataset:'custom-transfers-v1',blockFrom:1,blockTo:1,records:[{block:1,from:'a',to:'b',cents:1}]};
  const draft=():OrderDraft=>{const requestId=crypto.randomUUID(),bytes=inputEvidence({id:'chain-'+requestId,input,skill:'event-analysis'},owner);return {requestId,vaultSessionId:session.sessionId,buyer:owner,agentId:'atlas',title:'Daily reservation',budget:300,input,spec:{datasetUrl:'https://a.example',artifactUrl:'https://b.example',datasetHash:bytes.datasetHash,verification:bytes.verification},scenario:'success',timeoutSeconds:300};};
  state=await createOrder(state,draft(),deployment,now);assert.equal(state.chainOrders![0].status,'funding');assert.equal(state.chainOrders![0].funding,null);

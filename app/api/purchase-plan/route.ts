@@ -18,7 +18,7 @@ const schema=z.object({goal:z.string().trim().min(3).max(500),budget:z.number().
 export async function POST(request:Request){try{
  checkOrigin(request);const scope=owner(request);if(!request.headers.get('content-type')?.includes('application/json'))return Response.json({error:'JSON required.'},{status:415});
  const raw=await request.text();if(new TextEncoder().encode(raw).length>65536)return Response.json({error:'Request too large.'},{status:413});const {goal,budget,buyer,input,vaultSessionId}=schema.parse(JSON.parse(raw)),snapshot=await read(scope);
- let choices=purchaseChoices(snapshot.state,budget),excluded:ExcludedPurchaseChoice[]=[],chainTime:(()=>Promise<number>)|undefined;
+ const excluded:ExcludedPurchaseChoice[]=[];let choices=purchaseChoices(snapshot.state,budget),chainTime:(()=>Promise<number>)|undefined;
  // Legacy calls without a wallet compare built-ins only; no unsigned supplier price is eligible.
  if(buyer){
   const configured=await configuredOrderChain(request),candidates:PurchaseQuoteCandidate[]=[];let payer=buyer;
