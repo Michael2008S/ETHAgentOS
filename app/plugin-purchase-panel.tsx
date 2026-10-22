@@ -45,7 +45,7 @@ function PluginPurchasePanelContent({scope}:{scope:string}){
  }
  function act(action:(expected:number)=>Promise<void>){if(locked.current)return;locked.current=true;setBusy(true);setError('');setNotice('');const expected=generation.current;void action(expected).catch(reason=>{if(expected===generation.current)setError(reason instanceof Error?reason.message:'Plugin purchase is unavailable.');}).finally(()=>{if(expected===generation.current){locked.current=false;setBusy(false);}});}
  useEffect(()=>{const expected=++generation.current;void refresh(expected,true).catch(()=>{if(expected===generation.current)setError('Paid plugin runtime is unavailable. Refresh the catalogue after starting the local demo.');});
-  const timer=setInterval(()=>{if(!locked.current&&!polling.current){polling.current=true;void refresh(expected).catch(reason=>{if(expected===generation.current)setError(reason instanceof Error?reason.message:'Plugin purchase is unavailable.');}).finally(()=>{polling.current=false;});}},3500);return()=>{generation.current++;clearInterval(timer);};
+  const timer=setInterval(()=>{if(!locked.current&&!polling.current){polling.current=true;void refresh(expected).catch(reason=>{if(expected===generation.current)setError(reason instanceof Error?reason.message:'Plugin purchase is unavailable.');}).finally(()=>{polling.current=false;});}},3500);return()=>{generation.current=expected+1;clearInterval(timer);};
  },[key]); // eslint-disable-line react-hooks/exhaustive-deps
  const configuration=catalogue?.configuration,runtime=configuration?.runtime,disabled=busy||loaded!==key;
  const [reviewed,setReviewed]=useBoundReview(JSON.stringify([scope,runtime?.configHash,configuration?.priceCents,plugins?.plugins.map(p=>p.manifestHash).join(',')]));

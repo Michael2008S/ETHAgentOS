@@ -8,7 +8,7 @@ import type {ExcludedPurchaseChoice} from '@/lib/agentos/purchase-quotes';
 import {supplierQuoteSchema,supplierQuoteHash,type SupplierQuote} from '@/lib/agentos/supplier-quote';
 import {orderSeller} from '@/lib/agentos/order-parties';
 import {ChainDataInput} from './chain-data-input';
-import { useEffect,useState,type FormEvent } from 'react';
+import { useEffect,useEffectEvent,useState,type FormEvent } from 'react';
 import { Play,RefreshCw,Download } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n/context';
 import { AgentIdentityClient,type PaidFeedback } from '@/sdk/agent-identity';
@@ -37,7 +37,9 @@ function OrderPanelContent({scope,session,agents,orders,vaultSessions=[],feedbac
   const [suppliers,setSuppliers]=useState<SupplierDescriptor[]>([]),[selectedSupplier,setSelectedSupplier]=useState(''),supplier=suppliers[0]??null;
   useEffect(()=>{const controller=new AbortController();void fetch('/api/suppliers',{signal:controller.signal}).then(async r=>{if(r.ok){const data=await r.json() as {descriptor:SupplierDescriptor;descriptors?:SupplierDescriptor[];x402Policies?:Record<string,X402Policy>};const entries=data.descriptors??[data.descriptor],policies:Record<string,X402Policy>={};for(const d of entries)if(isX402Supplier(d))policies[d.id]=await checkX402Policy(data.x402Policies?.[d.id],d.revision);setX402Policies(policies);setSuppliers(entries);}}).catch(()=>{});return()=>controller.abort();},[]);
   useEffect(()=>{const controller=new AbortController();void fetch('/api/models',{signal:controller.signal}).then(async r=>{const data=await r.json() as {descriptor?:ModelDescriptor};if(r.ok)setModel(data.descriptor??null);}).catch(()=>{});return()=>controller.abort();},[]);
-  useEffect(()=>{const scroll=()=>{const id=routeFromHash(location.hash).order;const index=orders.findIndex(o=>o.id===id);if(index>=0)setLimit(current=>Math.max(current,index+1));if(id)requestAnimationFrame(()=>document.getElementById('order-'+id)?.scrollIntoView({block:'start'}));};scroll();window.addEventListener('hashchange',scroll);return()=>window.removeEventListener('hashchange',scroll);},[orders.length]);
+  const orderIds=orders.map(order=>order.id).join(',');
+  const scrollToOrder=useEffectEvent(()=>{const id=routeFromHash(location.hash).order;const index=orders.findIndex(o=>o.id===id);if(index>=0)setLimit(current=>Math.max(current,index+1));if(id)requestAnimationFrame(()=>document.getElementById('order-'+id)?.scrollIntoView({block:'start'}));});
+  useEffect(()=>{const scroll=()=>scrollToOrder();scroll();window.addEventListener('hashchange',scroll);return()=>window.removeEventListener('hashchange',scroll);},[orderIds]);
   const client=session?new AgentOrderClient(session):null;
   async function create(event:FormEvent<HTMLFormElement>){
     event.preventDefault();const fields=new FormData(event.currentTarget);

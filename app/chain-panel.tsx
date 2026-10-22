@@ -51,7 +51,7 @@ function ChainPanelContent({scope,tasks,receipts=[],agents,orders=[],feedback=[]
     if(!session)return;
     let stopped=false;const poll=async()=>{try{const [balance,status]=await Promise.all([session.balances(),task?session.task(task):Promise.resolve(null)]);if(!stopped){setBalances(balance);setCurrent(status);}}catch(reason){if(!stopped)setError(reason instanceof Error?reason.message:'Wallet refresh failed.');}};
     void poll();const timer=setInterval(()=>void poll(),5000);return()=>{stopped=true;clearInterval(timer);};
-  },[session,task?.id]);
+  },[session,task]);
   async function perform(action:()=>Promise<void>){if(lock.current)return;lock.current=true;setBusy(true);setError('');try{await action();}catch(reason){setError(reason instanceof Error?reason.message:'Wallet operation failed.');}finally{try{await refresh();}catch{}lock.current=false;setBusy(false);}}
   function record(evidence:ChainEvidence){setProof(evidence);setTx(evidence.transactionHash);setPhase(evidence.phase);setSaved(false);}
   const bytes=session&&task?deliveryBytes(task,session.account):null;

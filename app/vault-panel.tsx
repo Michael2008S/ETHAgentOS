@@ -1,5 +1,5 @@
 'use client';
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useEffectEvent,useRef,useState,useCallback} from 'react';
 import {formatUnits} from 'viem';
 import {AgentVaultClient} from '@/sdk/vault';
 import type {AgentWalletSession} from '@/sdk/wallet';
@@ -10,8 +10,9 @@ export function VaultPanel({session,busy,perform,onSessions,refreshKey}:{session
  const {tr}=useLanguage(),[view,setView]=useState<View|null>(null),[sessions,setSessions]=useState<VaultSession[]>([]),[error,setError]=useState('');
  const generation=useRef(0);
  const client=new AgentVaultClient(session);
- function refresh(){const request=++generation.current;return client.sessions().then(data=>{const current=data.view as View|null;if(request!==generation.current)return;setView(current);setSessions(data.sessions);onSessions(data.sessions.filter(s=>s.signature&&!s.revokedAt&&s.owner.toLowerCase()===session.account.toLowerCase()&&s.vault.toLowerCase()===current?.vault.toLowerCase()&&s.epoch===current?.epoch&&BigInt(s.expires)>BigInt(Math.floor(Date.now()/1000))));setError('');}).catch(()=>{if(request!==generation.current)return;setError('Vault status unavailable.');onSessions([]);});}
- useEffect(()=>{void refresh();return()=>{generation.current++;onSessions([]);};},[session,refreshKey]);
+ const refresh=useCallback(()=>{const request=++generation.current;return new AgentVaultClient(session).sessions().then(data=>{const current=data.view as View|null;if(request!==generation.current)return;setView(current);setSessions(data.sessions);onSessions(data.sessions.filter(s=>s.signature&&!s.revokedAt&&s.owner.toLowerCase()===session.account.toLowerCase()&&s.vault.toLowerCase()===current?.vault.toLowerCase()&&s.epoch===current?.epoch&&BigInt(s.expires)>BigInt(Math.floor(Date.now()/1000))));setError('');}).catch(()=>{if(request!==generation.current)return;setError('Vault status unavailable.');onSessions([]);});},[session,onSessions]);
+ const clearSessions=useEffectEvent(()=>{generation.current++;onSessions([]);});
+ useEffect(()=>{void refresh();return()=>clearSessions();},[refresh,refreshKey]);
  if(!session.deployment.vault)return <p className="form-note">{tr('AgentVault is not configured.')}</p>;
  return <details className="chain-proof"><summary>{tr('AgentVault · bounded purchasing')}</summary>
   <p className="form-note">{tr('Grant once, then purchase without signing every order. Funds return to the Vault on refund. Refunds do not restore this session allowance.')}</p>
