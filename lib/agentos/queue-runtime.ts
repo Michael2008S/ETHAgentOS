@@ -1,3 +1,5 @@
+import {configuredServiceRepairRuntime} from './service-repair-runtime';
+import {runServiceRepair} from './service-repair-runner';
 import {runPluginPurchase} from './plugin-purchase-runner';
 import {configuredPluginPurchaseRuntime} from './plugin-purchase-runtime';
 import {runPluginJob} from './plugin-runner';
@@ -32,7 +34,7 @@ export async function drainQueue(request: Request, ownerId?: string, intervalMs=
     counts.claimed++;
     let failed=false;
     try {
-      if(job.kind==='plugin-purchase'){const result=await runPluginPurchase(pluginDatabase(),job.owner_id,job.task_id,()=>configuredPluginPurchaseRuntime(request),{maxTransitions:8});failed=result.status==='retryable';}else if(job.kind==='plugin'){const result=await runPluginJob(pluginDatabase(),job.owner_id,job.task_id,()=>configuredPluginExecutor(request));failed=result.status==='retryable';}else if(job.kind==='task') {
+      if(job.kind==='service-repair'){await runServiceRepair(store,job.owner_id,job.task_id,()=>configuredServiceRepairRuntime(request,job.owner_id));}else if(job.kind==='plugin-purchase'){const result=await runPluginPurchase(pluginDatabase(),job.owner_id,job.task_id,()=>configuredPluginPurchaseRuntime(request),{maxTransitions:8});failed=result.status==='retryable';}else if(job.kind==='plugin'){const result=await runPluginJob(pluginDatabase(),job.owner_id,job.task_id,()=>configuredPluginExecutor(request));failed=result.status==='retryable';}else if(job.kind==='task') {
         const snapshot=await store.read(job.owner_id);
         // Never promote a test/manual task, even if a stale or corrupted queue row exists.
         const task=snapshot.state.tasks.find(t=>t.id===job.task_id);

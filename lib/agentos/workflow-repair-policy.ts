@@ -1,4 +1,6 @@
 import {z} from 'zod';
+import {consistentRepairControl,claimRepairControl,finishRepairControl,type RepairStatus,type RepairAttempt,type RepairHistory} from './repair-control.ts';
+export type {RepairAttempt,RepairHistory} from './repair-control.ts';
 import {canonical} from '../../cre/workflow/verify.ts';
 import {digest,DomainError} from './engine.ts';
 import type {Workspace} from './types.ts';
@@ -11,14 +13,12 @@ export const repairPolicyInputSchema=z.object({requestId:z.string().uuid(),workf
 export type RepairPolicyInput=z.infer<typeof repairPolicyInputSchema>;
 export const automatedProposalSchema=z.object({policyId:id,policyDigest:hash,attempt:z.number().int().min(1).max(3)}).strict();
 export type AutomatedProposal=z.infer<typeof automatedProposalSchema>;
-export type RepairPolicyStatus='armed'|'waiting'|'running'|'proposed'|'blocked'|'exhausted'|'cancelled'|'expired'|'completed';
-export type RepairAttempt={number:number;requestId:string;token:string;leaseUntil:string;startedAt:string};
-export type RepairHistory={number:number;requestId:string;startedAt:string;finishedAt:string;outcome:'proposed'|'failed'|'lease-expired'|'cancelled';code?:string;planId?:string};
+export type RepairPolicyStatus=RepairStatus;
 export type WorkflowRepairPolicy={version:'agentos.workflow-repair-policy.v1';id:string;requestId:string;workspaceHash:string;parameters:RepairPolicyInput;deployment:WalletDeployment;model:ModelDescriptor;createdAt:string;expiresAt:string;digest:string;activeWorkflowId:string;status:RepairPolicyStatus;attempts:number;history:RepairHistory[];lease?:RepairAttempt;notBefore?:string;proposalId?:string;reason?:string};
 export const repairPolicyTerms=(p:WorkflowRepairPolicy)=>({version:p.version,id:p.id,requestId:p.requestId,workspaceHash:p.workspaceHash,parameters:p.parameters,deployment:p.deployment,model:p.model,createdAt:p.createdAt,expiresAt:p.expiresAt});
 export async function verifyRepairPolicy(p:WorkflowRepairPolicy){
  const parsed=repairPolicyInputSchema.safeParse(p.parameters);if(!parsed.success||canonical(parsed.data)!==canonical(p.parameters)||p.version!=='agentos.workflow-repair-policy.v1'||p.id!=='repair-'+p.requestId||p.requestId!==p.parameters.requestId||await digest(repairPolicyTerms(p))!==p.digest||!Number.isFinite(Date.parse(p.expiresAt))||Date.parse(p.expiresAt)<=Date.parse(p.createdAt)||Date.parse(p.expiresAt)-Date.parse(p.createdAt)>p.parameters.durationSeconds*1000||!Number.isSafeInteger(p.attempts)||p.attempts<0||p.attempts>p.parameters.maxAttempts)throw new DomainError('Automatic repair policy differs from its approved limits.','FORBIDDEN');
- if(!['armed','waiting','running','proposed','blocked','exhausted','cancelled','expired','completed'].includes(p.status)||p.history.length+(p.lease?1:0)!==p.attempts||new Set(p.history.map(h=>h.number)).size!==p.history.length||p.history.some(h=>h.number<1||h.number>p.attempts)||p.lease&&(p.lease.number!==p.attempts||p.status!=='running'||p.lease.leaseUntil>p.expiresAt))throw new DomainError('Automatic repair attempt history is inconsistent.','FORBIDDEN');
+ if(!consistentRepairControl(p))throw new DomainError('Automatic repair attempt history is inconsistent.','FORBIDDEN');
 }
 export function findRepairPolicy(state:Workspace,id:string){const p=state.workflowRepairPolicies?.find(p=>p.id===id);if(!p)throw new DomainError('Automatic repair policy not found.','NOT_FOUND');return p;}
 export const activeRepairStatus=(status:RepairPolicyStatus)=>['armed','waiting','running','proposed','blocked'].includes(status);
@@ -46,14 +46,10 @@ export async function setRepairPolicy(state:Workspace,id:string,reviewDigest:str
 export async function repairAttemptRequestId(policyId:string,number:number){const h=(await digest({policyId,number})).slice(2);return `${h.slice(0,8)}-${h.slice(8,12)}-4${h.slice(13,16)}-8${h.slice(17,20)}-${h.slice(20,32)}`;}
 /** The claim is committed before inference. A replacement lease never restores an attempt. */
 export function claimRepairAttempt(state:Workspace,id:string,token:string,requestId:string,leaseMs:number,now=new Date().toISOString()){
- const p=findRepairPolicy(state,id);if(!['armed','waiting'].includes(p.status)||p.lease||p.notBefore&&p.notBefore>now||p.expiresAt<=now||p.attempts>=p.parameters.maxAttempts)return state;
- const next=structuredClone(state),target=findRepairPolicy(next,id);target.attempts++;target.status='running';target.lease={number:target.attempts,token,requestId,startedAt:now,leaseUntil:new Date(Math.min(Date.parse(now)+leaseMs,Date.parse(target.expiresAt))).toISOString()};delete target.notBefore;delete target.reason;return next;
+ const p=findRepairPolicy(state,id),changed=claimRepairControl(p,token,requestId,leaseMs,now);if(changed===p)return state;const next=structuredClone(state);next.workflowRepairPolicies=next.workflowRepairPolicies!.map(p=>p.id===id?changed:p);return next;
 }
 export function finishRepairAttempt(state:Workspace,id:string,token:string,outcome:RepairHistory['outcome'],code?:string,planId?:string,now=new Date().toISOString()){
- const p=findRepairPolicy(state,id);if(p.status!=='running'||p.lease?.token!==token)return state;
- const next=structuredClone(state),target=findRepairPolicy(next,id),attempt=target.lease!;target.history.push({number:attempt.number,requestId:attempt.requestId,startedAt:attempt.startedAt,finishedAt:now,outcome,...(code?{code}:{}),...(planId?{planId}:{})});delete target.lease;
- target.status=target.expiresAt<=now?'expired':outcome==='proposed'?'proposed':target.attempts>=target.parameters.maxAttempts?'exhausted':'waiting';target.reason=code;
- if(planId)target.proposalId=planId;if(target.status==='waiting')target.notBefore=new Date(Date.parse(now)+Math.min(60000,1000*2**target.attempts)).toISOString();else delete target.notBefore;return next;
+ const p=findRepairPolicy(state,id),changed=finishRepairControl(p,token,outcome,code,planId,now);if(changed===p)return state;const next=structuredClone(state);next.workflowRepairPolicies=next.workflowRepairPolicies!.map(p=>p.id===id?changed:p);return next;
 }
 /** Revoking automation stops future generation; an existing proposal still needs owner approval. */
 export function cancelWorkflowRepairs(state:Workspace,workflowId:string,now=new Date().toISOString()){

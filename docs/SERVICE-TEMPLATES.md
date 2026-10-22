@@ -63,5 +63,6 @@ restore, a template-derived proposal and two paid steps with a 300-second timeou
 it checks Chinese/English and 390px layout. Unit checks cover strict portability,
 schema composition, identity conflicts and independent SDK verification. See the
 roadmap for current results. The full runner includes this stage; reviewed repair is now available (SERVICE-REPLANNING.md). Bounded automatic repair
-proposals and the final complete sequence remain subsequent work. Public-chain settlement,
+proposals are also integrated (SERVICE-AUTOMATIC-REPAIR.md); the final complete
+sequence remains its own verification gate. Public-chain settlement,
 DON and hosted execution are deferred.

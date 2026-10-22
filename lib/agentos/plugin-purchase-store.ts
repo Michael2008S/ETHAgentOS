@@ -1,4 +1,5 @@
 import {digest,DomainError} from './engine.ts';
+import {advanceServiceRepairPolicies} from './service-repair-policy.ts';
 import {readPluginFlow,canonicalPluginPaidRoot} from './plugin-paid-memory.ts';
 import {buildServiceReplan} from './service-replan.ts';
 import type {PluginPurchaseChain} from './plugin-purchase-chain.ts';
@@ -44,6 +45,7 @@ export async function createPluginPurchase(store:PluginDatabase,owner:string,raw
   for(const [index,step]of body.steps.entries()){
    const installed=await pluginInstallation(store.database,owner,step.pluginId),grant=grants.get(step.pluginId)??await pluginGrant(store.database,owner,step.pluginId);
    if(!installed||installed.manifestHash!==step.manifestHash||c.runtime.configHash!==step.runtimeHash||!grant?.enabled||grant.manifestHash!==step.manifestHash||grant.runtimeHash!==step.runtimeHash||grant.expiresAt<=now||grant.used>=grant.maxRuns)throw new DomainError('An available exact plugin execution grant is required.','FORBIDDEN');
+   if(proposal?.automation){const policy=s.state.serviceRepairPolicies?.find(p=>p.id===proposal.automation!.policyId),authorization=policy?.authorizations.find(a=>a.service.id===step.pluginId);if(!authorization||authorization.grantEpoch!==grant.epoch)throw new DomainError('The original automatic repair execution epoch changed.','FORBIDDEN');}
    pluginToolsAvailable(installed.manifest,c.runtime);session=pluginVaultAllowance(s.state,body.vaultSessionId,body.buyer as `0x${string}`,step,step.maxPriceCents,total,now);
    if(session.scope!==s.scope)throw new DomainError('Vault plugin session belongs to another workspace.','FORBIDDEN');
    minExpiry=Math.min(minExpiry,Date.parse(grant.expiresAt),Number(session.expires)*1000);requiredMs+=2*installed.manifest.limits.wallMs;
@@ -60,7 +62,7 @@ export async function createPluginPurchase(store:PluginDatabase,owner:string,raw
   await c.checkSession(session!,total);
   const flow:PluginPurchaseWorkflow={...(body.acceptedRoot?{acceptedRoot:structuredClone(body.acceptedRoot)}:{}),...(proposal?.replan?{repair:structuredClone(proposal.replan)}:{}),...(review?{planReview:structuredClone(review)}:{}),version:'agentos.plugin-purchase.v1',id,requestId:body.requestId,scope:s.scope,draftHash,termsHash:'',title:body.title,buyer:body.buyer as `0x${string}`,vaultSessionId:body.vaultSessionId,deployment:c.deployment,runtime:c.runtime,vault:sessionBinding(session!),input:body.input,totalBudget:body.totalBudget,createdAt:now,deadlineAt,updatedAt:now,status:'running',steps};flow.termsHash=await digest(pluginPurchaseTerms(flow));
   if(replaced)replaced.supersededBy=flow.id;
-  return {state:refState(replaced?refState(approved,replaced):approved,flow),value:flow,write:g=>[write(store,owner,flow,g),...(replaced?[write(store,owner,replaced,g)]:[]),...Array.from(grants.values(),grant=>store.database.prepare('UPDATE agentos_plugin_grants SET data=? WHERE owner_id=? AND plugin_id=? AND '+g.sql).bind(JSON.stringify(grant),owner,grant.pluginId,...g.values))]};
+  return {state:refState(replaced?refState(advanceServiceRepairPolicies(approved,proposal!,flow.id,now),replaced):approved,flow),value:flow,write:g=>[write(store,owner,flow,g),...(replaced?[write(store,owner,replaced,g)]:[]),...Array.from(grants.values(),grant=>store.database.prepare('UPDATE agentos_plugin_grants SET data=? WHERE owner_id=? AND plugin_id=? AND '+g.sql).bind(JSON.stringify(grant),owner,grant.pluginId,...g.values))]};
  });
 }
 export async function changePluginPurchase<T>(store:PluginDatabase,owner:string,id:string,reduce:(snapshot:PluginSnapshot,flow:PluginPurchaseWorkflow)=>Promise<{flow:PluginPurchaseWorkflow;value:T}|{value:T}>){return mutatePlugin(store,owner,async s=>{const prior=await pluginPurchase(store,owner,id);if(prior.termsHash!==await digest(pluginPurchaseTerms(prior)))throw new DomainError('Stored plugin purchase terms differ.','CONFLICT');const originalTerms=canonical(pluginPurchaseTerms(prior)),originalHash=prior.termsHash;const result=await reduce(s,structuredClone(prior));if(!('flow'in result))return {state:s.state,value:result.value};if(result.flow.termsHash!==originalHash||canonical(pluginPurchaseTerms(result.flow))!==originalTerms)throw new DomainError('A running purchase cannot replace its reviewed terms.','CONFLICT');return {state:refState(s.state,result.flow),value:result.value,write:g=>[write(store,owner,result.flow,g)]};});}

@@ -78,7 +78,8 @@
     "demo:plugin-purchases": "node scripts/demo-plugin-purchases.mjs",
     "demo:service-plans": "node scripts/demo-service-plans.mjs",
     "demo:service-templates": "node scripts/demo-service-templates.mjs",
-    "demo:service-replanning": "node scripts/demo-service-replanning.mjs"
+    "demo:service-replanning": "node scripts/demo-service-replanning.mjs",
+    "demo:service-auto-repair": "node scripts/demo-service-auto-repair.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

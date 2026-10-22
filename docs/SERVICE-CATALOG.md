@@ -69,6 +69,6 @@ Schema and adversarial planning tests are in `tests/service-plans.test.mjs`;
 browser coverage exercises plan review, refresh, wallet approval, actual payment,
 Chinese/English and mobile layout. Current evidence is recorded in the roadmap.
 
-Portable plugin templates now reuse this reviewed proposal and purchase path; see SERVICE-TEMPLATES.md. Reviewed paid-memory repair now uses the same path; see SERVICE-REPLANNING.md. Bounded automatic repair proposals are the next increment. Public-chain
+Portable plugin templates now reuse this reviewed proposal and purchase path; see SERVICE-TEMPLATES.md. Reviewed paid-memory repair now uses the same path; see SERVICE-REPLANNING.md. Bounded automatic repair proposals are also integrated; see SERVICE-AUTOMATIC-REPAIR.md. Public-chain
 settlement, actual DON acceptance and hosted consumers remain deferred. This
 increment does not extend guest privileges beyond reviewed read-only MCP.

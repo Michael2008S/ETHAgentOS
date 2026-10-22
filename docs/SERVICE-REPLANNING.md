@@ -83,6 +83,7 @@ Browser coverage verifies root selection, real-model review, reload, reuse of th
 existing session, real remaining-work payment, Chinese/English and 390px layout.
 See the roadmap and validation outputs for the current results.
 
-Bounded automatic repair proposals are the next increment. Public chain, actual
+Bounded automatic repair proposals now use this exact repair path; see
+SERVICE-AUTOMATIC-REPAIR.md. Public chain, actual
 DON, hosted deployment and hosted scheduling remain deferred; guest permissions
 are still limited to explicitly reviewed read-only MCP.
