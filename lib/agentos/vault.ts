@@ -1,3 +1,4 @@
+import {omitFields} from './omit-fields.ts';
 import {futurePurchaseReservations} from './purchase-reservations.ts';
 import {parseAbi,type Address,type Hex,type PublicClient} from 'viem';
 import {canonical} from '../../cre/workflow/verify.ts';
@@ -71,7 +72,7 @@ export async function prepareVaultSession(state:Workspace,ownerId:string,deploym
  return {...binding,message,challengeExpiresAt} satisfies VaultSession;
 }
 export function sessionBinding(session:VaultSession):VaultBinding{
- const {message:_,challengeExpiresAt:__,signature:___,revokedAt:____,...binding}=session;return binding;
+ const binding=omitFields(session,"message","challengeExpiresAt","signature","revokedAt");return binding;
 }
 export function vaultAllowance(state:Workspace,sessionId:string,buyer:Address,skill:Skill,budget:number,quote:number,now=new Date().toISOString(),excludeOrder?:string){
  const session=vaultMoneyAllowance(state,sessionId,buyer,budget,quote,now,excludeOrder);

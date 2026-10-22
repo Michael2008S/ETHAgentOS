@@ -21,7 +21,7 @@ async function occupied(port){return new Promise(resolve=>{const socket=createCo
 await mkdir('.sites-runtime/demo',{recursive:true});
 const lock=await open('.sites-runtime/demo/launcher.lock','wx').catch(()=>{throw new Error('Another demo launcher is active. Inspect its process before removing a stale launcher.lock.');});
 try{
- for(const [name,port,url,command,valid] of services){
+ for(const [name,port,url,,valid] of services){
   if(await probe(url,valid)){console.log('REUSE '+name);continue;}
   if(await occupied(port))throw new Error(`Port ${port} is occupied by an unrecognized/unhealthy service. Inspect it; the launcher will not replace it.`);
   if(name==='web'&&!existsSync('dist/server/wrangler.json'))throw new Error('First installation: run npm ci, npm run build and npm run db:local.');

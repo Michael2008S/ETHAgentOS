@@ -34,7 +34,7 @@ export async function drainQueue(request: Request, ownerId?: string, intervalMs=
   const heartbeat=(status:string)=>env.DB!.prepare('INSERT INTO agentos_runtime_consumers(scope,last_seen,status,interval_ms) VALUES(?,?,?,?) ON CONFLICT(scope) DO UPDATE SET last_seen=excluded.last_seen,status=excluded.status,interval_ms=excluded.interval_ms').bind(scope,Date.now(),status,intervalMs).run();
   await heartbeat('busy');
   try {
-  const counts = {claimed:0,completed:0,rescheduled:0,failed:0}, started=Date.now();
+  const counts = {claimed:0,completed:0,rescheduled:0,failed:0};
   await drainIndependent(()=>claimJob(env.DB!,ownerId),async job=>{
     counts.claimed++;
     let failed=false;

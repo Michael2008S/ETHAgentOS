@@ -1,3 +1,4 @@
+import {omitFields} from '../../lib/agentos/omit-fields.ts';
 import assert from 'node:assert/strict';
 import {readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -15,6 +16,6 @@ const current=await inspectIdentity(client,{...config,confirmations:2},identity)
 assert.equal((await client.getBlock({blockNumber:BigInt(current.checkedBlock)})).hash,current.checkedBlockHash);
 const preview=state.previews.find(p=>p.agentId==='atlas'&&p.agentIdentity.registryAgentId==='11207');assert.ok(preview,'Save an identity preview before final verification');
 assert.equal(preview.status,'identity-preview');assert.equal(preview.fundingEnabled,false);assert.equal(preview.workspaceHash,state.scope);assert.deepEqual(preview.agentIdentity,identity);assert.equal(state.chainOrderCount,0);
-const {id,status,fundingEnabled,commitment,createdAt,...parameters}=preview;assert.equal(commitment,await digest({version:'agentos.identity-order-preview.v1',...parameters}));
+const {commitment}=preview,parameters=omitFields(preview,"id","status","fundingEnabled","commitment","createdAt");assert.equal(commitment,await digest({version:'agentos.identity-order-preview.v1',...parameters}));
 const report={status:'passed',scope:'Sepolia chain identity + owner-signed AgentOS local D1 workspace binding + unfunded identity preview only',checkedAt:new Date().toISOString(),workspaceScope:state.scope,identity:current,binding:{nonce:binding.nonce,message:challenge.message,signature:binding.signature,revision:binding.revision},preview,chainOrderCount:state.chainOrderCount,pending:['CRE deploy access','receiver and workflow deployment/binding','public evidence service','new fundable order','paid feedback and revocation']};
 await writeFile(directory+'/workspace-verified.json',JSON.stringify(report,null,2));console.log(JSON.stringify({status:report.status,agentId:identity.registryAgentId,workspaceScope:state.scope,previewId:preview.id,commitment:preview.commitment,evidence:directory+'/workspace-verified.json'},null,2));

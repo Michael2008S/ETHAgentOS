@@ -1,3 +1,4 @@
+import {omitFields} from './omit-fields.ts';
 import {leasedModelRequest} from './model-request.ts';
 import { activeHistory } from './business-archives.ts';
 import {z} from 'zod';
@@ -19,7 +20,7 @@ export type MixedModelProgram=z.infer<typeof mixedModelProgramSchema>;
 export type MixedPlanDraft=Omit<MixedWorkflowDraft,'vaultSessionId'>;
 export type MixedPlan={version:'agentos.mixed-plan.v1';id:string;scope:string;parameters:MixedPlanParameters;deployment:WalletDeployment;catalog:ServiceDescriptor[];program:MixedModelProgram;candidates:MixedModelProgram[];selection:number;draft:MixedPlanDraft;model:ModelDescriptor;promptHash:string;responseHash:string;generatedAt:string;expiresAt:string;digest:string;status:'proposed'|'accepted'|'dismissed';workflowId?:string;acceptedAt?:string};
 export type MixedPlanReview={planId:string;digest:string};
-export const mixedPlanTerms=({digest:_,status:__,workflowId:___,acceptedAt:____,...terms}:MixedPlan)=>terms;
+export const mixedPlanTerms=(value:MixedPlan)=>omitFields(value,"digest","status","workflowId","acceptedAt");
 export function findMixedPlan(state:Workspace,id:string){const p=state.mixedPlans?.find(p=>p.id===id);if(!p)throw new DomainError('Mixed plan not found.','NOT_FOUND');return p;}
 export async function compileMixedPlan(raw:unknown,parameters:MixedPlanParameters,catalog:ServiceDescriptor[]):Promise<MixedPlanDraft>{
  const program=mixedModelProgramSchema.parse(raw);
@@ -66,4 +67,4 @@ export async function generateMixedPlan(state:Workspace,raw:MixedPlanParameters,
 }
 
 export async function saveMixedPlan(state:Workspace,p:MixedPlan,scope:string){await verifyMixedPlan(p);if(p.scope!==scope||!state.policy.active)throw new DomainError('Mixed planning scope or policy changed.','FORBIDDEN');const prior=state.mixedPlans?.find(s=>s.id===p.id);if(prior){if(canonical(prior.parameters)!==canonical(p.parameters))throw new DomainError('Mixed plan identifier has different parameters.','IDEMPOTENCY_CONFLICT');return state;}if(activeHistory(state,'plan',state.mixedPlans??[]).length>=20)throw new DomainError('Mixed plan history is full.');if(new TextEncoder().encode(JSON.stringify([p,...state.mixedPlans??[]])).length>1048576)throw new DomainError('Mixed plan history exceeds its storage bound.');return {...state,mixedPlans:[p,...state.mixedPlans??[]]};}
-export async function approveMixedPlan(state:Workspace,review:MixedPlanReview,scope:string,draft:MixedWorkflowDraft,deployment:WalletDeployment,now:string){const p=findMixedPlan(state,review.planId);await verifyMixedPlan(p);const {vaultSessionId:_,...program}=draft;if(p.status!=='proposed'||p.expiresAt<=now||p.scope!==scope||p.digest!==review.digest||canonical(p.deployment)!==canonical(deployment)||canonical(p.draft)!==canonical(program))throw new DomainError('Mixed purchase differs from its reviewed plan or the review expired.','FORBIDDEN');return {...state,mixedPlans:state.mixedPlans!.map(s=>s.id===p.id?{...s,status:'accepted' as const,workflowId:'mixed-'+draft.requestId,acceptedAt:now}:s)};}
+export async function approveMixedPlan(state:Workspace,review:MixedPlanReview,scope:string,draft:MixedWorkflowDraft,deployment:WalletDeployment,now:string){const p=findMixedPlan(state,review.planId);await verifyMixedPlan(p);const program=omitFields(draft,"vaultSessionId");if(p.status!=='proposed'||p.expiresAt<=now||p.scope!==scope||p.digest!==review.digest||canonical(p.deployment)!==canonical(deployment)||canonical(p.draft)!==canonical(program))throw new DomainError('Mixed purchase differs from its reviewed plan or the review expired.','FORBIDDEN');return {...state,mixedPlans:state.mixedPlans!.map(s=>s.id===p.id?{...s,status:'accepted' as const,workflowId:'mixed-'+draft.requestId,acceptedAt:now}:s)};}

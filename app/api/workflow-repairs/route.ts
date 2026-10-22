@@ -1,3 +1,4 @@
+import {omitFields} from '../../../lib/agentos/omit-fields.ts';
 import {z} from 'zod';
 import {owner,checkOrigin,read,updateWorkspace} from '@/lib/agentos/store';
 import {apiFailure} from '@/lib/agentos/api-failure';
@@ -13,7 +14,7 @@ export async function POST(request:Request){try{
  checkOrigin(request);const ownerId=owner(request);if(!request.headers.get('content-type')?.includes('application/json'))return Response.json({error:'JSON required.'},{status:415});const reader=request.body?.getReader();if(!reader)return Response.json({error:'JSON required.'},{status:400});let size=0,text='';const decoder=new TextDecoder();try{for(;;){const r=await reader.read();if(r.done)break;if((size+=r.value.length)>65536){await reader.cancel();return Response.json({error:'Request too large.'},{status:413});}text+=decoder.decode(r.value,{stream:true});}text+=decoder.decode();}finally{reader.releaseLock();}
  const body=schema.parse(JSON.parse(text)),snapshot=await read(ownerId);let result,policyId:string;
  if(body.action==='configure'){
-  const {action:_,...input}=body;policyId='repair-'+input.requestId;const prior=snapshot.state.workflowRepairPolicies?.find(p=>p.id===policyId);
+  const input=omitFields(body,"action");policyId='repair-'+input.requestId;const prior=snapshot.state.workflowRepairPolicies?.find(p=>p.id===policyId);
   if(prior){result=await updateWorkspace(ownerId,state=>createRepairPolicy(state,input,snapshot.scope,prior.deployment,prior.model));}
   else{const runtime=await configuredRepairRuntime(request,snapshot.scope),configured=await configuredOrderChain(request),session=snapshot.state.vaultSessions?.find(s=>s.sessionId===input.vaultSessionId);if(session)await checkVaultBinding(configured.client,runtime.deployment,session);const descriptor=await modelDescriptor(runtime.model.configuration);result=await updateWorkspace(ownerId,state=>createRepairPolicy(state,input,snapshot.scope,runtime.deployment,descriptor));}
  }else{

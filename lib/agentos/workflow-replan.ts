@@ -1,3 +1,4 @@
+import {omitFields} from './omit-fields.ts';
 import {verifyMixed} from './mixed-workflow.ts';
 import {z} from 'zod';
 import {canonical} from '../../cre/workflow/verify.ts';
@@ -26,7 +27,7 @@ function lineage(state:Workspace,sourceId:string){
  return result;
 }
 function snapshot(state:Workspace,chain:AgentWorkflow[]){return {
- workflows:chain.map(w=>{const {updatedAt:_,lastError:__,runLease:___,...terms}=w;return terms;}),
+ workflows:chain.map(w=>{const terms=omitFields(w,"updatedAt","lastError","runLease");return terms;}),
  orders:[...new Set(chain.flatMap(w=>w.steps.flatMap(s=>s.orderId?[s.orderId]:[])))].map(id=>{const o=findOrder(state,id);return {id:o.id,workflowId:o.workflowId,status:o.status,quote:o.quote,inputHash:o.inputHash,outputHash:o.outputHash,funding:o.funding?.transactionHash??null,fundingBlock:o.funding?.blockHash??null,settlement:o.settlement?{status:o.settlement.status,transactionHash:o.settlement.transactionHash,blockHash:o.settlement.blockHash,outputHash:o.settlement.outputHash}:null,vaultFunding:o.vaultFunding??null};}),
 };}
 export async function assertReplanSnapshot(state:Workspace,context:WorkflowReplan){
@@ -72,7 +73,7 @@ export async function verifyReplanFunding(state:Workspace,order:ChainOrder,chain
  if(!order.workflowId)return;const mixed=state.mixedWorkflows?.find(f=>f.id===order.workflowId);if(mixed){await verifyMixed(mixed);const step=mixed.steps.find(s=>s.childId===order.id);if(mixed.status!=='running'||!step||step.service.executor==='plugin'||step.inputHash!==order.inputHash||step.requestId!==order.requestId||step.service.binding.agentId!==order.agentId||step.maxPriceCents!==order.budget||mixed.buyer.toLowerCase()!==order.buyer.toLowerCase()||canonical(mixed.deployment)!==canonical(order.deployment))throw new DomainError('Mixed funding commitment changed.','FORBIDDEN');return;}const current=workflow(state,order.workflowId);if(!current.replan)return;
  const context=current.replan,source=workflow(state,context.sourceWorkflowId),proposal=state.workflowPlans?.find(p=>p.id===current.planId);
  if(current.status!=='running'||source.supersededBy!==current.id||!proposal||proposal.status!=='accepted'||proposal.workflowId!==current.id||canonical(proposal.replan)!==canonical(context))throw new DomainError('Replanned workflow no longer authorizes new funding.','FORBIDDEN');
- const {digest:expected,status:_,workflowId:__,acceptedAt:___,dismissedAt:____,...terms}=proposal;
+ const {digest:expected}=proposal,terms=omitFields(proposal,"digest","status","workflowId","acceptedAt","dismissedAt");
  if(await digest(terms)!==expected||current.parallelism!==proposal.draft.parallelism||canonical(current.steps.map(s=>({agentId:s.agentId,budget:s.budget,input:s.input,...(s.when?{when:s.when}:{}),...(s.supplierId?{supplierId:s.supplierId}:{})})))!==canonical(proposal.draft.steps)||canonical(current.input)!==canonical(proposal.draft.input)||current.buyer.toLowerCase()!==order.buyer.toLowerCase()||canonical(current.deployment)!==canonical(order.deployment))throw new DomainError('Replanned workflow differs from its approved program.','FORBIDDEN');
  const selected=current.steps.find(s=>s.orderId===order.id);if(!selected||selected.agentId!==order.agentId||selected.budget!==order.budget||selected.input?.from==='accepted'&&order.input.memory?.orderId!==selected.input.orderId)throw new DomainError('Replanned child differs from its approved input.','FORBIDDEN');
  for(const failure of context.failures){const original=findOrder(state,failure.orderId),proof=await routeRefundProof(original,chain);if(!proof||proof.kind!==failure.kind||failure.kind==='refunded'&&(proof.transactionHash!==failure.transactionHash||proof.blockHash!==failure.blockHash))throw new DomainError('Earlier replanning refund is no longer canonically finalized.','UNAVAILABLE');}

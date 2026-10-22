@@ -1,3 +1,4 @@
+import {omitFields} from './omit-fields.ts';
 import {leasedModelRequest} from './model-request.ts';
 import {z} from 'zod';
 import {canonical} from '../../cre/workflow/verify.ts';
@@ -14,7 +15,7 @@ import {servicePlanParametersSchema,serviceProgramSchema,compileServiceProgram,t
 export {servicePlanParametersSchema,serviceProgramSchema,compileServiceProgram,type ServicePlanParameters,type ServiceProgram,type ServicePlanDraft} from './service-program.ts';
 const hash=z.string().regex(/^0x[0-9a-f]{64}$/);
 export type ServiceProposal={version:'agentos.service-plan.v1';id:string;scope:string;parameters:ServicePlanParameters;catalog:ServiceDescriptor[];program:ServiceProgram;draft:ServicePlanDraft;automation?:ServiceAutomation;replan?:ServiceReplan;template?:ServiceTemplateSource;model?:ModelDescriptor;promptHash?:string;responseHash?:string;generatedAt:string;expiresAt:string;digest:string;status:'proposed'|'accepted'|'dismissed';workflowId?:string;acceptedAt?:string;dismissedAt?:string};
-export const serviceProposalTerms=({digest:_,status:__,workflowId:___,acceptedAt:____,dismissedAt:_____,...terms}:ServiceProposal)=>terms;
+export const serviceProposalTerms=(value:ServiceProposal)=>omitFields(value,"digest","status","workflowId","acceptedAt","dismissedAt");
 export function servicePlan(state:Workspace,id:string){const p=state.servicePlans?.find(p=>p.id===id);if(!p)throw new DomainError('Service plan not found.','NOT_FOUND');return p;}
 export async function verifyServiceProposal(p:ServiceProposal){
  if(!p||p.version!=='agentos.service-plan.v1'||!hash.safeParse(p.scope).success||!['proposed','accepted','dismissed'].includes(p.status)||!Array.isArray(p.catalog)||!p.catalog.length||p.catalog.length>64||new Set(p.catalog.map(s=>s.id)).size!==p.catalog.length||p.digest!==await digest(serviceProposalTerms(p)))throw new DomainError('Service plan commitment differs.','FORBIDDEN');
@@ -52,6 +53,6 @@ export type ServicePlanReview={planId:string;digest:string};
 export async function approveServicePlan(state:Workspace,review:ServicePlanReview,scope:string,draft:PluginPurchaseDraft,now:string){
  const p=servicePlan(state,review.planId);await verifyServiceProposal(p);await verifyAutomaticServiceProposal(state,p,draft.vaultSessionId);if(p.scope!==scope||p.digest!==review.digest||p.status!=='proposed'||p.expiresAt<=now)throw new DomainError('Service plan is expired, unavailable or differs from the reviewed digest.','FORBIDDEN');
  if(p.template){const current=state.serviceTemplates?.find(t=>t.id===p.template!.id);if(!current||current.archivedAt||current.scope!==scope||current.digest!==p.template.digest||canonical(current.definition)!==canonical(p.template.definition))throw new DomainError('Service template changed or was archived before approval.','FORBIDDEN');}
- const {buyer:_,vaultSessionId:__,...program}=draft;if(canonical(program)!==canonical(p.draft))throw new DomainError('Purchase differs from the reviewed service plan.','FORBIDDEN');
+ const program=omitFields(draft,"buyer","vaultSessionId");if(canonical(program)!==canonical(p.draft))throw new DomainError('Purchase differs from the reviewed service plan.','FORBIDDEN');
  return {...state,servicePlans:state.servicePlans!.map(plan=>plan.id===p.id?{...plan,status:'accepted' as const,workflowId:'plugin-purchase-'+draft.requestId,acceptedAt:now}:plan)};
 }

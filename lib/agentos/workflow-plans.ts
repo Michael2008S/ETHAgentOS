@@ -1,3 +1,4 @@
+import {omitFields} from './omit-fields.ts';
 import {leasedModelRequest} from './model-request.ts';
 import {assertReplanSnapshot,buildWorkflowReplan,replanCapacityState,workflowReplanSchema,type WorkflowReplan} from './workflow-replan.ts';
 import {automatedProposalSchema,verifyAutomaticProposal,advanceRepairPolicy,type AutomatedProposal} from './workflow-repair-policy.ts';
@@ -29,7 +30,7 @@ export function findWorkflowProposal(state:Workspace,id:string){const p=state.wo
 
 /** Checked-at fields can change without changing the reviewed identity or payee. */
 export async function workflowBindingHash(binding:WorkflowSupplierBinding){
- const {checkedAt:_,checkedBlock:__,checkedBlockHash:___,status:____,...identity}=binding.identity;
+ const identity=omitFields(binding.identity,"checkedAt","checkedBlock","checkedBlockHash","status");
  return digest({supplier:binding.supplier,identity:{...identity,registry:identity.registry.toLowerCase(),reputationRegistry:identity.reputationRegistry.toLowerCase(),owner:identity.owner.toLowerCase(),wallet:identity.wallet.toLowerCase()}});
 }
 export function planSession(state:Workspace,p:PlanParameters,now=new Date().toISOString()){
@@ -53,7 +54,7 @@ export async function workflowPlanChoices(state:Workspace,p:PlanParameters,deplo
  const distinct=all.filter((c,i)=>all.findIndex(x=>x.skill===c.skill&&x.executor===c.executor)===i),ordered=[...distinct,...all.filter(c=>!distinct.includes(c))];
  return {choices:ordered.slice(0,MAX_PLAN_CHOICES),omitted:Math.max(0,ordered.length-MAX_PLAN_CHOICES)};
 }
-export const publicPlanChoice=({binding:_,...choice}:PlanChoice):PlanCatalogEntry=>choice;
+export const publicPlanChoice=(value:PlanChoice)=>omitFields(value,"binding");
 
 export function validateWorkflowProgram(raw:unknown,choices:PlanChoice[],p:PlanParameters,replan?:WorkflowReplan){
  const parsed=workflowProgramSchema.safeParse(raw);if(!parsed.success)throw new DomainError('Model returned an invalid workflow plan.','MODEL_REJECTED');const program=parsed.data;
@@ -79,7 +80,7 @@ export function validatePlanCapacity(state:Workspace,p:PlanParameters,selected:P
  const same=(d:WalletDeployment)=>d.chainId===deployment.chainId&&d.token.toLowerCase()===deployment.token.toLowerCase(),used=(state.chainOrders??[]).filter(o=>same(o.deployment)&&(o.funding||o.vault&&o.status==='funding')).reduce((sum,o)=>sum+(o.settlement?.status==='paid'?(o.settledAt?.slice(0,10)===now.slice(0,10)?o.quote:0):!o.settlement?o.budget:0),0),reserved=future.filter(r=>same(r.deployment)).reduce((sum,r)=>sum+r.budget,0);
  if(used+reserved+fees>state.policy.dailyBudget)throw new DomainError('Workflow plan exceeds the remaining workspace daily budget.','FORBIDDEN');return session;
 }
-export function workflowProposalTerms(p:WorkflowProposal){const {digest:_,status:__,workflowId:___,acceptedAt:____,dismissedAt:_____,...terms}=p;return terms;}
+export function workflowProposalTerms(p:WorkflowProposal){const terms=omitFields(p,"digest","status","workflowId","acceptedAt","dismissedAt");return terms;}
 export async function verifyWorkflowProposal(p:WorkflowProposal){
  if(p.automation&&(!p.replan||!automatedProposalSchema.safeParse(p.automation).success))throw new DomainError('Invalid automatic repair provenance.','FORBIDDEN');
  if(p.replan){const parsed=workflowReplanSchema.safeParse(p.replan);if(!parsed.success||canonical(parsed.data)!==canonical(p.replan)||p.replan.grossSpent>p.replan.goalBudget)throw new DomainError('Invalid workflow replanning evidence.','FORBIDDEN');}

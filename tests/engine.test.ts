@@ -1,3 +1,4 @@
+import {omitFields} from '../lib/agentos/omit-fields.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { seed, transition, wallet, verifyReceipt, authorizeOperation, assertInvariants, digest, DomainError } from '../lib/agentos/engine.ts';
@@ -27,7 +28,7 @@ test('reusing an idempotency key with a different payload is a conflict',async()
  await assert.rejects(transition(s,{type:'register_agent',agent:{...agent,description:'Different'},requestId:'same'},now),error=>error instanceof DomainError && error.code==='IDEMPOTENCY_CONFLICT');
 });
 test('receipt verification rejects a correctly rehashed but malformed receipt schema',async()=>{
- const s=await run(await transition(seed(now),create(),now)); const {digest:hash,...body}=s.tasks[0].receipt!;
+ const s=await run(await transition(seed(now),create(),now)); const body=omitFields(s.tasks[0].receipt!,"digest");
  for(const patch of [{currency:'ETH'},{inputHash:'not-a-hash'},{taskId:''},{settlementId:'different'},{settledAt:'never'},{extra:true}]){
    const altered={...body,...patch};
    assert.equal(await verifyReceipt({...altered,digest:await digest(altered)} as never),false);

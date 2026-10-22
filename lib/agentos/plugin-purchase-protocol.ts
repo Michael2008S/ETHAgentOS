@@ -1,3 +1,4 @@
+import {omitFields} from './omit-fields.ts';
 import {z} from 'zod';
 import {digest,DomainError} from './engine.ts';
 import {boundedJson,type Json,type PluginRuntimeDescriptor} from './plugin-protocol.ts';
@@ -51,4 +52,4 @@ export function pluginStepRequestId(taskId:string){const hex=taskId.slice(2,34);
 export function pluginPurchaseSpec(flow:PluginPurchaseWorkflow,step:PluginPurchaseStep){if(!step.inputHash)throw new DomainError('Plugin purchase has no committed input.','FORBIDDEN');return {version:'agentos.plugin-purchase-spec.v1',policy:'replay-and-reviewed-verifier.v1',workflowTermsHash:flow.termsHash,scope:flow.scope,taskId:step.taskId,index:step.index,jobId:step.jobId,chainId:flow.deployment.chainId,escrow:flow.deployment.escrow,token:flow.deployment.token,payer:flow.vault.vault,seller:flow.deployment.seller,priceCents:step.priceCents,manifestHash:step.manifestHash,runtimeHash:step.runtimeHash,inputHash:step.inputHash,parent:step.parent??null};}
 
 export type PublicPluginPurchase=Omit<PluginPurchaseWorkflow,'runLease'|'steps'> & {steps:(Omit<PluginPurchaseStep,'fundingIntent'> & {fundingIntent?:Omit<NonNullable<PluginPurchaseStep['fundingIntent']>,'token'>})[]};
-export function publicPluginPurchase(flow:PluginPurchaseWorkflow):PublicPluginPurchase{const {runLease:_,...value}=flow;return {...value,steps:flow.steps.map(step=>{const {fundingIntent,...publicStep}=step;if(!fundingIntent)return publicStep;const {token:__,...intent}=fundingIntent;return {...publicStep,fundingIntent:intent};})};}
+export function publicPluginPurchase(flow:PluginPurchaseWorkflow):PublicPluginPurchase{const value=omitFields(flow,"runLease");return {...value,steps:flow.steps.map(step=>{const {fundingIntent,...publicStep}=step;if(!fundingIntent)return publicStep;const intent=omitFields(fundingIntent,"token");return {...publicStep,fundingIntent:intent};})};}

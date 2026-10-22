@@ -1,3 +1,4 @@
+import {omitFields} from '../../../lib/agentos/omit-fields.ts';
 import {z} from 'zod';
 import {workflowSupplierAccess} from '@/lib/agentos/workflow-supplier-runtime';
 import {owner,checkOrigin,read,updateWorkspace} from '@/lib/agentos/store';
@@ -17,7 +18,7 @@ export async function POST(request:Request){try{
  const body=schema.parse(JSON.parse(raw));
  let result,workflowId:string;
  if(body.action==='create'){
-  const {action:_,...draft}=body,configured=await configuredOrderChain(request),snapshot=await read(ownerId),prior=snapshot.state.workflows?.find(w=>w.requestId===draft.requestId);
+  const draft=omitFields(body,"action"),configured=await configuredOrderChain(request),snapshot=await read(ownerId),prior=snapshot.state.workflows?.find(w=>w.requestId===draft.requestId);
   if(!prior){await checkInputSource(request,draft.input);const session=snapshot.state.vaultSessions?.find(s=>s.sessionId===draft.vaultSessionId);if(!session?.signature||session.revokedAt)throw new DomainError('An active owner Vault session is required.','FORBIDDEN');await checkVaultBinding(configured.client,configured.deployment,session);}
   result=await updateWorkspace(ownerId,state=>createWorkflow(state,{...draft,buyer:draft.buyer as `0x${string}`},configured.deployment,workflowPublisher(configured),undefined,workflowSupplierAccess(configured,snapshot.scope)));workflowId='workflow-'+draft.requestId;
  }else{workflowId=body.workflowId;result=await updateWorkspace(ownerId,state=>controlWorkflow(state,workflowId,body.action));}

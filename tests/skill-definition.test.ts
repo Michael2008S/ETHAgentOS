@@ -1,3 +1,4 @@
+import {omitFields} from '../lib/agentos/omit-fields.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -52,7 +53,7 @@ test('full delivery commitments bind an extension recipe and independently rejec
  assert.notEqual(specHash(spec),specHash({...spec,verification:next}));
  const changedRecipe=deliveryArtifact(taskId,next,datasetHash,executeRankedFlows(newDefinition,input));assert.equal(verifyDelivery(datasetText,JSON.stringify(changedRecipe),taskId,spec).accepted,false);
  assert.throws(()=>validateVerification({...verification,skill:'treasury-report'}));
- const {skillDefinition:_,...missing}=verification;assert.throws(()=>validateVerification(missing));
+ const missing=omitFields(verification,"skillDefinition");assert.throws(()=>validateVerification(missing));
 });
 test('installation is owner-state scoped, immutable, replay safe and does not grant execution permission',async()=>{
  let state=seed();const policy=structuredClone(state.policy),ledger=structuredClone(state.ledger);

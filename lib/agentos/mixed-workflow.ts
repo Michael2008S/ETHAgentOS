@@ -1,3 +1,4 @@
+import {omitFields} from './omit-fields.ts';
 import {monitorPluginRuns} from './usdc-monitor-state.ts';
 import {usdcTreasurySchema} from './treasury-business.ts';
 import {selectedPluginMemorySchema,type SelectedPluginMemory} from './plugin-semantic-memory.ts';
@@ -20,7 +21,7 @@ export type MixedWorkflow={version:'agentos.mixed-workflow.v1';id:string;scope:s
 export const mixedTerms=(f:MixedWorkflow)=>({version:f.version,id:f.id,scope:f.scope,requestId:f.requestId,draftHash:f.draftHash,title:f.title,buyer:f.buyer,vaultSessionId:f.vaultSessionId,deployment:f.deployment,...(f.repair?{repair:f.repair}:{}),...(f.planReview?{planReview:f.planReview}:{}),...(f.memory?{memory:f.memory}:{}),input:f.input,totalBudget:f.totalBudget,timeoutSeconds:f.timeoutSeconds,createdAt:f.createdAt,deadlineAt:f.deadlineAt,steps:f.steps.map(s=>({requestId:s.requestId,...(s.originWorkflowId?{originWorkflowId:s.originWorkflowId}:{}),service:s.service,maxPriceCents:s.maxPriceCents,quote:s.quote,input:s.input,...(s.grantEpoch===undefined?{}:{grantEpoch:s.grantEpoch}),...(s.supplierBinding?{supplierBinding:s.supplierBinding}:{})}))});
 export function findMixed(state:Workspace,id:string){const f=state.mixedWorkflows?.find(f=>f.id===id);if(!f)throw new DomainError('Mixed workflow not found.','NOT_FOUND');return f;}
 export async function verifyMixed(f:MixedWorkflow){if(await digest(mixedTerms(f))!==f.termsHash)throw new DomainError('Mixed workflow terms changed.','CONFLICT');}
-export function publicMixed(f:MixedWorkflow){const {lease:_,...value}=f;return value;}
+export function publicMixed(f:MixedWorkflow){const value=omitFields(f,"lease");return value;}
 export const pendingMixed=(state:Workspace)=>(state.mixedWorkflows??[]).filter(f=>f.status==='running'||f.status==='cancelling');
 export const mixedDrivesPlugin=(state:Workspace,id:string)=>pendingMixed(state).some(f=>f.steps.some(s=>s.childId===id));
 export const futureMixed=(state:Workspace)=>pendingMixed(state).flatMap(flow=>flow.steps.filter(step=>step.status==='pending'&&!step.childId).map(step=>({flow,step})));

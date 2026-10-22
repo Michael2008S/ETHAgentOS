@@ -1,3 +1,4 @@
+import {omitFields} from '../../../lib/agentos/omit-fields.ts';
 import {chainOrderInputSchema} from '@/lib/agentos/order-input-schema';
 import {makeSupplierQuoteRequest,verifySupplierQuote,supplierQuoteSchema} from '@/lib/agentos/supplier-quote';
 import { deliveryVerificationSchema } from '@/lib/agentos/skill-schema';
@@ -60,7 +61,7 @@ export async function POST(request:Request){
    }
    const spec=prior?.spec??(localCall?await localCall<DeliverySpec>('/drafts',bytes):configured.evidence?await configured.evidence.prepare(bytes):body.spec);
    if(!spec||spec.datasetHash!==bytes.datasetHash||body.spec&&canonical(body.spec)!==canonical(spec))throw new DomainError('Evidence URLs and hash must match the committed order input.');
-   const {action:_,supplierId:__,...fields}=body,draft={...fields,...(signedQuote?{supplierQuote:body.supplierQuote??signedQuote}:{}),spec,input:normalized,...(body.planner==='llm'?{model:planner!.descriptor}:{}),...(identity?{agentIdentity:identity}:{}),...(body.executor==='supplier'?{supplier:chosenSupplier!}:{})} as OrderDraft;
+   const fields=omitFields(body,"action","supplierId"),draft={...fields,...(signedQuote?{supplierQuote:body.supplierQuote??signedQuote}:{}),spec,input:normalized,...(body.planner==='llm'?{model:planner!.descriptor}:{}),...(identity?{agentIdentity:identity}:{}),...(body.executor==='supplier'?{supplier:chosenSupplier!}:{})} as OrderDraft;
    const result=await updateWorkspace(ownerId,state=>createOrder(state,draft,deployment,undefined,{now:quoteNow,workspaceHash:snapshot.scope}));if(draft.vaultSessionId&&!deferInline(request))scheduleOrders(ownerId,result.state,request);return Response.json({...result,order:findOrder(result.state,'chain-'+body.requestId)},{headers:{'Cache-Control':'no-store'}});
   }
   const {state}=await read(ownerId),order=findOrder(state,body.orderId);

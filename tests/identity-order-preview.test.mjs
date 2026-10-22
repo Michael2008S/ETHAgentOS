@@ -1,3 +1,4 @@
+import {omitFields} from '../lib/agentos/omit-fields.ts';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {seed,digest} from '../lib/agentos/engine.ts';
 import {previewIdentityOrder} from '../lib/agentos/identity-order-preview.ts';
@@ -7,7 +8,7 @@ test('unfunded preview snapshots bound identity, commits exact draft, replays on
  const state={...seed(),agentIdentities:[structuredClone(identity)]},input={requestId:crypto.randomUUID(),agentId:'atlas',title:'Sepolia identity draft',budget:1000,buyer:address};
  const next=await previewIdentityOrder(state,'workspace-a',input,identity),p=next.identityOrderPreviews[0];
  assert.equal(p.agentIdentity.registryAgentId,'11207');assert.equal(p.status,'identity-preview');assert.equal(p.fundingEnabled,false);assert.deepEqual(next.chainOrders,state.chainOrders);assert.deepEqual(next.ledger,state.ledger);assert.equal(state.identityOrderPreviews,undefined);
- const {id,status,fundingEnabled,commitment,createdAt,...parameters}=p;assert.equal(commitment,await digest({version:'agentos.identity-order-preview.v1',...parameters}));
+ const {commitment}=p,parameters=omitFields(p,"id","status","fundingEnabled","commitment","createdAt");assert.equal(commitment,await digest({version:'agentos.identity-order-preview.v1',...parameters}));
  assert.strictEqual(await previewIdentityOrder(next,'workspace-a',input,{...identity,checkedBlock:'102'}),next);
  await assert.rejects(previewIdentityOrder(next,'workspace-a',{...input,budget:2000},identity),/different parameters/);
  await assert.rejects(previewIdentityOrder(next,'workspace-b',input,identity),/different parameters/);

@@ -1,3 +1,4 @@
+import {omitFields} from './omit-fields.ts';
 import {z} from 'zod';
 import {canonical} from '../../cre/workflow/verify.ts';
 import {digest,DomainError} from './engine.ts';
@@ -13,7 +14,7 @@ export type USDCMonitor={version:'agentos.usdc-monitor.v1';id:string;scope:strin
 export const monitorTerms=(m:USDCMonitor)=>({version:m.version,id:m.id,scope:m.scope,draft:m.draft,draftHash:m.draftHash,deployment:m.deployment,services:m.services,grantEpoch:m.grantEpoch,fee:m.fee,expiresAt:m.expiresAt,createdAt:m.createdAt});
 export async function verifyMonitor(m:USDCMonitor){if(m.version!=='agentos.usdc-monitor.v1'||await digest(monitorTerms(m))!==m.termsHash||await digest(m.draft)!==m.draftHash)throw new DomainError('USDC monitor terms changed.','CONFLICT');}
 export function findMonitor(state:Workspace,id:string){const m=state.usdcMonitors?.find(m=>m.id===id);if(!m)throw new DomainError('USDC monitor not found.','NOT_FOUND');return m;}
-export const publicMonitor=({lease:_,...m}:USDCMonitor)=>m;
+export const publicMonitor=(value:USDCMonitor)=>omitFields(value,"lease");
 export const monitorDrivesMixed=(state:Workspace,id:string)=>(state.usdcMonitors??[]).some(m=>['running','paused','stopping'].includes(m.status)&&m.reports.some(r=>r.status==='active'&&r.workflowId===id));
 export const pendingMonitors=(state:Workspace)=>(state.usdcMonitors??[]).filter(m=>['running','stopping','paused'].includes(m.status));
 export function futureMonitorTickets(state:Workspace,now=new Date().toISOString()){

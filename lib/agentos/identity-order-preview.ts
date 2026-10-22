@@ -1,3 +1,4 @@
+import {omitFields} from './omit-fields.ts';
 import {canonical} from '../../cre/workflow/verify.ts';
 import {digest,DomainError,resolveSkillInput} from './engine.ts';
 import type {AgentIdentity} from './identity.ts';
@@ -10,7 +11,7 @@ export async function previewIdentityOrder(state:Workspace,scope:string,input:{r
  if(!Number.isInteger(input.budget)||input.budget<agent.price||input.budget>1000000)throw new DomainError('Budget does not cover the current quote.');
  const parameters={...input,quote:agent.price,skill:agent.skill,input:resolveSkillInput(state,agent.skill),agentIdentity:structuredClone(bound),workspaceHash:scope};
  const prior=state.identityOrderPreviews?.find(p=>p.requestId===input.requestId);
- if(prior){const {id:_,status:__,fundingEnabled:___,commitment:____,createdAt:_____,...old}=prior;if(canonical(old)!==canonical(parameters))throw new DomainError('Preview request was already used with different parameters.','IDEMPOTENCY_CONFLICT');return state;}
+ if(prior){const old=omitFields(prior,"id","status","fundingEnabled","commitment","createdAt");if(canonical(old)!==canonical(parameters))throw new DomainError('Preview request was already used with different parameters.','IDEMPOTENCY_CONFLICT');return state;}
  if((state.identityOrderPreviews?.length??0)>=50)throw new DomainError('Identity preview limit reached.');
  const preview:IdentityOrderPreview={...parameters,id:'identity-preview-'+input.requestId,status:'identity-preview',fundingEnabled:false,commitment:await digest({version:'agentos.identity-order-preview.v1',...parameters}),createdAt:new Date().toISOString()};
  return {...state,identityOrderPreviews:[...(state.identityOrderPreviews??[]),preview]};

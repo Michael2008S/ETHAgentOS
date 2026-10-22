@@ -1,3 +1,4 @@
+import {omitFields} from '../../../lib/agentos/omit-fields.ts';
 import {owner,checkOrigin,read,updateWorkspace} from '@/lib/agentos/store';
 import {deferInline} from '@/lib/agentos/auth';
 import {apiFailure} from '@/lib/agentos/api-failure';
@@ -20,7 +21,7 @@ export async function POST(request:Request){try{
  const raw=await request.text();if(new TextEncoder().encode(raw).length>65536)return Response.json({error:'Request too large.'},{status:413});const body=workflowPlanRequestSchema.parse(JSON.parse(raw)),snapshot=await read(ownerId);let result,planId:string,omitted=0,excluded:unknown[]=[];
  if(body.action==='propose'||body.action==='replan'){
   const sourceId=body.action==='replan'?body.sourceWorkflowId:undefined,goalBudget=body.action==='replan'?body.goalBudget:undefined;
-  const fields=body.action==='replan'?(({action:_,sourceWorkflowId:__,goalBudget:___,...rest})=>rest)(body):(({action:_,...rest})=>rest)(body);
+  const fields=body.action==='replan'?((value)=>omitFields(value,"action","sourceWorkflowId","goalBudget"))(body):((value)=>omitFields(value,"action"))(body);
   const parameters=normalizePlanParameters({...fields,input:sourceId?findWorkflow(snapshot.state,sourceId).input:body.action==='propose'?body.input:undefined},Boolean(sourceId)),prior=snapshot.state.workflowPlans?.find(p=>p.requestId===parameters.requestId);planId='plan-'+parameters.requestId;
   if(prior){if(canonical(prior.parameters)!==canonical(parameters)||prior.replan?.sourceWorkflowId!==sourceId||prior.replan?.goalBudget!==goalBudget)throw new DomainError('Workflow plan request ID was used with different parameters.','IDEMPOTENCY_CONFLICT');result=snapshot;}
   else{

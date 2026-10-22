@@ -1,3 +1,4 @@
+import {omitFields} from './omit-fields.ts';
 import {z} from 'zod';
 import {pluginManifestSchema,boundedJson,type Json,type PluginManifest,type PluginExecution,type PluginRuntimeDescriptor} from './plugin-protocol.ts';
 import {DomainError} from './engine.ts';
@@ -22,5 +23,5 @@ export function pluginAuthority(state:Workspace,job:PluginJob,installed:Installe
  if(!state.policy.active||!installed||installed.manifestHash!==job.manifestHash||!grant?.enabled||grant.epoch!==job.grantEpoch||grant.manifestHash!==job.manifestHash||grant.runtimeHash!==job.runtimeHash||grant.expiresAt<=now)throw new DomainError('Plugin execution permission expired or was revoked.','FORBIDDEN');if(job.deadlineAt<=now)throw new DomainError('Plugin execution deadline passed.','FORBIDDEN');
 }
 export function pluginToolsAvailable(manifest:PluginManifest,runtime:PluginRuntimeDescriptor){if(!manifest.tools.every(t=>runtime.tools.some(c=>c.serverId===t.serverId&&c.name===t.name&&c.toolHash===t.toolHash&&c.readOnly)))throw new DomainError('Plugin MCP capabilities changed. Review and grant again.','FORBIDDEN');}
-export function pluginPublicJob(job:PluginJob){const {lease:_,...publicJob}=job;return publicJob;}
+export function pluginPublicJob(job:PluginJob){const publicJob=omitFields(job,"lease");return publicJob;}
 export const pluginExecutionRequest=(job:PluginJob,installed:InstalledPlugin)=>({jobId:job.id,scope:job.scope,manifest:installed.manifest,manifestHash:job.manifestHash,input:job.input,inputHash:job.inputHash,runtimeHash:job.runtimeHash});

@@ -1,3 +1,4 @@
+import {omitFields} from '../lib/agentos/omit-fields.ts';
 import assert from 'node:assert/strict';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {encodeFunctionData,parseAbi} from 'viem';
@@ -19,7 +20,7 @@ try{
  const deployment=await(await fetch(chain+'/config')).json();assert.equal(deployment.mode,'local');assert.equal(deployment.chainId,31337);let signatures=0;const provider=localWalletProvider(chain),buyer=await AgentWalletSession.connect({request:args=>{if(args.method==='personal_sign')signatures++;return provider.request(args);}},deployment,false),vault=new AgentVaultClient(buyer,base,headers),flows=new AgentWorkflowClient(buyer,base,headers),view=(await vault.sessions()).view,unit=10n**BigInt(view.decimals)/100n,balance=address=>buyer.client.readContract({address:deployment.token,abi:tokenABI,functionName:'balanceOf',args:[address]}),beforeVault=await balance(deployment.vault),beforeSeller=await balance(deployment.seller),walletBalance=BigInt((await buyer.balances()).token);
  if(walletBalance<2000n*unit)await buyer.send({to:deployment.token,data:encodeFunctionData({abi:parseAbi(['function mint(address,uint256)']),functionName:'mint',args:[buyer.account,2000n*unit-walletBalance]})});
  const session=await vault.authorize({depositCents:2000,perTaskCents:500,totalCents:2000,dailyCents:Number(BigInt(view.spent)/unit)+3000,durationSeconds:3600});assert.equal(signatures,1);
- const instantiated=await templates.instantiate(template,[{agentId:'sage'},{agentId:'atlas'}]),{templateDigest:_,...program}=instantiated,done=[];
+ const instantiated=await templates.instantiate(template,[{agentId:'sage'},{agentId:'atlas'}]),program=omitFields(instantiated,"templateDigest"),done=[];
  for(const amount of [679,999]){
   const data=structuredClone(input);data.records[1].cents=amount-123;const requestId=crypto.randomUUID(),first=await flows.create({...program,requestId,vaultSessionId:session.sessionId,input:data});assert.equal((await flows.create({...program,requestId,vaultSessionId:session.sessionId,input:data})).id,first.id);
   for(let tick=0;tick<50;tick++){const response=await fetch(base+'/api/runtime/drain',{method:'POST',headers,signal:AbortSignal.timeout(120000)});assert.equal(response.status,200);const flow=(await flows.list()).find(w=>w.id===first.id);if(flow.status==='completed'){done.push(flow);break;}if(flow.status==='blocked')throw Error(flow.lastError);await new Promise(r=>setTimeout(r,150));}

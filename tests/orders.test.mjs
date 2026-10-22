@@ -36,14 +36,13 @@ test('pre-funded runtime executes only after escrow, pays once, refunds rejectio
     return {hash:await write(escrow,parseAbi(['function onReport(bytes,bytes)']),'onReport',[metadata,encodeSettlementReport(body.id,current[4],verdict.outputHash,verdict.accepted)],forwarder)};
    })());return transactions.get(body.id);
   });
-  function specHashValue(id){return keccak256(stringToHex(data.get(id)));}
   async function draft(scenario='success',model,supplier,identity){
    const requestId=crypto.randomUUID(),input={dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:[{block:0,from:'x',to:'ignored',cents:999},{block:1,from:'x',to:'a',cents:123},{block:2,from:'x',to:'b',cents:456}]},bytes=inputEvidence({id:'chain-'+requestId,input,skill:'event-analysis'},buyer),spec={datasetUrl:'https://data.example/'+bytes.id,artifactUrl:'https://artifact.example/'+bytes.id,datasetHash:bytes.datasetHash,verification:bytes.verification};
    specifications.set(bytes.id,spec);data.set(bytes.id,bytes.datasetText);state=await createOrder(state,{requestId,title:'Pre-funded '+scenario,agentId:'atlas',budget:1000,buyer,input,spec,scenario,timeoutSeconds:300,...(model?{planner:'llm',model}:{} ),...(supplier?{executor:'supplier',supplier,agentIdentity:identity}:{})},deployment);return state.chainOrders[0];
   }
   async function fund(order){const evidence=await wallet.fundOrder(order,120);state=(await authorizeOrder(state,order.id,'owner',evidence.transactionHash,crypto.randomUUID())).state;const current=await access.funding(findOrder(state,order.id),evidence.transactionHash);state=activateOrder(state,order.id,findOrder(state,order.id).authorization.nonce,current);return evidence;}
   const first=await draft();await runOrder(store,'owner',first.id,access);assert.equal(findOrder(state,first.id).output,null);assert.equal(artifacts.size,0);assert.equal(findOrder(state,first.id).status,'awaiting-funding');
-  const funded=await fund(first);assert.equal(findOrder(state,first.id).output,null);failSettlementCommit=true;
+  await fund(first);assert.equal(findOrder(state,first.id).output,null);failSettlementCommit=true;
   await Promise.all(Array.from({length:3},()=>runOrder(store,'owner',first.id,access)));
   let done=findOrder(state,first.id);assert.equal(done.status,'completed');assert.equal(done.output.totalCents,579);assert.equal(done.settlement.status,'paid');assert.equal(transactions.size,1);assert.equal(state.chainReceipts.length,1);assert.deepEqual(state.ledger,ledger);
   await assert.rejects(wallet.fundOrder(first),/already exists/);

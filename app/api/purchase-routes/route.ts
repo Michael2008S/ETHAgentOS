@@ -1,3 +1,4 @@
+import {omitFields} from '../../../lib/agentos/omit-fields.ts';
 import {owner,checkOrigin,read,updateWorkspace} from '@/lib/agentos/store';
 import {purchaseRouteRequestSchema} from '@/lib/agentos/purchase-route-schema';
 import {configuredOrderChain} from '@/lib/agentos/order-runtime';
@@ -21,7 +22,7 @@ export async function POST(request:Request){try{
  const configured=await configuredOrderChain(request),access=purchaseRouteAccess(configured);
  if(body.action==='sync'){await runPurchaseRoute({read,updateWorkspace},ownerId,body.routeId,access,configured);const snapshot=await read(ownerId);return Response.json({...snapshot,route:findPurchaseRoute(snapshot.state,body.routeId)});}
  if(!('requestId' in body))throw new DomainError('Invalid purchase route action.');
- const snapshot=await read(ownerId),{action,...parameters}=body,prior=snapshot.state.purchaseRoutes?.find(r=>r.requestId===body.requestId);
+ const snapshot=await read(ownerId),parameters=omitFields(body,"action"),prior=snapshot.state.purchaseRoutes?.find(r=>r.requestId===body.requestId);
  if(body.action==='create'&&prior){const result=await updateWorkspace(ownerId,state=>createPurchaseRoute(state,parameters as PurchaseRouteDraft,configured.deployment,snapshot.scope,prior.offers,access));if(!deferInline(request))schedulePurchaseRoutes(ownerId,result.state,request);return Response.json({...result,route:findPurchaseRoute(result.state,prior.id)});}
  const session=snapshot.state.vaultSessions?.find(s=>s.sessionId===body.vaultSessionId);if(!session?.signature||session.revokedAt||session.owner.toLowerCase()!==body.buyer.toLowerCase())throw new DomainError('An active owner Vault session is required.','FORBIDDEN');await access.checkSession(session,0);
  const requested=body.action==='prepare'?body.candidates:body.offers;if(new Set(requested.map(c=>c.supplierId)).size!==requested.length)throw new DomainError('Select distinct suppliers for automatic fallback.');
@@ -34,7 +35,7 @@ export async function POST(request:Request){try{
   const supplierQuote='supplierQuote' in candidate?supplierQuoteSchema.parse(candidate.supplierQuote):await supplier.quote(context);offers.push({agentId:agent.id,supplierId:candidate.supplierId,supplierQuote,identity,supplier:supplier.descriptor});
  }
  if(body.action==='prepare'&&body.strategy==='lowest-price')offers.sort((a,b)=>a.supplierQuote.payload.priceCents-b.supplierQuote.payload.priceCents||(a.agentId+':'+a.supplierId).localeCompare(b.agentId+':'+b.supplierId));
- const {candidates:_,...base}=parameters as typeof parameters&{candidates?:unknown};const draft={...base,offers:offers.map(({agentId,supplierId,supplierQuote})=>({agentId,supplierId,supplierQuote}))} as PurchaseRouteDraft;
+ const base=omitFields(parameters as typeof parameters&{candidates?:unknown},"candidates");const draft={...base,offers:offers.map(({agentId,supplierId,supplierQuote})=>({agentId,supplierId,supplierQuote}))} as PurchaseRouteDraft;
  if(body.action==='prepare'){await validatePurchaseRoute(snapshot.state,draft,configured.deployment,snapshot.scope,offers,access);return Response.json({draft,scope:snapshot.scope},{headers:{'Cache-Control':'no-store'}});}
  const result=await updateWorkspace(ownerId,state=>createPurchaseRoute(state,draft,configured.deployment,snapshot.scope,offers,access));if(!deferInline(request))schedulePurchaseRoutes(ownerId,result.state,request);return Response.json({...result,route:findPurchaseRoute(result.state,'purchase-'+body.requestId)},{headers:{'Cache-Control':'no-store'}});
 }catch(error){return apiFailure(error,'runtime');}}

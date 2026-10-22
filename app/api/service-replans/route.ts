@@ -1,3 +1,4 @@
+import {omitFields} from '../../../lib/agentos/omit-fields.ts';
 import {owner,checkOrigin,read,updateWorkspace} from '@/lib/agentos/store';
 import {apiFailure} from '@/lib/agentos/api-failure';
 import {DomainError} from '@/lib/agentos/engine';
@@ -14,7 +15,7 @@ export async function POST(request:Request){try{
  const body=serviceReplanRequestSchema.parse(JSON.parse(text)),snapshot=await read(ownerId);if(body.scope!==snapshot.scope)throw new DomainError('Plugin repair belongs to another workspace.','FORBIDDEN');
  if(body.action==='propose'){
   const prior=snapshot.state.servicePlans?.find(p=>p.parameters.requestId===body.parameters.requestId);
-  if(prior){const {input:_,...parameters}=prior.parameters,r=prior.replan;if(!r||prior.template||prior.automation||canonical(parameters)!==canonical(body.parameters)||r.sourceWorkflowId!==body.sourceWorkflowId||r.buyer.toLowerCase()!==body.buyer.toLowerCase()||r.goalBudget!==body.goalBudget||canonical(r.root?{workflowId:r.root.workflowId,step:r.root.step}:null)!==canonical(body.root))throw new DomainError('Repair request identifier already has different terms.','IDEMPOTENCY_CONFLICT');return Response.json({scope:snapshot.scope,proposal:prior},{headers});}
+  if(prior){const parameters=omitFields(prior.parameters,"input"),r=prior.replan;if(!r||prior.template||prior.automation||canonical(parameters)!==canonical(body.parameters)||r.sourceWorkflowId!==body.sourceWorkflowId||r.buyer.toLowerCase()!==body.buyer.toLowerCase()||r.goalBudget!==body.goalBudget||canonical(r.root?{workflowId:r.root.workflowId,step:r.root.step}:null)!==canonical(body.root))throw new DomainError('Repair request identifier already has different terms.','IDEMPOTENCY_CONFLICT');return Response.json({scope:snapshot.scope,proposal:prior},{headers});}
  }
  const runtime=await configuredPluginPurchaseRuntime(request),context=await buildServiceReplan(pluginDatabase(),ownerId,body.sourceWorkflowId,body.buyer,body.goalBudget,body.root,runtime.chain);
  if(body.action==='inspect')return Response.json({scope:snapshot.scope,context},{headers});

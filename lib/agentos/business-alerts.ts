@@ -1,3 +1,4 @@
+import {omitFields} from './omit-fields.ts';
 import {digest,DomainError} from './engine.ts';import type {Workspace} from './types.ts';
 export type AlertReview={id:string;alertId:string;evidenceHash:string;previousId:string|null;decision:'acknowledged'|'resolved'|'dismissed';comment:string;at:string};
 export async function businessAlerts(state:Workspace){
@@ -12,7 +13,7 @@ export async function businessAlerts(state:Workspace){
 }
 export async function reviewBusinessAlert(state:Workspace,input:Omit<AlertReview,'at'>){
  const alert=(await businessAlerts(state)).find(a=>a.id===input.alertId);if(!alert||alert.evidenceHash!==input.evidenceHash)throw new DomainError('Alert evidence changed. Refresh before reviewing.','CONFLICT');
- const existing=state.businessAlertReviews?.find(r=>r.id===input.id);if(existing){const {at:_,...body}=existing;if(await digest(body)!==await digest(input))throw new DomainError('Alert review identifier changed.','IDEMPOTENCY_CONFLICT');return state;}
+ const existing=state.businessAlertReviews?.find(r=>r.id===input.id);if(existing){const body=omitFields(existing,"at");if(await digest(body)!==await digest(input))throw new DomainError('Alert review identifier changed.','IDEMPOTENCY_CONFLICT');return state;}
  if((alert.review?.id??null)!==input.previousId)throw new DomainError('Alert disposition changed. Refresh.','CONFLICT');if((state.businessAlertReviews?.length??0)>=200)throw new DomainError('Alert review history full. Export before extending retention.');
  return {...state,businessAlertReviews:[{...input,at:new Date().toISOString()},...state.businessAlertReviews??[]]};
 }

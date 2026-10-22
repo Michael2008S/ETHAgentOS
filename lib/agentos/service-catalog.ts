@@ -1,3 +1,4 @@
+import {omitFields} from './omit-fields.ts';
 import { isArchived } from './business-archives.ts';
 import {canonical} from '../../cre/workflow/verify.ts';
 import {digest,DomainError} from './engine.ts';
@@ -8,7 +9,7 @@ import type {Agent,Workspace} from './types.ts';
 export type ServiceContract={protocol:'transfers.v1'|'allocation-report.v1'|'event-summary.v1'|'ranked-flows.v1'}|{protocol:'json.v1';schema:PluginSchema};
 export type ServiceTerms={protocol:'agentos.service.v1';id:string;name:string;description:string;executor:'builtin'|'supplier'|'plugin';revision:string;input:ServiceContract;output:ServiceContract;priceCents:number;priceKind:'fixed'|'ceiling';permissions:string[];binding:{agentId?:string;skill?:string;supplierId?:string;pluginId?:string;manifestHash?:string;runtimeHash?:string}};
 export type ServiceDescriptor=ServiceTerms&{digest:string};
-export const serviceTerms=({digest:_,...terms}:ServiceDescriptor)=>terms;
+export const serviceTerms=(value:ServiceDescriptor)=>omitFields(value,"digest");
 export const describeService=async(terms:ServiceTerms):Promise<ServiceDescriptor>=>({...terms,digest:await digest(terms)});
 export async function verifyService(service:ServiceDescriptor){
  if(!service||service.protocol!=='agentos.service.v1'||!['builtin','supplier','plugin'].includes(service.executor)||!service.id||service.id.length>200||!Number.isSafeInteger(service.priceCents)||service.priceCents<1||service.priceCents>1000000||!['fixed','ceiling'].includes(service.priceKind)||!Array.isArray(service.permissions)||service.permissions.length>10||await digest(serviceTerms(service))!==service.digest)throw new DomainError('Service descriptor commitment differs.','FORBIDDEN');
