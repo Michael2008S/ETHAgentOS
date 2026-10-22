@@ -5,3 +5,10 @@ test('matching pre-existing services are never signalled and an occupied unverif
 test('failed startup retires the same owned handle instead of leaving a model process or restarting on a timeout',async()=>{const f=fixture({neverReady:true});await assert.rejects(f.manager.ensure(['planning']),/did not become ready/);assert.deepEqual(f.starts,['planning']);assert.deepEqual(f.signals,['planning']);assert.deepEqual(f.manager.owned(),[]);await f.manager.close();assert.deepEqual(f.signals,['planning']);});
 
 test('interruption stops owned models and fences subsequent starts while allowing final cleanup',async()=>{const f=fixture();await f.manager.ensure(['planning']);f.manager.signalOwned();await assert.rejects(f.manager.ensure(['base']),/interrupted/);await f.manager.close();assert.deepEqual(f.starts,['planning']);assert.deepEqual(f.signals,['planning']);assert.deepEqual(f.manager.owned(),[]);});
+
+
+test('every demo script with a direct or conditional LLM planner declares its base model dependency',async()=>{
+ const {readFile}=await import('node:fs/promises'),pkg=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));let checked=0;
+ for(const [command,script] of Object.entries(pkg.scripts)){if(!command.startsWith('demo:'))continue;const file=script.match(/^node (scripts\/demo-[\w-]+\.mjs)$/)?.[1];if(!file)continue;const source=await readFile(new URL('../'+file,import.meta.url),'utf8');if(/planner\s*:/.test(source)&&/["']llm["']/.test(source)){assert.ok(demoModels(command).includes('base'),command+' uses an LLM planner');checked++;}}
+ assert.ok(checked>=5);
+});
