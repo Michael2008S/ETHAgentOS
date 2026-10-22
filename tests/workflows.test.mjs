@@ -52,8 +52,8 @@ test('two paid steps consume accepted allocations and recover a crashed D1 workf
   assert.throws(()=>acceptedArtifact(state.chainOrders[0]),/completed, paid/);
   await runOrder(store,'owner',w.steps[0].orderId,access,{vaultFunder:fund});state=(await store.read('owner')).state;const first=findOrder(state,w.steps[0].orderId);assert.equal(first.status,'completed');assert.equal(state.workflows[0].steps[1].orderId,undefined);
   // The order worker completed; the workflow consumer died before advancing its dependency.
-  let job=await claimJob(db,'owner',Date.now(),100);assert.equal(job.kind,'order');await acknowledgeJob(db,job,await store.read('owner'));
-  job=await claimJob(db,'owner',Date.now(),100);assert.equal(job.kind,'workflow');loseCommit=true;
+  assert.equal(sqlite.prepare("SELECT status FROM agentos_runtime_jobs WHERE owner_id=? AND kind='order' AND task_id=?").get('owner',first.id).status,'completed','direct settlement retires its delayed queue row without another claim');
+  const job=await claimJob(db,'owner',Date.now(),100);assert.equal(job.kind,'workflow');loseCommit=true;
   await assert.rejects(runWorkflow(store,'owner',w.id,access,publish,{vaultFunder:fund}),/Crash after immutable publication/);
   state=(await store.read('owner')).state;assert.equal(state.chainOrders.length,1);assert.equal(state.workflows[0].steps[1].orderId,undefined);
   const recovered=await claimJob(db,'owner',Date.now()+120001);assert.equal(recovered.kind,'workflow');assert.notEqual(recovered.lease_token,job.lease_token);

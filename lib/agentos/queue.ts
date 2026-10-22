@@ -30,12 +30,19 @@ export async function commitWithJobs(database: D1Database, owner: string, revisi
 }
 export function workspaceCommitStatements(database:D1Database,owner:string,revision:number,before:Workspace,next:Workspace,now=Date.now()){
   const data = JSON.stringify(next), prior = new Set(workItems(before, now).map(j => jobId(owner, j.kind, j.taskId)));
-  const added = workItems(next, now).filter(j => !prior.has(jobId(owner, j.kind, j.taskId)));
+  const active = workItems(next, now), added = active.filter(j => !prior.has(jobId(owner, j.kind, j.taskId)));
   const statements = [database.prepare('UPDATE agentos_workspaces SET revision = revision + 1, data = ? WHERE owner_id = ? AND revision = ?').bind(data, owner, revision)];
   for (const job of added) statements.push(database.prepare(`INSERT INTO agentos_runtime_jobs (id, owner_id, kind, task_id, status, available_at, created_at, updated_at)
     SELECT ?, ?, ?, ?, 'pending', ?, ?, ? WHERE EXISTS (SELECT 1 FROM agentos_workspaces WHERE owner_id = ? AND revision = ? AND data = ?)
     ON CONFLICT(id) DO UPDATE SET status = 'pending', available_at = excluded.available_at, failures = 0, last_error = NULL, updated_at = excluded.updated_at
     WHERE agentos_runtime_jobs.status IN ('completed', 'dead')`).bind(jobId(owner,job.kind,job.taskId),owner,job.kind,job.taskId,Math.max(now,job.notBefore),now,now,owner,revision+1,data));
+  // Direct owner/workflow execution can finish an order before its pending queue
+  // retry becomes due. Retire only rows absent from the committed work set; live
+  // claims retain their lease and must acknowledge against the current revision.
+  statements.push(database.prepare(`UPDATE agentos_runtime_jobs SET status = 'completed', updated_at = ?
+    WHERE owner_id = ? AND status = 'pending' AND id NOT IN (SELECT value FROM json_each(?))
+    AND EXISTS (SELECT 1 FROM agentos_workspaces WHERE owner_id = ? AND revision = ? AND data = ?)`)
+    .bind(now,owner,JSON.stringify(active.map(j=>jobId(owner,j.kind,j.taskId))),owner,revision+1,data));
   return statements;
 }
 

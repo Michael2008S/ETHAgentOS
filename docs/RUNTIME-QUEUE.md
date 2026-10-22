@@ -8,6 +8,8 @@ Queue messages contain only owner, task/order ID, scheduling metadata and a gene
 
 An atomic SQL claim has a two-minute lease and a unique token. Expired claims can be recovered after process/request loss. Acknowledgements require both the current token and the exact workspace revision, so a stale response cannot overwrite a replacement consumer or swallow a concurrent resume. Runtime and settlement idempotency also protect against overlapping workers. Temporary failures back off up to one minute. Twenty consecutive failures move work to `dead`; an authenticated owner may retry it. Terminal checkpoints become completed queue records without another payment.
 
+Each workspace CAS also retires that owner's pending rows absent from the newly committed work set, in the same transaction. Direct order or workflow execution may finish before an earlier funding lease/retry time; its terminal queue row no longer waits for that obsolete time. Live claimed rows retain their token and must acknowledge normally. Active funding, paused expiry work and outstanding evidence acknowledgements remain queued. A resumed item reopens its original completed row, preserving identity and attempt history. This reconciliation never runs on GET, executes no work, and does not replace final payment/refund verification.
+
 ## API and local worker
 
 - `GET /api/runtime/health`: owner-scoped real service probes, queue counts and last consumer contact; missing, busy and stale consumers are distinct. Health reads do not advance work.

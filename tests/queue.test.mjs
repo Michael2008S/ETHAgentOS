@@ -110,3 +110,28 @@ test('unattended scope fails closed unless explicitly enabled for the exact priv
   assert.equal(drainScope(new Request('https://example.com/api/runtime/drain'),'https://example.com'),undefined);
   assert.equal(drainScope(new Request('http://127.0.0.1/api/runtime/drain',{headers:{'x-agentos-sandbox':'test'}})),'local-demo:sandbox:test');
 });
+
+test('terminal orders retire their delayed pending jobs atomically without losing live funding or evidence acknowledgement work',async()=>{
+ const d=database(),now=Date.now(),before=seed();d.insert('a');
+ const active={...before,chainOrders:[{id:'direct-sync',status:'funding',deadlineAt:new Date(now+300000).toISOString(),vaultFunding:{leaseUntil:new Date(now+90000).toISOString(),deadline:String(Math.floor(now/1000)+300)}},{id:'still-funding',status:'queued',deadlineAt:new Date(now+300000).toISOString()},{id:'evidence-ack',status:'completed',evidencePendingAck:true,evidenceAckAfter:new Date(now+90000).toISOString()}]};
+ await commitWithJobs(d.database,'a',0,before,active,now);
+ assert.equal(await claimJob(d.database,'a',now-1),null);
+ const terminal={...active,chainOrders:active.chainOrders.map(o=>o.id==='direct-sync'?{...o,status:'completed'}:o)};
+ await commitWithJobs(d.database,'a',1,active,terminal,now+1);
+ const rows=d.sqlite.prepare('SELECT task_id,status,available_at FROM agentos_runtime_jobs ORDER BY task_id').all();
+ assert.equal(rows.find(r=>r.task_id==='direct-sync').status,'completed','a terminal direct sync must not wait for its former funding lease');
+ assert.equal(rows.find(r=>r.task_id==='direct-sync').available_at,now+90000,'history is retained instead of deleting or rewriting the original scheduling evidence');
+ assert.equal(rows.find(r=>r.task_id==='still-funding').status,'pending');assert.equal(rows.find(r=>r.task_id==='evidence-ack').status,'pending');
+ d.sqlite.close();
+});
+
+test('retirement is fenced by the workspace CAS and owner, preserves active leases, and reopens the same job on resume',async()=>{
+ const d=database(),now=Date.now();for(const owner of ['a','b'])d.insert(owner);
+ const active=await transition(seed(),draft('same'),new Date(now).toISOString());for(const owner of ['a','b'])await commitWithJobs(d.database,owner,0,seed(),active,now);
+ const leased=await claimJob(d.database,'a',now),terminal={...active,tasks:active.tasks.map(t=>({...t,status:'cancelled'}))};
+ assert.equal(await commitWithJobs(d.database,'a',0,active,terminal,now+1),false);assert.equal((await queueSummary(d.database,'b')).pending,1);
+ assert.equal(await commitWithJobs(d.database,'a',1,active,terminal,now+2),true);assert.equal((await queueSummary(d.database,'a')).leased,1,'the active claimant retains its lease');
+ assert.equal(await acknowledgeJob(d.database,leased,{revision:1,state:active},false,now+3),false);assert.equal(await acknowledgeJob(d.database,leased,await d.read('a'),false,now+3),true);
+ assert.equal(await commitWithJobs(d.database,'a',2,terminal,active,now+4),true);assert.equal((await queueSummary(d.database,'a')).pending,1);assert.equal(d.sqlite.prepare('SELECT COUNT(*) AS n FROM agentos_runtime_jobs WHERE owner_id=?').get('a').n,1);assert.equal((await queueSummary(d.database,'b')).pending,1);
+ d.sqlite.close();
+});

@@ -364,3 +364,13 @@ The complete demo is a final gate after the individual changes. Public workflow 
 当前 226/226 Node 回归、6/6 CRE SDK 测试（92 assertions）、网站/CRE 类型检查和生产构建通过。原始日志、浏览器交易证明及截图归档到 outputs/validation-plugin-purchases-2026-10-22/browser-ui/。同步修正 PLUGINS、ARCHITECTURE 与 README 中仍将通用沙箱/本地付费列为未实现的旧描述，补齐 demo:plugin-purchases 的 npm 命令登记。
 
 本项完成网页付费闭环，最终当前 37 步完整 demo 仍须从第一步实际运行，不以增量回归代替。三个模型仅为全部浏览器与最终 demo 按需启动，结束后停掉；仅复用当前一套本地服务，不发布站点、启用托管调度或广播公共链交易。
+
+## 完整演示发现并修复：终态订单的延迟队列记录
+
+在 `844fca3` 上从第一步执行当前 37 步序列，前 11 步通过，第 12 步供应商组合的七组业务场景全部通过，但末尾空队列断言失败，pending=3、completed=19。原报告保留为 outputs/full-demo-91e01d07-19c1-4f21-878e-955f18e59f1b/report.json，不将本次尝试表述为整套通过。直接读取该隔离 D1 表确认三个订单均已付款完成，但其 pending 作业沿用约 90 秒后的原注资重试时刻，在 60 秒收尾结束时仍分别差约 18/23/26 秒才可领取。
+
+工作区 CAS/batch 现在在同一事务中结束本 owner 已不在当前 workItems 中的 pending 行；不修改原 available_at 或删除历史，不执行任务、不发交易、不改 GET。活动 leased 行保留原 token 并按原修订确认；注资、暂停到期和待确认发布等仍需工作的行保留。恢复重新打开原 job ID。两项实际 SQLite 新回归先复现失败再通过，覆盖旧退避终态、存活资金/证据任务、CAS/owner 隔离、活动租约和同编号恢复。两项组合 EVM 测试改为明确断言原订单行已经完成，保留原来的崩溃、最终确认、租约恢复及唯一付款检查；未删除断言以迎合通过。
+
+修复后原七组供应商 HTTP/D1/SDK/ERC-8004/Vault/EVM 验收全部通过：outputs/supplier-workflow-demo-d9d61802-b744-4d9b-98b6-9eee486d3889.json。12 笔注资、11 笔付款、1 笔退款、2 笔未注资取消，累计注资 3560 分、付款 3360 分；22 个作业完成，pending/leased/dead 均为零。原失败工作区另行显式恢复三个到期记录，原订单、付款 hash 和 ledger 均未改变；原失败报告保持 failed。
+
+当前完整 228/228 Node、21/21 Chromium、6/6 CRE SDK（92 assertions）、网站/CRE 类型检查及生产构建通过。九项队列专项和两项组合 EVM 专项共 11 项通过。第一次完整 Node 中两项旧领取顺序断言失败的原日志与后续通过记录全部保留，归档到 outputs/validation-terminal-queue-2026-10-22/。此修复单独提交；由于实现发生变化，最终 37 步须从第一步重新执行，不续跑旧源码的失败报告。模型继续仅供此最终验收按需保留，结束清理；公网及托管验收继续暂缓。
