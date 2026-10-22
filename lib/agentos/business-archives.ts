@@ -1,0 +1,14 @@
+import {digest,DomainError} from './engine.ts';
+import {futureMixed} from './mixed-workflow.ts';
+import {futureMonitorTickets} from './usdc-monitor-state.ts';
+import type {Workspace} from './types.ts';
+export type ArchiveKind='mixed'|'monitor'|'plan'|'plugin-purchase'|'plugin-version';
+export type BusinessArchive={kind:ArchiveKind;id:string;evidenceHash:string;archivedAt:string};
+export const isArchived=(state:Workspace,kind:ArchiveKind,id:string)=>Boolean(state.businessArchives?.some(a=>a.kind===kind&&a.id===id));
+export const activeHistory=<T extends {id:string}>(state:Workspace,kind:ArchiveKind,rows:T[])=>rows.filter(r=>!isArchived(state,kind,r.id));
+export async function archiveBusiness(state:Workspace,kind:ArchiveKind,id:string,plugin?:{manifestHash:string},restore=false){
+ const next=structuredClone(state),prior=isArchived(state,kind,id);if(restore){if(!prior)return state;const rows=kind==='mixed'?state.mixedWorkflows:kind==='monitor'?state.usdcMonitors:kind==='plan'?state.mixedPlans:kind==='plugin-purchase'?state.pluginPurchases:undefined;if(rows&&activeHistory<{id:string}>(state,kind,rows).length>=(kind==='monitor'?10:20))throw new DomainError('Archive another record before restoring this one.');next.businessArchives=(next.businessArchives??[]).filter(a=>a.kind!==kind||a.id!==id);return next;}if(prior)return state;
+ let evidence:unknown;if(kind==='plugin-version'){if(!plugin)throw new DomainError('Plugin version not found.','NOT_FOUND');if(state.pluginPurchases?.some(p=>['running','cancelling'].includes(p.status)&&p.steps.some(s=>s.pluginId===id))||state.pluginJobs?.some(j=>j.pluginId===id&&['queued','running'].includes(j.status))||futureMixed(state).some(s=>s.step.service.binding.pluginId===id)||futureMonitorTickets(state).some(m=>m.services[1].binding.pluginId===id))throw new DomainError('Reconcile active plugin work before archiving this version.','FORBIDDEN');evidence=plugin;}
+ else{const record=kind==='mixed'?state.mixedWorkflows?.find(f=>f.id===id):kind==='monitor'?state.usdcMonitors?.find(m=>m.id===id):kind==='plan'?state.mixedPlans?.find(p=>p.id===id):state.pluginPurchases?.find(p=>p.id===id);if(!record)throw new DomainError('History record not found.','NOT_FOUND');if(kind==='plan'){if(record.status==='proposed'&&'expiresAt'in record&&record.expiresAt>new Date().toISOString())throw new DomainError('Dismiss or expire the proposal before archiving.','FORBIDDEN');}else if(!['completed','failed','cancelled','expired','stopped'].includes(record.status))throw new DomainError('Reconcile active work before archiving.','FORBIDDEN');evidence=record;}
+ if((next.businessArchives?.length??0)>=500)throw new DomainError('Archive metadata capacity reached. Export histories before extending capacity.');next.businessArchives=[{kind,id,evidenceHash:await digest(evidence),archivedAt:new Date().toISOString()},...next.businessArchives??[]];return next;
+}

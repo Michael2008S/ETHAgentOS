@@ -1,3 +1,4 @@
+import {activeHistory,isArchived} from './business-archives.ts';
 import {inspectMixedRepair} from './mixed-repair.ts';
 import {handoffMonitor,findMonitor,futureMonitorTickets} from './usdc-monitor-state.ts';
 import {approveMixedPlan,type MixedPlanReview} from './mixed-plans.ts';
@@ -26,11 +27,11 @@ export async function createMixedWorkflow(store:MixedStore,owner:string,raw:Mixe
   const approved=review?await approveMixedPlan(state,review,await digest({workspace:owner}),body,deployment,now):state;
   if(body.memory){if(!c.plugins.chain)throw new DomainError('Canonical plugin memory verification unavailable.','UNAVAILABLE');await verifySelectedPluginMemory(store,owner,body.memory,await digest({workspace:owner}),body.buyer,body.input,c.plugins.chain);}
   if(deployment.mode!=='local')throw new DomainError('Public mixed workflows are deferred.','FORBIDDEN');
-  if(!state.policy.active||(state.mixedWorkflows?.length??0)+futureMonitorTickets(state,now).length>=20)throw new DomainError('Mixed workflow permission or history limit reached.','FORBIDDEN');
+  if((state.mixedWorkflows?.length??0)>=100)throw new DomainError('Total retained mixed history capacity reached.');if(!state.policy.active||activeHistory(state,'mixed',state.mixedWorkflows??[]).length+futureMonitorTickets(state,now).length>=20)throw new DomainError('Mixed workflow permission or history limit reached.','FORBIDDEN');
   if(pluginPurchaseDailyExposure(state,deployment,now)+body.steps.slice(offset).reduce((n,s)=>n+s.maxPriceCents,0)>state.policy.dailyBudget)throw new DomainError('Mixed workflow exceeds the shared daily budget.','FORBIDDEN');
   const pluginCount=selected.slice(offset).filter(s=>s.executor==='plugin').length;
   if((state.pluginJobs?.length??0)+pendingPluginPurchaseSlots(state)+mixedPluginRuns(state)+pluginCount>100)throw new DomainError('Mixed workflow exceeds reserved plugin capacity.','FORBIDDEN');
-  if((state.pluginPurchases?.length??0)+mixedPluginRuns(state)+pluginCount>20)throw new DomainError('Mixed workflow exceeds plugin purchase capacity.','FORBIDDEN');
+  if(activeHistory(state,'plugin-purchase',state.pluginPurchases??[]).length+mixedPluginRuns(state)+pluginCount>20)throw new DomainError('Mixed workflow exceeds plugin purchase capacity.','FORBIDDEN');
   if((state.chainOrders?.length??0)+futurePurchaseReservations(state,now).length+body.steps.length-offset>300)throw new DomainError('Mixed workflow exceeds order capacity.','FORBIDDEN');
   const gross=selected.slice(offset).reduce((n,s,i)=>n+(s.priceKind==='fixed'?s.priceCents:body.steps[i+offset].maxPriceCents),0),steps:MixedWorkflow['steps']=[];let expiry=Date.parse(now)+body.timeoutSeconds*1000,session;
   for(const [index,service]of selected.entries()){

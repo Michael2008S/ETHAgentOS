@@ -1,3 +1,4 @@
+import {activeHistory,isArchived} from './business-archives.ts';
 import {canonical} from '../../cre/workflow/verify.ts';
 import {digest,DomainError} from './engine.ts';
 import {validatePluginSchema,validatePluginValue,type Json,type PluginSchema,type PluginRuntimeDescriptor} from './plugin-protocol.ts';
@@ -22,7 +23,7 @@ export async function pluginService(installed:InstalledPlugin,runtime:PluginRunt
 }
 export async function serviceCatalog(state:Workspace,installed:InstalledPlugin[],configuration?:{runtime:PluginRuntimeDescriptor;priceCents:number}){
  const entries=await Promise.all(state.agents.filter(a=>a.enabled&&state.policy.allowedSkills.includes(a.skill)).map(a=>skillService(a))),excluded:{id:string;reason:string}[]=[];
- if(configuration)for(const plugin of installed)try{entries.push(await pluginService(plugin,configuration.runtime,configuration.priceCents));}catch{excluded.push({id:plugin.manifest.id,reason:'runtime-capability-unavailable'});}
+ if(configuration)for(const plugin of installed.filter(p=>!isArchived(state,'plugin-version',p.manifest.id)))try{entries.push(await pluginService(plugin,configuration.runtime,configuration.priceCents));}catch{excluded.push({id:plugin.manifest.id,reason:'runtime-capability-unavailable'});}
  return {entries:entries.sort((a,b)=>a.id.localeCompare(b.id)),excluded};
 }
 

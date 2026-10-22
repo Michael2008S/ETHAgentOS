@@ -1,3 +1,4 @@
+import {activeHistory,isArchived} from './business-archives.ts';
 import {handoffMixed,mixedPluginRuns} from './mixed-workflow.ts';
 import {digest,DomainError} from './engine.ts';
 import {advanceServiceRepairPolicies} from './service-repair-policy.ts';
@@ -39,7 +40,7 @@ export async function createPluginPurchase(store:PluginDatabase,owner:string,raw
   if(review&&body.steps.some(step=>step.maxPriceCents!==c.priceCents))throw new DomainError('Reviewed service price changed. Generate a new plan.','FORBIDDEN');
   if(!s.state.policy.active||!Number.isSafeInteger(c.priceCents)||c.priceCents<1||c.priceCents>1000000||!c.runtime.deliverySigner)throw new DomainError('Authenticated paid plugin execution is unavailable.','FORBIDDEN');
   const {configHash,...terms}=c.runtime;if(await digest(terms)!==configHash)throw new DomainError('Plugin runtime commitment differs.','FORBIDDEN');
-  if((s.state.pluginPurchases?.length??0)+mixedPluginRuns(s.state)>=20||(s.state.pluginJobs?.length??0)+pendingPluginPurchaseSlots(s.state)+mixedPluginRuns(s.state)+body.steps.length>100)throw new DomainError('Plugin purchase or reserved job history limit reached.');
+  if(activeHistory(s.state,'plugin-purchase',s.state.pluginPurchases??[]).length+mixedPluginRuns(s.state)>=20||(s.state.pluginJobs?.length??0)+pendingPluginPurchaseSlots(s.state)+mixedPluginRuns(s.state)+body.steps.length>100)throw new DomainError('Plugin purchase or reserved job history limit reached.');
   const total=c.priceCents*body.steps.length;if(total>body.totalBudget||body.steps.some(p=>c.priceCents>p.maxPriceCents||p.maxPriceCents>s.state.policy.maxTaskBudget))throw new DomainError('Plugin quotes exceed the reviewed fees or per-task policy.','FORBIDDEN');
   if(pluginPurchaseDailyExposure(s.state,c.deployment,now)+total>s.state.policy.dailyBudget)throw new DomainError('Plugin workflow exceeds the shared daily budget.','FORBIDDEN');
   const services:ServiceDescriptor[]=[];
