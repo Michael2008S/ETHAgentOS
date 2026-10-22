@@ -1,3 +1,4 @@
+import {crashAfterLocalFunding} from './local-crash-test.mjs';
 import {readLocalState,writeLocalState,localMap} from './local-state.mjs';
 import {pluginPurchaseRoutes} from './plugins/purchase-chain-routes.mjs';
 import {inputEvidence} from '../sdk/wallet.ts';
@@ -66,7 +67,7 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
         const order=body.order,record=order&&deliveries.get(inputEvidence(order,order.buyer).id);
         if(!record?.locked||specHash(record.spec)!==specHash(order.spec))throw new Error('A committed local order is required.');
         const fund=vaultFunder(client,config,async(_order,data)=>{const hash=await wallet.sendTransaction({account:executor,to:vault,data,gas:6000000n});const receipt=await client.waitForTransactionReceipt({hash});if(receipt.status!=='success')throw new Error('Vault execute reverted.');return hash;});
-        return json(200,{hash:await fund(order)});
+        const hash=await fund(order);deliveryJournal.flush();crashAfterLocalFunding(stateDirectory,{orderId:order.id,taskId:inputEvidence(order,order.buyer).id,transactionHash:hash});return json(200,{hash});
       }
       if(path==='/drafts'){
         if(!/^0x[0-9a-f]{64}$/.test(body.id)||typeof body.datasetText!=='string')throw new Error('Invalid local input commitment.');
