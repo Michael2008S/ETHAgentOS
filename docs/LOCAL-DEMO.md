@@ -65,7 +65,7 @@ npm run demo:evidence
 
 ## 验证命令
 
-服务和模型文件准备完成且 CRE 已登录后，使用 `npm run demo:full -- --runtime .sites-runtime/isolated-demo/current.json --manage-models` 串行执行完整 41 步，按场景启动和释放模型。日志及报告保存到 `outputs/full-demo-*/`，单元、类型、构建和浏览器回归另行执行；浏览器也支持同一 `--runtime`。失败立即停止。仅在源码、链部署和服务实例保持不变时，使用相同 `--runtime` 加 `--resume outputs/full-demo-<id>/report.json` 显式续跑，保留 failedAttempts；实现变化后必须从第一步重跑。
+服务和模型文件准备完成且 CRE 已登录后，使用 `npm run demo:full -- --runtime .sites-runtime/isolated-demo/current.json --manage-models` 串行执行当前完整 47 步，按场景启动和释放模型。日志及报告保存到 `outputs/full-demo-*/`，单元、类型、构建和浏览器回归另行执行；浏览器也支持同一 `--runtime`。失败立即停止。仅在源码、链部署和服务实例保持不变时，使用相同 `--runtime` 加 `--resume outputs/full-demo-<id>/report.json` 显式续跑，保留 failedAttempts；实现变化后必须从第一步重跑。
 
 历史 37 步记录：`4ccad5b` 的 37 项最终步骤全部通过；完整 228 Node、21 Chromium、6 CRE SDK 回归及类型/构建也通过。第 35 步曾因默认 UDP DNS 失败，在同源码下经进程级网络参数续跑成功，原失败保留。报告及精确配置在 `outputs/full-demo-8001b0aa-da62-4655-bf28-b885ad6b3f44/`，详见 ROADMAP-IMPLEMENTATION.md 的最终验收。
 
@@ -115,6 +115,21 @@ HTTP demo 使用独立测试工作区。链上集成 demo 使用本地测试代�
 
 只停止当前管理器实际启动的子进程；匹配的预先运行服务可复用但不停止，未核实的占用端口拒绝替换。启动失败、退出和中断均清理拥有的句柄，中断后不能继续启动模型。续跑必须保留最初的管理模式。运行期间不另行执行 demo:cleanup；验收结束后再核查遗留进程，保留当前应用、链、供应商、插件和 MCP 以及全部历史。
 
-当前 41 步验收：实现提交 709bcd3，最终全部通过，报告与摘要清单在 outputs/full-demo-68ac37bf-7900-4cd9-a6f5-2daf67354a3b/。保留临时 HTTPS 超时、账户 API EOF 及两次同源码续跑。过程使用已核验的进程级 TUNNEL_EDGE，未修改系统 DNS/代理/TLS，不保证默认网络路径可达。
+历史 41 步验收：实现提交 709bcd3，最终全部通过，报告与摘要清单在 outputs/full-demo-68ac37bf-7900-4cd9-a6f5-2daf67354a3b/。保留临时 HTTPS 超时、账户 API EOF 及两次同源码续跑。过程使用已核验的进程级 TUNNEL_EDGE，未修改系统 DNS/代理/TLS，不保证默认网络路径可达。
 
 验收后六项本地服务正常，三个模型已停止。网页需要 AI 规划时，在项目目录单独运行 `npm run model:planning`；完整命令的 --manage-models 自行管理模型。公共链、实际 DON 与托管部署/调度继续暂缓。
+
+
+## 本地多业务闭环（2026-10-22）
+
+在 current.json 对应服务健康时执行 `npm run demo:local-business`。此独立验收包含八个场景：业务 A 持续监测与 B 报告并存；B 注资确认丢响应与授权绑定丢响应后恢复；B 失败退款并复用已付款前缀；人工处置、来源记忆和累计费用；A 不受 B 授权影响继续完成；独立消费者停止/重启后从已审阅游标续订；两窗口统计和续订成果核验；七笔唯一托管与空待处理队列。它读取公共主网 USDC 已终局数据，付款只使用本地测试代币，不广播公共链交易。
+
+逐项复验命令：`demo:business-authorizations`、`demo:business-repair`、`demo:monitor-renewal`、`demo:monitor-repair`、`demo:business-review`、`demo:business-archives`。监测失败修复须先完成混合子流程修复，再在监测卡片核对修复结果；核对只推进已验证游标，不自动开启新采购。续订需要重新审阅期限、预算和会话，不能回退游标。已结算历史可归档释放活跃名额，保留原证据及引用；总历史和存储仍有上限。
+
+每项业务使用独立应用会话与精确插件额度，在用户审阅过的共享链上包络内追加，避免新业务替换活跃授权。当前本地初始包络明确显示单笔 2500 分、额外日额度 10000 分和 24 小时；业务会话有各自更小的上限。网页保存可恢复的公开交易编号，不保存私钥、签名或消费者令牌。人工处置、记忆保存和语义索引是显式操作。
+
+按需模型按钮需要另一个终端运行 `npm run models:control`（回环 6100）；它仅管理固定三种本项目模型，空闲五分钟后释放自己启动的模型。模型停止时确定性业务仍可运行，规划和语义功能会如实提示未就绪。控制器常驻不代表模型占用内存。
+
+收据驱动的界面检查：先运行组合 demo，再将产出的证据路径传给 `AGENTOS_BUSINESS_REPORT=outputs/local-business-loop-<id>.json node scripts/test-browser.mjs --runtime .sites-runtime/isolated-demo/current.json --grep 'local business closed loop'`。覆盖 65% 参数刷新、0.29% 精确阈值、修复时间线、人工处置持久化、中英文和移动布局；此用例没有证据参数时跳过。
+
+最新组合验收为实现 d5a7ac7，八项通过；47 步全量序列的历史记录仍是 266c833，不应当作此轮重新执行的全回归。当前代码、证据及清理结果见 VALIDATION.md。公共链、DON、托管部署和调度继续暂缓。

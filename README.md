@@ -235,3 +235,6 @@ Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/
 插件审阅式修复：在付费工作流历史中选择已失败/取消且资金已终结的采购，核验付款、明确选择原输入或已付款成果，为剩余工作生成新方案。替代采购原子标记旧流程，退款仍计入累计目标费用。运行 `npm run demo:service-replanning`，见 [SERVICE-REPLANNING](docs/SERVICE-REPLANNING.md)。
 
 插件有界自动修复：后台消费者按固定服务、授权版本、会话、模型及累计费用/次数/期限生成修复方案，替代采购仍须明确审阅。停止后现有方案可审阅但不会重启自动化，失败/租约恢复不补次数。运行 `npm run demo:service-auto-repair`，见 [SERVICE-AUTOMATIC-REPAIR](docs/SERVICE-AUTOMATIC-REPAIR.md)。
+
+
+本地多业务闭环：运行 `npm run demo:local-business` 验证并存业务、授权中断恢复、失败退款后复用成果、消费者重启、监测续订及人工处置收据。按需模型控制器为 `npm run models:control`，不会启动托管任务。逐项验证、最新证据和资源清理见 [LOCAL-DEMO](docs/LOCAL-DEMO.md) 与 [VALIDATION](docs/VALIDATION.md)。
