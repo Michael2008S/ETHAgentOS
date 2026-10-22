@@ -21,11 +21,11 @@ export async function startReportService({asset,payTo,account,facilitatorOrigin,
   const path=new URL(req.url,base).pathname;
   if(req.method==='GET'&&path==='/health')return json(200,{status:'ok'});
   if(req.method==='GET'&&path==='/stats')return json(200,{results:journal.rows('reports').map(r=>({requestHash:r.requestHash,paymentId:r.paymentId,nonce:r.nonce,settlement:r.settlement,outputHash:r.report.terms.outputHash}))});
-  if(req.method==='POST'&&path==='/testing'){const b=await readJson(req);if(!['healthy','wrong-result','lost-response','outage','overpriced'].includes(b.mode))return json(400,{});mode=b.mode;return json(200,{mode});}
+  if(req.method==='POST'&&path==='/testing'){const b=await readJson(req);if(!['healthy','wrong-result','wrong-signature','repeat-402','lost-response','outage','overpriced'].includes(b.mode))return json(400,{});mode=b.mode;return json(200,{mode});}
   if(req.method!=='POST'||path!=='/v1/treasury-report')return json(404,{});
   const request=await checkX402ReportRequest(await readJson(req)),resource={url:base+path,description:'Deterministic treasury allocation report',mimeType:'application/json'};
   if(mode==='outage')return json(503,{error:'Reference report service unavailable.'});
-  if(!req.headers['payment-signature']){const required={x402Version:2,resource,accepts:[requirements()],extensions:{'payment-identifier':declarePaymentIdentifierExtension(true)}};return json(402,required,{'PAYMENT-REQUIRED':encodePaymentRequiredHeader(required)});}
+  if(!req.headers['payment-signature']||mode==='repeat-402'){const required={x402Version:2,resource,accepts:[requirements()],extensions:{'payment-identifier':declarePaymentIdentifierExtension(true)}};return json(402,required,{'PAYMENT-REQUIRED':encodePaymentRequiredHeader(required)});}
   const payload=decodePaymentSignatureHeader(req.headers['payment-signature']),r=requirements(),a=await checkPayloadSignature(payload,r),paymentId=extractPaymentIdentifier(payload);
   if(!paymentId||payload.resource?.url!==resource.url)return json(400,{});
   const requestHash=await digest(request),payloadHash=await digest(payload),key=a.from.toLowerCase()+':'+paymentId,nonceKey=a.from.toLowerCase()+':'+a.nonce;
@@ -48,7 +48,8 @@ export async function startReportService({asset,payTo,account,facilitatorOrigin,
   if(!locks.has(key))locks.set(key,operation().finally(()=>locks.delete(key)));
   const row=await locks.get(key);
   if(mode==='lost-response'){mode='healthy';req.socket.destroy();return;}
-  return json(200,row.report,{'PAYMENT-RESPONSE':encodePaymentResponseHeader(row.settlement)});
+  const delivered=mode==='wrong-signature'?{...row.report,signature:await account.signMessage({message:'Deliberately invalid upstream report signature'})}:row.report;
+  return json(200,delivered,{'PAYMENT-RESPONSE':encodePaymentResponseHeader(row.settlement)});
  },port);
  return {...server,requirements,close:async()=>{await server.close();await Promise.allSettled([...locks.values()]);journal.close();}};
 }

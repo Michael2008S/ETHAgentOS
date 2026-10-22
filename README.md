@@ -201,6 +201,8 @@ Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/
 
 x402 本地采购：运行 `npm run demo:x402`，自动启动独立的 HTTP/D1/EVM 实例，演示 USDC 国库报告的正常付款、错误报告退款和付款后丢失响应恢复，并完成中英文及移动端浏览器检查。用户每单固定托管 1.00 DemoUSDC，上游 0.20 由供应商自有钱包支付；失败时用户本金全额退 Vault，上游成本和原生 gas 由供应商承担。三单预期为用户托管 3.00、支付 2.00、退款 1.00，上游支出另记 0.60。演示使用历史 finalized USDC 样本回放及本地测试代币，结束后保留证据并停止本轮服务，不覆盖当前实例。设计、启动选项与验收边界见 [接入方案](docs/X402-INTEGRATION-DESIGN.md) 和 [实现记录](docs/X402-IMPLEMENTATION.md)。
 
+实时只读数据路径可单独运行 `npm run demo:x402 -- --live`：重新导入当时的 finalized Ethereum USDC 窗口，采购与退款仍使用独立本地测试链。样本回放与实时验收分别产出报告；它们均不部署公网或转移真实 USDC。
+
 可配置工作流：钱包页可组合 2–8 步已安装技能，引用前序已验收成果并根据结果决定是否采购；支持条件跳过、预算释放、嵌套成果复核、丢失响应与并发恢复。保留原两步 API。运行 `npm run demo:workflow-configurable`，协议与信任边界见 [WORKFLOWS](docs/WORKFLOWS.md)。公共网络仍按路线图单独验收。
 
 供应商组合工作流：每步可选独立供应商，固定注册身份、签名配置和收款方；在批准的单步费用上限内，待前序已付款成果确定后获取并验证签名报价。超额或撤权阻止新采购，报价丢响应保留持久检查点。运行 `npm run demo:workflow-suppliers`，协议与边界见 [SUPPLIER-WORKFLOWS](docs/SUPPLIER-WORKFLOWS.md)。

@@ -20,7 +20,7 @@ import {vaultFunder} from '../lib/agentos/vault-executor.ts';
 import {authorizeX402} from '../lib/agentos/x402-authority.ts';
 import {x402SupplierHooks} from '../lib/agentos/x402-supplier-runtime.ts';
 
-export async function x402VaultFixture(){
+export async function x402VaultFixture(options={}){
  const root=await mkdtemp(tmpdir()+'/agentos-x402-vault-'),port=await freePort(),origin='http://127.0.0.1:'+port,db=new DatabaseSync(root+'/workspace.sqlite');
  for(const file of readdirSync('drizzle').filter(f=>/^\d+.*\.sql$/.test(f)).sort())db.exec(readFileSync('drizzle/'+file,'utf8'));
  const database={prepare(sql){return {bind(...args){return {run:async()=>({meta:db.prepare(sql).run(...args)}),first:async()=>db.prepare(sql).get(...args)??null,all:async()=>({results:db.prepare(sql).all(...args)})};}};}};
@@ -30,7 +30,7 @@ export async function x402VaultFixture(){
  let stack;
  const callback=await localServer(async(req,json,base)=>{const path=new URL(req.url,base).pathname;if(path!=='/api/runtime/x402-authorize'||req.method!=='POST')return json(404,{});try{json(200,await authorizeX402(store,req.headers['x-agentos-x402-ticket']??'',await readJson(req,4096),async o=>{await checkVaultBinding(stack.client,stack.chain.config,o.vault);await authorizeSupplier(stack.client,stack.chain.config,o.agentIdentity,o.supplier);}));}catch(error){json(error.code==='FORBIDDEN'?403:409,{error:error.message});}},port);
  try{
-  stack=await startX402Stack({root:root+'/stack',appOrigin:origin});const {client,walletFor,accounts,chain,supplier:remote}=stack,deployment=chain.config,buyer=accounts[0].address,seller=accounts[4].address,contracts=(await import('../scripts/compile-contracts.mjs')).compile();
+  stack=await startX402Stack({root:root+'/stack',appOrigin:origin,...options});const {client,walletFor,accounts,chain,supplier:remote}=stack,deployment=chain.config,buyer=accounts[0].address,seller=accounts[4].address,contracts=(await import('../scripts/compile-contracts.mjs')).compile();
   const write=async(address,abi,functionName,args=[],account=accounts[0])=>{const hash=await walletFor(account).writeContract({address,abi,functionName,args,gas:6000000n});if((await client.waitForTransactionReceipt({hash})).status!=='success')throw Error('Fixture transaction failed.');return hash;};
   const profile=await identityDocument((await store.read(owner)).state,owner,'sage',origin),registration=await write(deployment.identityRegistry,identityABI,'register',[profile.agentURI],accounts[4]),receipt=await client.getTransactionReceipt({hash:registration}),registered=receipt.logs.map(l=>{try{return decodeEventLog({abi:identityABI,eventName:'Registered',data:l.data,topics:l.topics}).args;}catch{return null;}}).find(Boolean),id=String(registered.agentId),uri=registrationDataURI(completeRegistrationDocument(profile.document,31337,deployment.identityRegistry,id));
   await write(deployment.identityRegistry,identityABI,'setAgentURI',[BigInt(id),uri],accounts[4]);
