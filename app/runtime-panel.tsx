@@ -2,6 +2,7 @@
 import { useEffect,useState,useCallback } from 'react';
 import { useLanguage } from '@/lib/i18n/context';
 import type { RuntimeHealth } from '@/lib/agentos/health';
+import {LocalModelPanel} from './local-model-panel';
 import {ConsumerPanel} from './consumer-panel';
 export function useRuntimeHealth(){
  const [health,setHealth]=useState<RuntimeHealth|null>(null);
@@ -15,6 +16,6 @@ export function RuntimePanel({health,refresh}:{health:RuntimeHealth|null;refresh
  <p role="status">{tr(health?.ready?'Healthy':'Degraded')}{health?' · '+new Date(health.checkedAt).toLocaleTimeString():''}</p>
  {health?<><div className="chain-summary">{Object.entries(health.services).map(([key,value])=><div key={key}><span>{tr(labels[key]??key)}</span><b>{tr(value)}</b></div>)}</div><p>{tr('Last consumer contact')}: {health.lastConsumerAt?new Date(health.lastConsumerAt).toLocaleString():tr('Not observed')}</p><p>{tr('Queue')}: {Object.entries(health.queue).map(([key,n])=>tr(key)+' '+n).join(' · ')}</p>{health.oldestPendingAt&&<p>{tr('Oldest pending job')}: {new Date(health.oldestPendingAt).toLocaleString()}</p>}<button disabled={busy||!health.queue.dead} className="btn secondary small" onClick={async()=>{setBusy(true);try{const r=await fetch('/api/runtime/queue',{method:'POST'});if(!r.ok)throw new Error();setMessage('Failed jobs queued for retry.');await refresh();}catch{setMessage('Queue retry failed.');}finally{setBusy(false);}}}>{tr('Retry failed jobs')}</button></>:<p>{tr('Status unavailable. Check the local services.')}</p>}
  <p className="form-note">{tr('Consumer contact is observed activity, not a guarantee of future scheduling.')}</p>{message&&<p role="status">{tr(message)}</p>}
- <ConsumerPanel/>
+ <LocalModelPanel refresh={refresh}/><ConsumerPanel/>
  </div></section>;
 }

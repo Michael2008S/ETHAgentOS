@@ -85,7 +85,13 @@
     "demo:treasury-business": "node scripts/demo-treasury-business.mjs",
     "demo:mixed-planning": "node scripts/demo-mixed-planning.mjs",
     "demo:business-wizard": "node scripts/demo-business-wizard.mjs",
-    "demo:usdc-monitor": "node scripts/demo-usdc-monitor.mjs"
+    "demo:usdc-monitor": "node scripts/demo-usdc-monitor.mjs",
+    "models:control": "node scripts/model-control.mjs",
+    "demo:business-authorizations": "node scripts/demo-business-authorizations.mjs",
+    "demo:business-repair": "node scripts/demo-business-repair.mjs",
+    "demo:monitor-renewal": "node scripts/demo-monitor-renewal.mjs",
+    "demo:business-review": "node scripts/demo-business-review.mjs",
+    "demo:business-archives": "node scripts/demo-business-archives.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

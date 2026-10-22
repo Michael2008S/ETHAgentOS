@@ -23,6 +23,6 @@ export async function GET(request:Request){
    env.DB.prepare("SELECT MIN(created_at) AS at FROM agentos_runtime_jobs WHERE owner_id=? AND status IN ('pending','leased','dead')").bind(ownerId).first<{at:number|null}>(),
   ]);
   const services:Record<string,ServiceState>={database:'healthy',chain:chain as ServiceState,model:model as ServiceState,planning:planning as ServiceState,memory:memory as ServiceState,plugins:plugins as ServiceState,supplier:supplier as ServiceState,consumer:consumerState(consumer)};
-  return Response.json({checkedAt:new Date().toISOString(),ready:Object.values(services).every(s=>s==='healthy'||s==='busy')&&!queue.dead,services,queue,lastConsumerAt:consumer?new Date(consumer.last_seen).toISOString():null,oldestPendingAt:oldest?.at?new Date(oldest.at).toISOString():null},{headers:{'Cache-Control':'no-store'}});
+  return Response.json({checkedAt:new Date().toISOString(),ready:Object.entries(services).filter(([key])=>!['model','planning','memory'].includes(key)).every(([,s])=>s==='healthy'||s==='busy')&&!queue.dead,services,queue,lastConsumerAt:consumer?new Date(consumer.last_seen).toISOString():null,oldestPendingAt:oldest?.at?new Date(oldest.at).toISOString():null},{headers:{'Cache-Control':'no-store'}});
  }catch(error){return apiFailure(error,'runtime');}
 }
