@@ -37,7 +37,7 @@ async function updateReady(bucket:R2Bucket,key:string,id:Hex,add:boolean){
  }
  throw new Fault(503,'Ready index is busy. Retry the same task.');
 }
-export default {async fetch(request:Request,env:EvidenceEnvironment):Promise<Response>{try{
+const evidenceWorker={async fetch(request:Request,env:EvidenceEnvironment):Promise<Response>{try{
  const origin=new URL(env.PUBLIC_ORIGIN);if(origin.protocol!=='https:'||origin.origin!==env.PUBLIC_ORIGIN||!/^0x[0-9a-fA-F]{40}$/.test(env.ESCROW_ADDRESS)||/^0x0+$/.test(env.ESCROW_ADDRESS))throw new Fault(503,'Evidence service is not configured.');
  const url=new URL(request.url);if(url.origin!==origin.origin)throw new Fault(400,'Invalid evidence origin or query.');
  const namespace='/v1/11155111/'+env.ESCROW_ADDRESS.toLowerCase(),keyPrefix=namespace.slice(1);
@@ -77,3 +77,5 @@ export default {async fetch(request:Request,env:EvidenceEnvironment):Promise<Res
  if(await env.BUCKET.head(archivedKey))await updateReady(env.BUCKET,keyPrefix+'/_ready',body.id,false);
  return json({stored:true});
 }catch(error){return json({error:error instanceof Fault?error.message:'Evidence service is unavailable.'},error instanceof Fault?error.status:503);}}};
+
+export default evidenceWorker;

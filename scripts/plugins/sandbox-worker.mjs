@@ -8,7 +8,7 @@ const vm=runtime.newContext(),pending=new Map();let remaining=limits.cpuMs,deadl
 const cpuClock=()=>{const value=process.threadCpuUsage();return value.user+value.system;};
 runtime.setInterruptHandler(()=>cpuClock()>deadline);
 function cpu(fn){if(remaining<=0)throw Error('budget');const before=cpuClock();deadline=before+remaining*1000;try{return fn();}finally{remaining-=(cpuClock()-before)/1000;}}
-function settle(message){if(finished)return;const deferred=pending.get(message.ordinal);if(!deferred)return;pending.delete(message.ordinal);try{cpu(()=>{const value=message.error?vm.newError('Tool capability refused or unavailable.'):vm.newString(message.json);try{message.error?deferred.reject(value):deferred.resolve(value);}finally{value.dispose();}});}catch{finished=true;parentPort.postMessage({error:true,reason:remaining<=0?'cpu-limit':'vm-rejected'});}finally{deferred.dispose();const resume=wake;wake=undefined;resume?.();}}
+function settle(message){if(finished)return;const deferred=pending.get(message.ordinal);if(!deferred)return;pending.delete(message.ordinal);try{cpu(()=>{const value=message.error?vm.newError('Tool capability refused or unavailable.'):vm.newString(message.json);try{if(message.error)deferred.reject(value);else deferred.resolve(value);}finally{value.dispose();}});}catch{finished=true;parentPort.postMessage({error:true,reason:remaining<=0?'cpu-limit':'vm-rejected'});}finally{deferred.dispose();const resume=wake;wake=undefined;resume?.();}}
 parentPort.on('message',settle);
 const call=vm.newFunction('__agentosTool',(server,name,args)=>{
  if(verify||ordinal>=limits.maxToolCalls){parentPort.postMessage({error:true});throw Error('Tool capability limit.');}
