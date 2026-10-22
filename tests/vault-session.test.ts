@@ -22,3 +22,6 @@ test('automatic Vault drafts reserve the workspace daily budget before any chain
  state=await createOrder(state,draft(),deployment,now);assert.equal(state.chainOrders![0].status,'funding');assert.equal(state.chainOrders![0].funding,null);
  await assert.rejects(createOrder(state,draft(),deployment,now),/daily allowance/);
 });
+
+import {refreshVaultChallenge,sessionBinding} from '../lib/agentos/vault.ts';
+test('expired unsigned challenges renew without changing the bounded authority',()=>{const {session}=fixture();delete session.signature;session.message='Grant: '+JSON.stringify(sessionBinding(session))+'\nChallenge expires: '+session.challengeExpiresAt;const renewed=refreshVaultChallenge(session,Date.parse(now));assert.deepEqual(sessionBinding(renewed),sessionBinding(session));assert.notEqual(renewed.challengeExpiresAt,session.challengeExpiresAt);assert.ok(renewed.message.endsWith(renewed.challengeExpiresAt));});

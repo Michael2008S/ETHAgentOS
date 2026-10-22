@@ -90,3 +90,5 @@ function vaultMoneyAllowance(state:Workspace,sessionId:string,buyer:Address,budg
  if(used+future+quote>session.totalCents)throw new DomainError('Vault session total allowance would be exceeded.','FORBIDDEN');
  return session;
 }
+
+export function refreshVaultChallenge(session:VaultSession,now=Date.now()){if(session.signature||session.revokedAt)throw new DomainError('Only an unsigned active challenge may be refreshed.','FORBIDDEN');const challengeExpiresAt=new Date(now+300000).toISOString();return {...session,message:session.message.replace('Challenge expires: '+session.challengeExpiresAt,'Challenge expires: '+challengeExpiresAt),challengeExpiresAt};}
