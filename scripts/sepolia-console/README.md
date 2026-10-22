@@ -28,3 +28,17 @@ node scripts/sepolia-console/verify-workspace.mjs
 This independently reads Sepolia and the persisted API state, verifies the binding signature and canonical identity snapshot, recomputes the preview commitment, and saves `workspace-verified.json`.
 
 CRE deployment access, actual workflow/receiver deployment and binding, public immutable evidence hosting, fundable orders, paid reviews and revocation remain pending. No substitute workflow ID, mock forwarder or payment claim is used.
+
+## Deploy test token and unbound receiver
+
+Use the already-connected Sepolia test account `0xa94b3b3A8398087aB05CB85A97771f5367110062`. Click **3. 部署无价值测试代币**, confirm a contract-creation transaction with zero ETH value, and wait for two confirmations. Leave the future workflow owner field set to that same address. The immutable future workflow name is `agentos-delivery-staging` (`0x66363765303630383763`); later CRE registration must use that owner/name. This is a planned owner until the CRE account links it, not proof of an existing workflow.
+
+Click **4. 部署待绑定的 CRE 接收合约**, review the new contract-creation transaction, and confirm. The token argument is the preceding verified creation address. Forwarder `0xF8344CFd5c43616a4366C34E3EEE75af79a74482` is rechecked against live `cre workflow supported-chains` output. No workflow ID is supplied to the constructor. Do not mint, approve, bind or fund in this stage. Keep the existing identity/workspace document unchanged.
+
+After both transactions succeed, run:
+
+```sh
+node scripts/sepolia-console/verify-deployment.mjs
+```
+
+The verifier requires the prepared `deployment-plan.json` and transaction records in the evidence directory. It checks canonical receipts and two confirmations, zero ETH value and expected deployer, exact compiled creation bytecode/constructor arguments, deployed code, immutable getters and metadata hash, ERC-165 interfaces, token decimals, `workflowId == 0`, zero escrow token balance, no WorkflowBound/Opened events, and `eth_call` funding rejection with `workflow not bound`. It submits no transactions. It saves full receipts and source fingerprints to `deployment-verified.json`, plus an explicitly inactive `deployment-unbound.json`; no active payment configuration is installed.
