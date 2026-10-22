@@ -1,4 +1,5 @@
 'use client';
+import {useNow} from './use-now';
 import {useEffect,useRef,useState} from 'react';
 import type {ChainOrder} from '@/lib/agentos/orders';
 import type {AgentWalletSession} from '@/sdk/wallet';
@@ -20,9 +21,10 @@ type Editor={parallelism:string;title:string;sessionId:string;input:string;timeo
 const newStep=(agentId='',budget='4',source='original'):EditorStep=>({agentId,budget,source,condition:'always',field:'concentrated',operator:'eq',value:'true'});
 const initial=():Editor=>({parallelism:'sequential',title:'Treasury allocation review',sessionId:'',timeout:'300',input:JSON.stringify(sample,null,2),steps:[newStep('sage'),newStep('atlas','3','0')]});
 export function WorkflowPanel({scope,session,agents,sessions,orders,busy,perform,onChanged}:{scope:string;session:AgentWalletSession;agents:Agent[];sessions:VaultSession[];orders:ChainOrder[];busy:boolean;perform:(action:()=>Promise<void>)=>Promise<void>;onChanged?:()=>Promise<void>}){
+ const now=useNow();
  const {tr}=useLanguage(),[workflows,setWorkflows]=useState<AgentWorkflow[]>([]),[error,setError]=useState(''),[suppliers,setSuppliers]=useState<SupplierDescriptor[]>([]),[identities,setIdentities]=useState<AgentIdentity[]>([]),[editor,setEditor]=useState<Editor>(initial),[loaded,setLoaded]=useState(''),generation=useRef(0),lastSeen=useRef('');
  const draftKey='agentos.workflow-draft.v2:'+scope+':'+session.account.toLowerCase(),client=new AgentWorkflowClient(session),services=agents.filter(a=>a.enabled),supplierMode=editor.steps.some(s=>s.supplierId),selectedSkills=editor.steps.map(step=>agents.find(a=>a.id===step.agentId)?.skill);
- const active=sessions.filter(s=>s.signature&&!s.revokedAt&&s.owner.toLowerCase()===session.account.toLowerCase()&&Number(s.expires)*1000>Date.now()&&selectedSkills.every(skill=>skill&&s.skills.includes(skill)));
+ const active=sessions.filter(s=>s.signature&&!s.revokedAt&&s.owner.toLowerCase()===session.account.toLowerCase()&&Number(s.expires)*1000>now&&selectedSkills.every(skill=>skill&&s.skills.includes(skill)));
  function save(next:Editor){setEditor(next);try{sessionStorage.setItem(draftKey,JSON.stringify(next));}catch{}}
  const readSteps=():WorkflowStepDraft[]=>editor.steps.map(s=>({agentId:s.agentId,...(s.supplierId?{supplierId:s.supplierId}:{}),budget:Math.round(Number(s.budget)*100),input:s.source==='original'?{from:'original'}:s.source==='merge'?{from:'merge',steps:s.mergeSteps??[]}:{from:'step',step:Number(s.source)},...(s.condition==='always'?{}:{when:{step:Number(s.condition),field:s.field,operator:s.operator,value:s.field==='concentrated'?s.value==='true':Number(s.value)}})}));
  function changeStep(index:number,patch:Partial<EditorStep>){save({...editor,steps:editor.steps.map((step,i)=>i===index?{...step,...patch}:step)});}

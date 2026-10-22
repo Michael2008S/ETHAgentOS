@@ -1,9 +1,11 @@
 'use client';
+import {useNow} from './use-now';
 import {useEffect,useState,useCallback} from 'react';
 import {AgentConsumerClient} from '@/sdk/consumers';
 import type {ConsumerCredential} from '@/lib/agentos/consumer-auth';
 import {useLanguage} from '@/lib/i18n/context';
 export function ConsumerPanel(){
+ const now=useNow();
  const {tr}=useLanguage(),[credentials,setCredentials]=useState<ConsumerCredential[]>([]),[issued,setIssued]=useState<{id:string;token:string}|null>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
  const refresh=useCallback(async()=>{try{setCredentials(await new AgentConsumerClient().list());}catch{setMessage('Consumer access is unavailable.');}},[]);useEffect(()=>{void refresh();},[refresh]);
  return <details className="chain-details"><summary>{tr('Recovery consumer access')}</summary>
@@ -13,7 +15,7 @@ export function ConsumerPanel(){
    <button className="btn secondary small" disabled={busy}>{tr('Issue consumer credential')}</button>
   </form>
   {issued&&<div><p className="form-note">{tr('Shown once. Store the token in your consumer host’s secret environment. Refreshing this page clears it.')}</p><label className="field">{tr('Consumer token')}<input type="password" readOnly value={issued.token} autoComplete="off"/></label><button className="btn secondary small" onClick={async()=>{try{await navigator.clipboard.writeText(issued.token);setMessage('Consumer token copied.');}catch{setMessage('Clipboard is unavailable.');}}}>{tr('Copy consumer token')}</button></div>}
-  {credentials.map(c=><div className="form-note" key={c.id}><b>{c.name}</b><p>{tr('Expires')}: {new Date(c.expiresAt).toLocaleString()} · {tr(c.revokedAt?'Revoked':Date.parse(c.expiresAt)<=Date.now()?'Expired':'Active')}</p>{!c.revokedAt&&<button className="btn secondary small" disabled={busy} onClick={async()=>{setBusy(true);try{await new AgentConsumerClient().revoke(c.id);if(issued?.id===c.id)setIssued(null);await refresh();setMessage('Consumer credential revoked.');}catch{setMessage('Consumer access is unavailable.');}finally{setBusy(false);}}}>{tr('Revoke consumer credential')}</button>}</div>)}
+  {credentials.map(c=><div className="form-note" key={c.id}><b>{c.name}</b><p>{tr('Expires')}: {new Date(c.expiresAt).toLocaleString()} · {tr(c.revokedAt?'Revoked':Date.parse(c.expiresAt)<=now?'Expired':'Active')}</p>{!c.revokedAt&&<button className="btn secondary small" disabled={busy} onClick={async()=>{setBusy(true);try{await new AgentConsumerClient().revoke(c.id);if(issued?.id===c.id)setIssued(null);await refresh();setMessage('Consumer credential revoked.');}catch{setMessage('Consumer access is unavailable.');}finally{setBusy(false);}}}>{tr('Revoke consumer credential')}</button>}</div>)}
   {message&&<p role="status">{tr(message)}</p>}
  </details>;
 }
