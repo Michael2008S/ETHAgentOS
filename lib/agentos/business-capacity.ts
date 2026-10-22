@@ -14,6 +14,7 @@ export function businessCapacity(state:Workspace,pluginVersions=0){
   ['orders',(state.chainOrders??[]).length,futurePurchaseReservations(state).length,300,'export'],
   ['mixed-retained',(state.mixedWorkflows??[]).length,0,100,'export'],
   ['monitor-retained',(state.usdcMonitors??[]).length,0,100,'export'],
+  ['alert-reviews',(state.businessAlertReviews??[]).length,0,200,'export'],
   ['reviews',(state.businessReviews??[]).length,0,200,'export'],
   ['plugin-versions',pluginVersions,0,100,'export'],
  ] as const;
