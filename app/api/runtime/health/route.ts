@@ -4,7 +4,7 @@ import { owner,isLoopback } from '@/lib/agentos/auth';
 import { read } from '@/lib/agentos/store';
 import { serverChain } from '@/lib/agentos/chain-config';
 import { queueSummary } from '@/lib/agentos/queue';
-import { consumerState,type ServiceState } from '@/lib/agentos/health';
+import { consumerState,monitorSourceState,type ServiceState } from '@/lib/agentos/health';
 import { apiFailure } from '@/lib/agentos/api-failure';
 import {localServices} from '@/lib/agentos/local-services';
 async function healthy(url:string){try{const r=await fetch(url,{redirect:'manual',signal:AbortSignal.timeout(2000)});await r.body?.cancel();return r.ok;}catch{return false;}}
@@ -24,7 +24,7 @@ export async function GET(request:Request){
    env.DB.prepare("SELECT MIN(created_at) AS at FROM agentos_runtime_jobs WHERE owner_id=? AND status IN ('pending','leased','dead')").bind(ownerId).first<{at:number|null}>(),
   ]);
   const services:Record<string,ServiceState>={database:'healthy',chain:chain as ServiceState,model:model as ServiceState,planning:planning as ServiceState,memory:memory as ServiceState,plugins:plugins as ServiceState,supplier:supplier as ServiceState,consumer:consumerState(consumer)};
-  const monitors=(snapshot.state.usdcMonitors??[]).filter(m=>['running','paused','stopping'].includes(m.status)),dataSource={mode:configuredDataReplay(request)?'captured-finalized-replay':'live-finalized-read',status:monitors.some(m=>m.sourceFailures)?'degraded':monitors.length&&monitors.every(m=>m.lastSuccessfulScanAt)?'healthy':'unchecked',activeMonitors:monitors.length};
-  return Response.json({dataSource,checkedAt:new Date().toISOString(),ready:Object.entries(services).filter(([key])=>!['model','planning','memory'].includes(key)).every(([,s])=>s==='healthy'||s==='busy')&&!queue.dead&&dataSource.status!=='degraded',services,queue,lastConsumerAt:consumer?new Date(consumer.last_seen).toISOString():null,oldestPendingAt:oldest?.at?new Date(oldest.at).toISOString():null},{headers:{'Cache-Control':'no-store'}});
+  const monitors=(snapshot.state.usdcMonitors??[]).filter(m=>['running','paused','stopping'].includes(m.status)),dataSource={mode:configuredDataReplay(request)?'captured-finalized-replay':'live-finalized-read',status:monitorSourceState(monitors)==='unavailable'?'degraded':monitorSourceState(monitors),activeMonitors:monitors.length};
+  return Response.json({dataSource,checkedAt:new Date().toISOString(),ready:Object.entries(services).filter(([key])=>!['model','planning','memory'].includes(key)).every(([,s])=>s==='healthy'||s==='busy')&&!queue.dead&&!['degraded','stale'].includes(dataSource.status),services,queue,lastConsumerAt:consumer?new Date(consumer.last_seen).toISOString():null,oldestPendingAt:oldest?.at?new Date(oldest.at).toISOString():null},{headers:{'Cache-Control':'no-store'}});
  }catch(error){return apiFailure(error,'runtime');}
 }
