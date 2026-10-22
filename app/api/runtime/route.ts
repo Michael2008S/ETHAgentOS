@@ -1,3 +1,6 @@
+import {pendingMixed,mixedDrivesPlugin} from '@/lib/agentos/mixed-workflow';
+import {runMixedWorkflow} from '@/lib/agentos/mixed-workflow-runner';
+import {mixedStore,configuredMixedRuntime} from '@/lib/agentos/mixed-workflow-runtime';
 import {runPluginPurchase} from '@/lib/agentos/plugin-purchase-runner';
 import {configuredPluginPurchaseRuntime} from '@/lib/agentos/plugin-purchase-runtime';
 import {runPluginJob} from '@/lib/agentos/plugin-runner';
@@ -37,9 +40,11 @@ export async function POST(request: Request) {
     const repairs=repairWorkItems((await read(ownerId)).state).filter(p=>p.notBefore<=Date.now()).slice(0,2),repairResults=[];
     if(repairs.length){const runtime=await configuredRepairRuntime(request,before.scope);for(const repair of repairs)repairResults.push(await runWorkflowRepair({read,updateWorkspace},ownerId,repair.taskId,runtime));}
     const plugins=((await read(ownerId)).state.pluginJobs??[]).filter(j=>j.status==='queued'||j.status==='running').slice(0,2),pluginResults=[];for(const job of plugins)pluginResults.push(await runPluginJob(pluginDatabase(),ownerId,job.id,()=>configuredPluginExecutor(request)));
-    const pluginPurchases=((await read(ownerId)).state.pluginPurchases??[]).filter(f=>f.status==='running'||f.status==='cancelling').slice(0,2),pluginPurchaseResults=[];for(const flow of pluginPurchases)pluginPurchaseResults.push(await runPluginPurchase(pluginDatabase(),ownerId,flow.id,()=>configuredPluginPurchaseRuntime(request)));
+    const mixedResults=[];for(const f of pendingMixed((await read(ownerId)).state).slice(0,2))mixedResults.push(await runMixedWorkflow(mixedStore(),ownerId,f.id,()=>configuredMixedRuntime(request,ownerId)));
+    const pluginState=(await read(ownerId)).state;
+    const pluginPurchases=(pluginState.pluginPurchases??[]).filter(f=>(f.status==='running'||f.status==='cancelling')&&!mixedDrivesPlugin(pluginState,f.id)).slice(0,2),pluginPurchaseResults=[];for(const flow of pluginPurchases)pluginPurchaseResults.push(await runPluginPurchase(pluginDatabase(),ownerId,flow.id,()=>configuredPluginPurchaseRuntime(request)));
     const current = await read(ownerId);
-    return Response.json({...current, runtime:{results,orderResults,workflowResults,routeResults,repairResults,pluginResults,pluginPurchaseResults,pending:(current.state.pluginPurchases??[]).filter(f=>f.status==='running'||f.status==='cancelling').length+(current.state.pluginJobs??[]).filter(j=>j.status==='queued'||j.status==='running').length+repairWorkItems(current.state).length+pendingTasks(current.state).length+pendingOrders(current.state).length+pendingWorkflows(current.state).length+pendingPurchaseRoutes(current.state).length}}, {headers:{'Cache-Control':'no-store'}});
+    return Response.json({...current, runtime:{mixedResults,results,orderResults,workflowResults,routeResults,repairResults,pluginResults,pluginPurchaseResults,pending:pendingMixed(current.state).length+(current.state.pluginPurchases??[]).filter(f=>f.status==='running'||f.status==='cancelling').length+(current.state.pluginJobs??[]).filter(j=>j.status==='queued'||j.status==='running').length+repairWorkItems(current.state).length+pendingTasks(current.state).length+pendingOrders(current.state).length+pendingWorkflows(current.state).length+pendingPurchaseRoutes(current.state).length}}, {headers:{'Cache-Control':'no-store'}});
   } catch (error) {
     return apiFailure(error,'runtime');
   }

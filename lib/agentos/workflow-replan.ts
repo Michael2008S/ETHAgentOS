@@ -1,3 +1,4 @@
+import {verifyMixed} from './mixed-workflow.ts';
 import {z} from 'zod';
 import {canonical} from '../../cre/workflow/verify.ts';
 import {digest,DomainError} from './engine.ts';
@@ -68,7 +69,7 @@ export async function buildWorkflowReplan(state:Workspace,sourceId:string,buyer:
 }
 /** Called again before each new funding intent, including roots not chosen by that child. */
 export async function verifyReplanFunding(state:Workspace,order:ChainOrder,chain:OrderChain){
- if(!order.workflowId)return;const current=workflow(state,order.workflowId);if(!current.replan)return;
+ if(!order.workflowId)return;const mixed=state.mixedWorkflows?.find(f=>f.id===order.workflowId);if(mixed){await verifyMixed(mixed);const step=mixed.steps.find(s=>s.childId===order.id);if(mixed.status!=='running'||!step||step.service.executor==='plugin'||step.inputHash!==order.inputHash||step.requestId!==order.requestId||step.service.binding.agentId!==order.agentId||step.maxPriceCents!==order.budget||mixed.buyer.toLowerCase()!==order.buyer.toLowerCase()||canonical(mixed.deployment)!==canonical(order.deployment))throw new DomainError('Mixed funding commitment changed.','FORBIDDEN');return;}const current=workflow(state,order.workflowId);if(!current.replan)return;
  const context=current.replan,source=workflow(state,context.sourceWorkflowId),proposal=state.workflowPlans?.find(p=>p.id===current.planId);
  if(current.status!=='running'||source.supersededBy!==current.id||!proposal||proposal.status!=='accepted'||proposal.workflowId!==current.id||canonical(proposal.replan)!==canonical(context))throw new DomainError('Replanned workflow no longer authorizes new funding.','FORBIDDEN');
  const {digest:expected,status:_,workflowId:__,acceptedAt:___,dismissedAt:____,...terms}=proposal;

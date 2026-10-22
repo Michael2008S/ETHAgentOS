@@ -1,3 +1,4 @@
+import {handoffMixed,mixedPluginRuns} from './mixed-workflow.ts';
 import {digest,DomainError} from './engine.ts';
 import {advanceServiceRepairPolicies} from './service-repair-policy.ts';
 import {readPluginFlow,canonicalPluginPaidRoot} from './plugin-paid-memory.ts';
@@ -24,9 +25,10 @@ export function pluginPurchaseDailyExposure(state:Workspace,deployment:WalletDep
  const used=(state.chainOrders??[]).filter(o=>matches(o.deployment)&&(o.funding||o.vault&&o.status==='funding')).reduce((n,o)=>n+(o.settlement?.status==='paid'?(o.settledAt?.slice(0,10)===now.slice(0,10)?o.quote:0):!o.settlement?o.budget:0),0);
  return used+futurePurchaseReservations(state,now).filter(r=>matches(r.deployment)).reduce((n,r)=>n+r.budget,0);
 }
-export async function createPluginPurchase(store:PluginDatabase,owner:string,raw:PluginPurchaseDraft,getContext:()=>Promise<PluginPurchaseContext>,now=new Date().toISOString(),review?:ServicePlanReview){
+export async function createPluginPurchase(store:PluginDatabase,owner:string,raw:PluginPurchaseDraft,getContext:()=>Promise<PluginPurchaseContext>,now=new Date().toISOString(),review?:ServicePlanReview,mixed?:{id:string;index:number;token:string;parent?:import('./mixed-workflow.ts').MixedStep['parent']}){
  const body=pluginPurchaseRequestSchema.parse(raw),draftHash=await digest(body),id='plugin-purchase-'+body.requestId;let context:Promise<PluginPurchaseContext>|undefined;
  return mutatePlugin(store,owner,async s=>{
+  if(mixed)s={...s,state:handoffMixed(s.state,mixed,id,await digest(body.input))};
   const prior=await store.database.prepare('SELECT data FROM agentos_plugin_purchases WHERE owner_id=? AND id=?').bind(owner,id).first<{data:string}>();
   if(prior){const flow=JSON.parse(prior.data) as PluginPurchaseWorkflow;if(flow.draftHash!==draftHash||canonical(flow.planReview??null)!==canonical(review??null))throw new DomainError('Plugin purchase identifier already has different parameters.','IDEMPOTENCY_CONFLICT');return {state:s.state,value:flow};}
   const approved=review?await approveServicePlan(s.state,review,s.scope,body,now):s.state;
@@ -37,14 +39,15 @@ export async function createPluginPurchase(store:PluginDatabase,owner:string,raw
   if(review&&body.steps.some(step=>step.maxPriceCents!==c.priceCents))throw new DomainError('Reviewed service price changed. Generate a new plan.','FORBIDDEN');
   if(!s.state.policy.active||!Number.isSafeInteger(c.priceCents)||c.priceCents<1||c.priceCents>1000000||!c.runtime.deliverySigner)throw new DomainError('Authenticated paid plugin execution is unavailable.','FORBIDDEN');
   const {configHash,...terms}=c.runtime;if(await digest(terms)!==configHash)throw new DomainError('Plugin runtime commitment differs.','FORBIDDEN');
-  if((s.state.pluginPurchases?.length??0)>=20||(s.state.pluginJobs?.length??0)+pendingPluginPurchaseSlots(s.state)+body.steps.length>100)throw new DomainError('Plugin purchase or reserved job history limit reached.');
+  if((s.state.pluginPurchases?.length??0)+mixedPluginRuns(s.state)>=20||(s.state.pluginJobs?.length??0)+pendingPluginPurchaseSlots(s.state)+mixedPluginRuns(s.state)+body.steps.length>100)throw new DomainError('Plugin purchase or reserved job history limit reached.');
   const total=c.priceCents*body.steps.length;if(total>body.totalBudget||body.steps.some(p=>c.priceCents>p.maxPriceCents||p.maxPriceCents>s.state.policy.maxTaskBudget))throw new DomainError('Plugin quotes exceed the reviewed fees or per-task policy.','FORBIDDEN');
   if(pluginPurchaseDailyExposure(s.state,c.deployment,now)+total>s.state.policy.dailyBudget)throw new DomainError('Plugin workflow exceeds the shared daily budget.','FORBIDDEN');
   const services:ServiceDescriptor[]=[];
   const grants=new Map<string,NonNullable<Awaited<ReturnType<typeof pluginGrant>>>>(),steps:PluginPurchaseWorkflow['steps']=[];let session:VaultSession|undefined,minExpiry=Infinity,requiredMs=20000;
   for(const [index,step]of body.steps.entries()){
    const installed=await pluginInstallation(store.database,owner,step.pluginId),grant=grants.get(step.pluginId)??await pluginGrant(store.database,owner,step.pluginId);
-   if(!installed||installed.manifestHash!==step.manifestHash||c.runtime.configHash!==step.runtimeHash||!grant?.enabled||grant.manifestHash!==step.manifestHash||grant.runtimeHash!==step.runtimeHash||grant.expiresAt<=now||grant.used>=grant.maxRuns)throw new DomainError('An available exact plugin execution grant is required.','FORBIDDEN');
+   if(!installed||installed.manifestHash!==step.manifestHash||c.runtime.configHash!==step.runtimeHash||!grant?.enabled||grant.manifestHash!==step.manifestHash||grant.runtimeHash!==step.runtimeHash||grant.expiresAt<=now||grant.used+mixedPluginRuns(s.state,step.pluginId)>=grant.maxRuns)throw new DomainError('An available exact plugin execution grant is required.','FORBIDDEN');
+   if(mixed&&grant.epoch!==s.state.mixedWorkflows?.find(f=>f.id===mixed.id)?.steps[mixed.index].grantEpoch)throw new DomainError('Original mixed plugin epoch changed.','FORBIDDEN');
    if(proposal?.automation){const policy=s.state.serviceRepairPolicies?.find(p=>p.id===proposal.automation!.policyId),authorization=policy?.authorizations.find(a=>a.service.id===step.pluginId);if(!authorization||authorization.grantEpoch!==grant.epoch)throw new DomainError('The original automatic repair execution epoch changed.','FORBIDDEN');}
    pluginToolsAvailable(installed.manifest,c.runtime);session=pluginVaultAllowance(s.state,body.vaultSessionId,body.buyer as `0x${string}`,step,step.maxPriceCents,total,now);
    if(session.scope!==s.scope)throw new DomainError('Vault plugin session belongs to another workspace.','FORBIDDEN');

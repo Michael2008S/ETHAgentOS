@@ -13,6 +13,7 @@ export type PluginPurchaseRuntime={chain:PluginPurchaseChain;executor:()=>Promis
 const active=(f:PluginPurchaseWorkflow)=>f.status==='running'||f.status==='cancelling';
 async function permit(store:PluginDatabase,owner:string,snapshot:PluginSnapshot,flow:PluginPurchaseWorkflow,step:PluginPurchaseStep,now:string){
  if(flow.status!=='running'||flow.deadlineAt<=now||!snapshot.state.policy.active||step.priceCents>snapshot.state.policy.maxTaskBudget||pluginPurchaseDailyExposure(snapshot.state,flow.deployment,now)>snapshot.state.policy.dailyBudget)throw new DomainError('Plugin workflow permission or deadline changed.','FORBIDDEN');
+ const mixed=snapshot.state.mixedWorkflows?.find(f=>f.steps.some(s=>s.childId===flow.id));if(mixed&&mixed.status!=='running')throw new DomainError('Mixed workflow no longer authorizes this purchase.','FORBIDDEN');
  const installed=await pluginInstallation(store.database,owner,step.pluginId),grant=await pluginGrant(store.database,owner,step.pluginId);
  if(!installed||installed.manifestHash!==step.manifestHash||!grant?.enabled||grant.epoch!==step.grantEpoch||grant.manifestHash!==step.manifestHash||grant.runtimeHash!==step.runtimeHash||grant.expiresAt<=now)throw new DomainError('The original plugin grant has expired or was revoked.','FORBIDDEN');
  const session=pluginVaultAllowance(snapshot.state,flow.vaultSessionId,flow.buyer,{pluginId:step.pluginId,manifestHash:step.manifestHash,runtimeHash:step.runtimeHash,maxPriceCents:step.priceCents},step.priceCents,0,now);

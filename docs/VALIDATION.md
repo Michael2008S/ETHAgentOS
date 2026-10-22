@@ -166,3 +166,11 @@
 - 第三方安全审计、任意外部 Agent 或 LLM 的攻击评测、生产负载测试。
 
 网页与合约采用不同的演示单位：网页是整数分 testUSD，合约是 token 最小单位。接入 adapter 时必须读取并校验 decimals，不能直接复用网页金额。
+
+## Mixed skill and plugin workflows — 2026-10-22
+
+A local-only, reviewed 2–8-step sequential controller composes exact versioned business services and JSON plugins. Explicit transfer, paid business projection and business summary adapters reject incompatible schemas before purchasing. Future budgets and plugin capacity are transferred atomically into deterministic child identifiers. Parent artifacts and canonical payments are rechecked before dependent child execution. The durable queue drives mixed parents, rather than independently advancing their child purchases. Cancellation preserves funding and settlement intents for reconciliation.
+
+The bilingual wallet panel exposes a reviewed JSON program, source inspection in Integrations, execution grants, exact plugin payment grants and recoverable history. Editing clears the selected payment session. This increment does not add model-generated mixed plans, parallel mixed DAGs, public-chain plugin payments or DON verification of generic plugin execution.
+
+Focused validation: `node --test tests/mixed-workflow.test.ts`, `npx tsc --noEmit`, and `node scripts/demo-mixed-workflows.mjs`. End-to-end evidence: `outputs/mixed-workflow-demo-0b81e1ab-a80e-469d-baa6-96bfda48dbb1.json`; both adapter directions, response-loss retry, one owner grant signature, exact gross payment, one escrow per child, empty test queue and revoked test session passed. Earlier failed attempts are retained in outputs. No broad regression was run for this increment.

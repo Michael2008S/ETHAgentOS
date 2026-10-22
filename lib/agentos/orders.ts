@@ -22,6 +22,7 @@ export function orderEvent(o:ChainOrder,title:string,detail:string,now=new Date(
   o.events.push({id:`${o.id}:${o.events.length}`,at:now,title,detail,level,step:o.step});o.updatedAt=now;
 }
 export function orderPolicy(state:Workspace,order:ChainOrder,now:string){
+  if(order.workflowId?.startsWith('mixed-')&&state.mixedWorkflows?.find(w=>w.id===order.workflowId)?.status!=='running')return 'Mixed workflow no longer authorizes this order.';
   if(order.purchaseRouteId&&state.purchaseRoutes?.find(r=>r.id===order.purchaseRouteId)?.status!=='running')return 'Purchase route no longer authorizes this order.';
   if(order.workflowId&&state.workflows?.find(w=>w.id===order.workflowId)?.status==='cancelled')return 'Workflow was cancelled.';
   if(!state.policy.active)return 'Execution permission has been revoked.';

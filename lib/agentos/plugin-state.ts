@@ -17,6 +17,7 @@ export const pluginRequestSchema=z.union([
 ]);
 export type PluginRequest=z.infer<typeof pluginRequestSchema>;
 export function pluginAuthority(state:Workspace,job:PluginJob,installed:InstalledPlugin|undefined,grant:PluginGrant|undefined,now=new Date().toISOString()){
+ if(job.purchase&&state.mixedWorkflows?.some(f=>f.status!=='running'&&f.steps.some(s=>s.childId===job.purchase!.workflowId)))throw new DomainError('Mixed workflow execution has stopped.','FORBIDDEN');
  if(job.purchase){const flow=state.pluginPurchases?.find(f=>f.id===job.purchase!.workflowId),step=flow?.steps[job.purchase.step];if(flow?.status!=='running'||flow.deadlineAt<=now||!step?.confirmed||step.jobId!==job.id||step.pluginId!==job.pluginId||step.manifestHash!==job.manifestHash||step.runtimeHash!==job.runtimeHash||step.grantEpoch!==job.grantEpoch||step.inputHash!==job.inputHash||!['funded','executing'].includes(step.status))throw new DomainError('Paid plugin execution requires its current confirmed escrow.','FORBIDDEN');}
  if(!state.policy.active||!installed||installed.manifestHash!==job.manifestHash||!grant?.enabled||grant.epoch!==job.grantEpoch||grant.manifestHash!==job.manifestHash||grant.runtimeHash!==job.runtimeHash||grant.expiresAt<=now)throw new DomainError('Plugin execution permission expired or was revoked.','FORBIDDEN');if(job.deadlineAt<=now)throw new DomainError('Plugin execution deadline passed.','FORBIDDEN');
 }

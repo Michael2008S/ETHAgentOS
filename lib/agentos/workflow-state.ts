@@ -12,7 +12,7 @@ export type AgentWorkflow={parallelism?:number;runLease?:{token:string;expiresAt
 export function workflowInput(step:WorkflowStep,index:number):WorkflowInputSource{return step.input??(index===0?{from:'original'}:{from:'step',step:index-1});}
 export function workflowDependencies(step:WorkflowStep,index:number){const input=workflowInput(step,index);return [...new Set([...(input.from==='step'?[input.step]:input.from==='merge'?input.steps:[]),...(step.when?[step.when.step]:[])])];}
 /** A running graph has one durable scheduler. Blocked/cancelled children recover through order jobs. */
-export function workflowDrivesOrder(state:Workspace,order:{workflowId?:string}){return Boolean(order.workflowId&&state.workflows?.some(w=>w.id===order.workflowId&&w.version==='agentos.workflow.v4'&&w.status==='running'));}
+export function workflowDrivesOrder(state:Workspace,order:{workflowId?:string}){return Boolean(order.workflowId&&(state.mixedWorkflows?.some(w=>w.id===order.workflowId&&['running','cancelling'].includes(w.status))||state.workflows?.some(w=>w.id===order.workflowId&&w.version==='agentos.workflow.v4'&&w.status==='running')));}
 /** Skipped steps release their reservation; existing orders account for themselves. */
 export function futureWorkflowSteps(state:Workspace){
  return (state.workflows??[]).filter(w=>['running','blocked'].includes(w.status)).flatMap(w=>w.steps.filter(step=>!step.orderId&&!step.skippedAt).map(step=>({workflow:w,step})));

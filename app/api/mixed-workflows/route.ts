@@ -1,0 +1,17 @@
+import {z} from 'zod';
+import {owner,checkOrigin,read,updateWorkspace} from '@/lib/agentos/store';
+import {deferInline} from '@/lib/agentos/auth';
+import {apiFailure} from '@/lib/agentos/api-failure';
+import {DomainError} from '@/lib/agentos/engine';
+import {mixedWorkflowDraftSchema,findMixed,publicMixed} from '@/lib/agentos/mixed-workflow';
+import {createMixedWorkflow,cancelMixedWorkflow} from '@/lib/agentos/mixed-workflow-store';
+import {configuredMixedContext,configuredMixedRuntime,mixedStore,scheduleMixed} from '@/lib/agentos/mixed-workflow-runtime';
+import {runMixedWorkflow} from '@/lib/agentos/mixed-workflow-runner';
+const headers={'Cache-Control':'private, no-store'},id=z.string().regex(/^mixed-[0-9a-f-]{36}$/),hash=z.string().regex(/^0x[0-9a-f]{64}$/);
+const schema=z.discriminatedUnion('action',[z.object({action:z.literal('create'),scope:hash,draft:mixedWorkflowDraftSchema}).strict(),z.object({action:z.enum(['recover','cancel']),scope:hash,id}).strict()]);
+export async function GET(request:Request){try{const ownerId=owner(request),snapshot=await read(ownerId),params=new URL(request.url).searchParams,flowId=params.get('id');if(flowId){id.parse(flowId);return Response.json({scope:snapshot.scope,flow:publicMixed(findMixed(snapshot.state,flowId))},{headers});}let configuration;if(params.get('catalogue')==='1'){const c=await configuredMixedContext(request,ownerId,snapshot.state);configuration={catalog:c.catalog,deployment:c.plugins.deployment,runtime:c.plugins.runtime,priceCents:c.plugins.priceCents};}return Response.json({scope:snapshot.scope,flows:(snapshot.state.mixedWorkflows??[]).map(publicMixed),...(configuration?{configuration}:{})},{headers});}catch(error){return apiFailure(error,'runtime');}}
+export async function POST(request:Request){try{checkOrigin(request);const ownerId=owner(request);if(!request.headers.get('content-type')?.includes('application/json'))throw new DomainError('JSON required.');const reader=request.body?.getReader();if(!reader)throw new DomainError('JSON required.');let text='',size=0;const decoder=new TextDecoder();try{for(;;){const r=await reader.read();if(r.done)break;if((size+=r.value.length)>65536)throw new DomainError('Mixed request exceeds its byte bound.');text+=decoder.decode(r.value,{stream:true});}text+=decoder.decode();}finally{reader.releaseLock();}
+ const body=schema.parse(JSON.parse(text)),snapshot=await read(ownerId);if(snapshot.scope!==body.scope)throw new DomainError('Mixed request belongs to another workspace.','FORBIDDEN');let flow;
+ if(body.action==='create')flow=await createMixedWorkflow(mixedStore(),ownerId,body.draft,()=>configuredMixedContext(request,ownerId,snapshot.state));else if(body.action==='cancel')flow=findMixed((await updateWorkspace(ownerId,state=>cancelMixedWorkflow(state,body.id))).state,body.id);else{await runMixedWorkflow(mixedStore(),ownerId,body.id,()=>configuredMixedRuntime(request,ownerId));flow=findMixed((await read(ownerId)).state,body.id);}
+ if(!deferInline(request))scheduleMixed(ownerId,(await read(ownerId)).state,request);return Response.json({scope:snapshot.scope,flow:publicMixed(flow)},{headers});
+ }catch(error){return apiFailure(error,'runtime');}}
