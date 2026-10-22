@@ -1,0 +1,22 @@
+import {readFile,writeFile,mkdir,chmod} from 'node:fs/promises';
+import {resolve,relative} from 'node:path';import {randomBytes} from 'node:crypto';
+import {creWorkflowName} from '../../sdk/cre-receiver.ts';import {validateConfig} from '../../cre/workflow/config.ts';
+const option=name=>{const i=process.argv.indexOf(name);return i<0?undefined:process.argv[i+1];};
+const origin=option('--origin'),accountId=option('--account-id'),root=resolve('.sites-runtime/sepolia-public'),evidence=resolve('outputs/erc8004-sepolia-2026-10-23/public-preparation');
+const deployment=JSON.parse(await readFile('outputs/erc8004-sepolia-2026-10-23/deployment-unbound.json','utf8'));
+if(deployment.chainId!==11155111||deployment.workflowId!=='0x'+'0'.repeat(64)||deployment.installAsActiveChainConfiguration!==false)throw Error('Expected verified unbound Sepolia deployment.');
+if(creWorkflowName('agentos-delivery-staging')!==deployment.workflowName)throw Error('Immutable workflow name mismatch.');
+if(origin){const url=new URL(origin);if(url.origin!==origin||url.protocol!=='https:'||url.username||url.password||/(?:\.example|\.invalid|localhost)$/.test(url.hostname)||/YOUR_|REPLACE_/i.test(origin))throw Error('Use a real plain HTTPS evidence origin.');}
+if(accountId&&!/^[0-9a-f]{32}$/.test(accountId))throw Error('Use the actual Cloudflare account ID.');
+await mkdir(root+'/cre/workflow',{recursive:true});await mkdir(evidence,{recursive:true});
+const config={mode:'dispatcher',schedule:'*/30 * * * * *',chainName:'ethereum-testnet-sepolia',escrowAddress:deployment.escrow,gasLimit:'500000',evidenceOrigin:origin||'https://YOUR_EVIDENCE_HOST.example'};
+if(origin)validateConfig(config);
+const workerName='agentos-evidence-bd805f9b',bucket='agentos-sepolia-evidence-bd805f9b';
+const wrangler={name:workerName,main:resolve('services/evidence/worker.ts'),compatibility_date:'2026-05-15',account_id:accountId||'YOUR_CLOUDFLARE_ACCOUNT_ID',workers_dev:true,r2_buckets:[{binding:'BUCKET',bucket_name:bucket}],vars:{PUBLIC_ORIGIN:config.evidenceOrigin,ESCROW_ADDRESS:deployment.escrow}};
+await writeFile(root+'/wrangler.json',JSON.stringify(wrangler,null,2));
+await writeFile(root+'/cre/project.yaml','sepolia-settings:\n  rpcs:\n    - chain-name: ethereum-testnet-sepolia\n      url: https://ethereum-sepolia-rpc.publicnode.com\n');
+await writeFile(root+'/cre/workflow/workflow.yaml','sepolia-settings:\n  user-workflow:\n    workflow-name: agentos-delivery-staging\n    deployment-registry: "private"\n  workflow-artifacts:\n    workflow-path: '+JSON.stringify(relative(root+'/cre/workflow',resolve('cre/workflow/main.ts')))+'\n    config-path: ./config.json\n    secrets-path: ""\n');
+await writeFile(root+'/cre/workflow/config.json',JSON.stringify(config,null,2));
+try{await writeFile(root+'/write-token',randomBytes(32).toString('hex'),{mode:0o600,flag:'wx'});}catch(e){if(e.code!=='EEXIST')throw e;}await chmod(root+'/write-token',0o600);
+const manifest={status:origin&&accountId?'configured-awaiting-authenticated-deployment':'draft-missing-cloudflare-inputs',workerName,bucket,publicOrigin:origin??null,cloudflareAccountConfigured:!!accountId,deploymentRegistry:'private',registryAvailability:'recheck with cre registry list',expectedWorkflowOwner:deployment.workflowOwner,privateReportOwnerCompatibility:'must match receiver before deployment is accepted',workflowName:'agentos-delivery-staging',encodedWorkflowName:deployment.workflowName,receiver:deployment.escrow,forwarder:deployment.forwarder,workflowConfig:root+'/cre/workflow/config.json',workerConfig:root+'/wrangler.json',writerCredential:'server-only file; value omitted',notDeployed:true,workflowId:null,bindingEnabled:false,fundingEnabled:false,pending:['CRE deploy access','verify private-registry report owner matches immutable receiver owner','Cloudflare login/account + R2 availability + public origin','publish evidence worker and set writer secret','register actual workflow and verify returned ID'],preparedAt:new Date().toISOString()};
+await writeFile(root+'/manifest.json',JSON.stringify(manifest,null,2));await writeFile(evidence+'/manifest.json',JSON.stringify(manifest,null,2));await writeFile(evidence+'/workflow-config.json',JSON.stringify(config,null,2));await writeFile(evidence+'/wrangler-config.json',JSON.stringify(wrangler,null,2));console.log(JSON.stringify(manifest,null,2));
