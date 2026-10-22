@@ -444,3 +444,9 @@ The complete demo is a final gate after the individual changes. Public workflow 
 CLI 验收后停模型（约 2444 MiB RSS），编写浏览器用例期间模型关闭；浏览器验收才按需重启，完成后再次停止其启动器及模型两个进程（约 2472 MiB RSS），remaining=[]。完整回归/构建后再核查清理，唯一当前本地服务及全部历史保留。证据目录 outputs/validation-service-auto-repair-2026-10-22/。协议见 SERVICE-AUTOMATIC-REPAIR.md。
 
 新增 demo:service-auto-repair，完整 runner 现为 41 步。规划、模板、审阅修复与有界自动提案各自已验证；最终当前完整 demo 及全量浏览器验收仍须实际执行。公共链、实际 DON、托管发布/调度继续暂缓。
+
+## 最终验收资源管理与规划顺序修复（2026-10-22）
+
+模型按场景启停已提交 b6abfb1：可选 --manage-models 接入全量 Chromium 与完整 runner，只停止自己实际启动的模型，保留外部匹配服务，拒绝替换未知端口；失败/中断清理且不能再次启动。首尾 doctor 保留九项真实服务检查，所有原验收关卡保留。六项资源管理/运行配置专项通过。验收前后清理均未发现多余进程，当前服务与历史保留。
+
+首次当前 25 项 Chromium 为 24 通过、1 失败：新插件四项全部通过，但业务目标“先 treasury-report 再 event-analysis”实际模型生成了相反顺序。审批前断言失败，没有采购；未放宽断言。提示明确按 first/then/finally 逐阶段选择，移除重复目录字段，并让正反顺序两个示例均符合两步上限。14 项规划单测及真实模型浏览器复验通过，原失败日志、trace、截图与报告保留在 outputs/validation-final-services-2026-10-22/browser-first-*。最终全量浏览器与 41 步完整 demo 尚待执行，不将专项复验当作整套通过。

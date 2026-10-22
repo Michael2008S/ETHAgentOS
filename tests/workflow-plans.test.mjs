@@ -63,3 +63,9 @@ test('SDK verifies returned plan limits and refuses a server workflow that chang
 test('a new model proposal cannot be attached retrospectively to a workflow that was already created',async()=>{
  const f=await fixture(),p=await f.generate(),saved=await saveWorkflowProposal(f.state,p),accepted=await acceptWorkflowProposal(saved,p.id,p.digest,f.deployment,f.publish,f.access),collision=structuredClone(accepted);collision.workflowPlans=[p];delete collision.workflows[0].planId;const before=f.counts();await assert.rejects(acceptWorkflowProposal(collision,p.id,p.digest,f.deployment,f.publish,f.access),/already belongs/);assert.deepEqual(f.counts(),before);await assert.rejects(generateWorkflowProposal(collision,f.parameters,scope,f.deployment,f.choices,config,undefined,f.response(f.program)),/already belongs/);assert.deepEqual(f.counts(),before);
 });
+
+
+test('planning examples fit a two-step limit, demonstrate both orders and keep versioned service contracts',async()=>{
+ const f=await fixture();f.parameters.maxSteps=2;let inspected=false;
+ await f.generate(f.program,async(url,init)=>{const body=JSON.parse(init.body),data=JSON.parse(body.messages.at(-1).content),examples=body.messages.filter(m=>m.role==='assistant').map(m=>JSON.parse(m.content));assert.match(body.messages[0].content,/Preserve the goal stage order exactly/);assert.equal(data.maxSteps,2);assert.equal(examples.length,2);assert.ok(examples.every(e=>e.steps.length<=data.maxSteps));assert.deepEqual(examples.map(e=>e.steps.map(s=>s.choice.split(' | ')[0])),[['treasury-report','event-analysis'],['event-analysis','treasury-report']]);assert.ok(data.catalog.every(c=>c.service.protocol==='agentos.service.v1'));inspected=true;return f.response(f.program)(url,init);});assert.equal(inspected,true);
+});
