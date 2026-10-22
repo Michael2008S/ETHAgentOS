@@ -1,21 +1,24 @@
 'use client';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { isLanguage, LANGUAGE_KEY, translate, type Language } from './translate';
 import { LanguageContext, useLanguage } from './context';
+const subscribeLanguage=(listener:()=>void)=>{
+  const sync=(event:StorageEvent)=>{if(event.key===LANGUAGE_KEY||event.key===null)listener();};
+  window.addEventListener('storage',sync);window.addEventListener('agentos-language',listener);
+  return()=>{window.removeEventListener('storage',sync);window.removeEventListener('agentos-language',listener);};
+};
+const storedLanguage=()=>{try{const saved=localStorage.getItem(LANGUAGE_KEY);return isLanguage(saved)?saved:null;}catch{return null;}};
+const serverLanguage=()=>null;
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, updateLanguage] = useState<Language>('zh-CN');
-  useEffect(() => {
-    try { const saved = localStorage.getItem(LANGUAGE_KEY); if (isLanguage(saved)) updateLanguage(saved); } catch { /* Storage may be disabled. */ }
-    const sync = (event: StorageEvent) => { if (event.key === LANGUAGE_KEY && isLanguage(event.newValue)) updateLanguage(event.newValue); };
-    window.addEventListener('storage', sync); return () => window.removeEventListener('storage', sync);
-  }, []);
+  const [preferredLanguage, updateLanguage] = useState<Language|null>(null);
+  const savedLanguage=useSyncExternalStore(subscribeLanguage,storedLanguage,serverLanguage);
+  const language=preferredLanguage??savedLanguage??'zh-CN';
   useEffect(() => {
     document.documentElement.lang = language;
     document.title = language === 'zh-CN' ? 'AgentOS — 任务总览' : 'AgentOS — Mission Control';
   }, [language]);
   const setLanguage = useCallback((next: Language) => {
-    updateLanguage(next);
-    try { localStorage.setItem(LANGUAGE_KEY, next); } catch { /* Switching still works without storage. */ }
+    try { localStorage.setItem(LANGUAGE_KEY, next); updateLanguage(null); window.dispatchEvent(new Event('agentos-language')); } catch { updateLanguage(next); }
   }, []);
   const tr = useCallback((text: string) => translate(language, text), [language]);
   return <LanguageContext.Provider value={{ language, setLanguage, tr }}>{children}</LanguageContext.Provider>;
