@@ -1,0 +1,2 @@
+import {spawn} from 'node:child_process';
+const args=['scripts/test-browser.mjs',...(!process.env.AGENTOS_TEST_URL?['--runtime','.sites-runtime/isolated-demo/current.json']:[]),'--grep','mixed business wizard'];const child=spawn(process.execPath,args,{stdio:'inherit',env:process.env});child.once('error',error=>{console.error(error);process.exitCode=1;});child.once('exit',code=>{process.exitCode=code??1;});for(const s of ['SIGINT','SIGTERM'])process.on(s,()=>child.kill(s));

@@ -83,7 +83,8 @@
     "demo:mixed": "node scripts/demo-mixed-workflows.mjs",
     "demo:plugin-memory": "node scripts/demo-plugin-memory.mjs",
     "demo:treasury-business": "node scripts/demo-treasury-business.mjs",
-    "demo:mixed-planning": "node scripts/demo-mixed-planning.mjs"
+    "demo:mixed-planning": "node scripts/demo-mixed-planning.mjs",
+    "demo:business-wizard": "node scripts/demo-business-wizard.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
