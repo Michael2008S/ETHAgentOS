@@ -1,3 +1,4 @@
+import {approveMixedPlan,type MixedPlanReview} from './mixed-plans.ts';
 import {verifySelectedPluginMemory} from './plugin-semantic-memory.ts';
 import {futurePurchaseReservations} from './purchase-reservations.ts';
 import {canonical} from '../../cre/workflow/verify.ts';
@@ -12,11 +13,12 @@ import type {ServiceDescriptor} from './service-catalog.ts';
 import type {Workspace} from './types.ts';
 export type MixedStore=PluginDatabase&{updateWorkspace:(owner:string,reduce:(state:Workspace)=>Workspace|Promise<Workspace>)=>Promise<{state:Workspace;scope:string;revision:number}>};
 export type MixedCreationContext={plugins:PluginPurchaseContext;catalog:ServiceDescriptor[];bindings:Map<string,WorkflowSupplierBinding>};
-export async function createMixedWorkflow(store:MixedStore,owner:string,raw:MixedWorkflowDraft,getContext:()=>Promise<MixedCreationContext>,now=new Date().toISOString()){
+export async function createMixedWorkflow(store:MixedStore,owner:string,raw:MixedWorkflowDraft,getContext:()=>Promise<MixedCreationContext>,now=new Date().toISOString(),review?:MixedPlanReview){
  const body=mixedWorkflowDraftSchema.parse(raw),draftHash=await digest(body),id='mixed-'+body.requestId;let context:Promise<MixedCreationContext>|undefined;
  const snapshot=await store.updateWorkspace(owner,async state=>{
-  const prior=state.mixedWorkflows?.find(f=>f.id===id);if(prior){if(prior.draftHash!==draftHash)throw new DomainError('Mixed workflow identifier has different parameters.','IDEMPOTENCY_CONFLICT');return state;}
+  const prior=state.mixedWorkflows?.find(f=>f.id===id);if(prior){if(prior.draftHash!==draftHash||canonical(prior.planReview??null)!==canonical(review??null))throw new DomainError('Mixed workflow identifier has different parameters.','IDEMPOTENCY_CONFLICT');return state;}
   const c=await(context??=getContext()),selected=await validateMixedProgram(body,c.catalog),deployment=c.plugins.deployment;
+  const approved=review?await approveMixedPlan(state,review,await digest({workspace:owner}),body,deployment,now):state;
   if(body.memory){if(!c.plugins.chain)throw new DomainError('Canonical plugin memory verification unavailable.','UNAVAILABLE');await verifySelectedPluginMemory(store,owner,body.memory,await digest({workspace:owner}),body.buyer,body.input,c.plugins.chain);}
   if(deployment.mode!=='local')throw new DomainError('Public mixed workflows are deferred.','FORBIDDEN');
   if(!state.policy.active||(state.mixedWorkflows?.length??0)>=20)throw new DomainError('Mixed workflow permission or history limit reached.','FORBIDDEN');
@@ -43,8 +45,8 @@ export async function createMixedWorkflow(store:MixedStore,owner:string,raw:Mixe
    steps.push({requestId:await mixedStepUUID(body.requestId,index),service:structuredClone(service),maxPriceCents:definition.maxPriceCents,quote:service.priceKind==='fixed'?service.priceCents:definition.maxPriceCents,input:definition.input,status:'pending',...(grantEpoch===undefined?{}:{grantEpoch}),...(supplierBinding?{supplierBinding:structuredClone(supplierBinding)}:{})});
   }
   if(expiry-Date.parse(now)<60000)throw new DomainError('Mixed permissions leave insufficient execution time.','FORBIDDEN');await c.plugins.checkSession(session!,gross);
-  const f:MixedWorkflow={version:'agentos.mixed-workflow.v1',id,scope:await digest({workspace:owner}),requestId:body.requestId,draftHash,termsHash:'',title:body.title,buyer:body.buyer as `0x${string}`,vaultSessionId:body.vaultSessionId,deployment,...(body.memory?{memory:body.memory}:{}),input:body.input,totalBudget:body.totalBudget,timeoutSeconds:body.timeoutSeconds,createdAt:now,deadlineAt:new Date(expiry).toISOString(),updatedAt:now,status:'running',steps};f.termsHash=await digest(mixedTerms(f));if(new TextEncoder().encode(JSON.stringify([f,...state.mixedWorkflows??[]])).length>524288)throw new DomainError('Mixed workflow history exceeds its storage bound.');
-  return {...state,mixedWorkflows:[f,...state.mixedWorkflows??[]]};
+  const f:MixedWorkflow={version:'agentos.mixed-workflow.v1',id,scope:await digest({workspace:owner}),requestId:body.requestId,draftHash,termsHash:'',title:body.title,buyer:body.buyer as `0x${string}`,vaultSessionId:body.vaultSessionId,deployment,...(review?{planReview:review}:{}),...(body.memory?{memory:body.memory}:{}),input:body.input,totalBudget:body.totalBudget,timeoutSeconds:body.timeoutSeconds,createdAt:now,deadlineAt:new Date(expiry).toISOString(),updatedAt:now,status:'running',steps};f.termsHash=await digest(mixedTerms(f));if(new TextEncoder().encode(JSON.stringify([f,...state.mixedWorkflows??[]])).length>524288)throw new DomainError('Mixed workflow history exceeds its storage bound.');
+  return {...approved,mixedWorkflows:[f,...state.mixedWorkflows??[]]};
  });return findMixed(snapshot.state,id);
 }
 export function cancelMixedWorkflow(state:Workspace,id:string,now=new Date().toISOString()){

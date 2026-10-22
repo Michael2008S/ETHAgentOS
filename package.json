@@ -82,7 +82,8 @@
     "demo:service-auto-repair": "node scripts/demo-service-auto-repair.mjs",
     "demo:mixed": "node scripts/demo-mixed-workflows.mjs",
     "demo:plugin-memory": "node scripts/demo-plugin-memory.mjs",
-    "demo:treasury-business": "node scripts/demo-treasury-business.mjs"
+    "demo:treasury-business": "node scripts/demo-treasury-business.mjs",
+    "demo:mixed-planning": "node scripts/demo-mixed-planning.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
