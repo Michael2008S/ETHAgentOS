@@ -28,7 +28,7 @@ export async function startLocalChain({port=8545,appOrigin='http://127.0.0.1:517
   const vault=await deploy('AgentVault',[escrow]);
   const registries=identity?await deployIdentityRegistries(client,wallet,buyer):{};
   config={mode:'local',chainId:31337,token,escrow,forwarder,metadataHash,confirmations:1,seller,vault,vaultExecutor:executor,deployedBlock:'0',...registries};writeLocalState(statePath,{...saved,buyer,config});}
-  const {token,escrow,vault,metadataHash}=config,deliveryJournal=localMap(stateDirectory?stateDirectory+'/deliveries.bin':undefined),deliveries=deliveryJournal.map,settlements=new Map();
+  const {token,escrow,vault,metadataHash}=config,registries={identityRegistry:config.identityRegistry,reputationRegistry:config.reputationRegistry},deliveryJournal=localMap(stateDirectory?stateDirectory+'/deliveries.bin':undefined),deliveries=deliveryJournal.map,settlements=new Map();
   const pluginRoutes=pluginPurchaseRoutes({client,wallet,config,metadata,buyer,executor,forwarder,stateDirectory});
   let base;
   const server=createServer(async(req,res)=>{
