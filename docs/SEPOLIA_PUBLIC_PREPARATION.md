@@ -71,3 +71,31 @@ The receiver remains `workflowId == 0` and has zero test-token balance. No activ
 The public onchain registry route involves Ethereum Mainnet and permanent organization key linking; it is outside this Sepolia stage. See [CRE deployment registry models](https://docs.chain.link/cre/guides/operations/deploying-workflows) and [key-linking requirements](https://docs.chain.link/cre/organization/linking-keys).
 
 Historical failed R2 enablement and temporary-tunnel checks remain retained in prior reports; they do not invalidate this separately verified D1 deployment.
+
+## Official CRE dry-run against the deployed D1 service
+
+```sh
+node scripts/sepolia-console/dry-run-public-d1.mjs
+```
+
+This builds the current production dispatcher with the official CLI, validates the exact public HTTPS configuration, and runs empty queue → one synthetic unfunded item → archived empty queue. The middle case must read the actual Sepolia task commitment and return `not-finalized`; it is not allowed to report, settle or bypass the funding check. Only the explicitly created synthetic evidence item is archived, and its input/artifact bytes remain public. Chain snapshots before/after must retain a zero workflow ID and zero escrow test-token balance.
+
+The CLI uses an ephemeral in-memory simulation key and never receives `--broadcast`. No user wallet key is accessed. CLI v1.39.0 limits the WASM path length and validates its existence; the runner copies its retained WASM to a short temporary absolute path, then deletes that temporary copy after the run. The original WASM, source hashes, config, commands, synthetic bytes and redacted logs remain in the report directory. Failed path-validation attempts are retained separately.
+
+When a previous official build has matching recorded source SHA-256 hashes, `--reuse-build /absolute/path/to/prior/report.json` reuses its retained WASM without rebuilding.
+
+After a successful dispatcher report, run:
+
+```sh
+node scripts/sepolia-console/dry-run-evidence-readonly.mjs /absolute/path/to/cre-public-d1-dry-run-ID/report.json
+```
+
+This is a separate, explicitly read-only CRE probe sharing the production `verifyDelivery` function. It anonymously retrieves the retained input and artifact through the actual CRE HTTP capability under node consensus, independently recomputes the output and checks the expected hash. It has no EVM/report/write capability and cannot settle anything. Its role is to exercise evidence retrieval without pretending an unfunded production task passed the production dispatcher gate.
+
+These are local official CLI executions with real HTTPS/public-chain reads, not deployed DON workflows or mined settlement evidence. CRE deploy access, compatible registered identity and a real workflow ID remain separate pending gates.
+
+### Verified execution on 2026-10-23 (Asia/Hong_Kong)
+
+Evidence is retained under `outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/`. Start with `summary.json`, then `report.json`, `readonly-probe/report.json` and the simulation logs; `checksums.sha256.json` fingerprints the retained files, including both WASM binaries. The successful dispatcher reused the official build from the retained preceding path-validation attempt after matching all recorded source hashes.
+
+All three dispatcher cases passed. The separate read-only CRE probe returned `accepted=true` with output hash `0xfdbcdffbd5cd22ddf72754142d88c3c5a761985be1bb22394c28ce3570882498`. The synthetic ready item was archived and the queue returned to zero; immutable evidence remains public. Sepolia snapshots at blocks 11972321 and 11972329 both showed zero workflow ID and zero receiver test-token balance. The live CLI access check remained `deployAccess=false`. No transactions were submitted, no workflow was bound, and no funding was performed. Funded settlement, DON deployment and post-payment ERC-8004 feedback/revocation remain pending.
