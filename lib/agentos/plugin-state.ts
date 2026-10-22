@@ -10,7 +10,7 @@ export type PluginJob={purchase?:{workflowId:string;step:number};id:string;reque
 const hash=z.string().regex(/^0x[0-9a-f]{64}$/),id=z.string().min(1).max(100),uuid=z.string().uuid(),json=z.custom<Json>(v=>{try{boundedJson(v);return true;}catch{return false;}},'Invalid bounded plugin JSON.');
 export const pluginRequestSchema=z.union([
  z.object({action:z.literal('install'),manifest:pluginManifestSchema}).strict(),
- z.object({action:z.literal('grant'),requestId:uuid,pluginId:id,manifestHash:hash,runtimeHash:hash,maxRuns:z.number().int().min(1).max(100),durationSeconds:z.number().int().min(60).max(86400)}).strict(),
+ z.object({action:z.literal('grant'),append:z.boolean().optional(),requestId:uuid,pluginId:id,manifestHash:hash,runtimeHash:hash,maxRuns:z.number().int().min(1).max(100),durationSeconds:z.number().int().min(60).max(86400)}).strict(),
  z.object({action:z.literal('revoke'),requestId:uuid,pluginId:id,epoch:z.number().int().positive()}).strict(),
  z.object({action:z.literal('create'),requestId:uuid,pluginId:id,manifestHash:hash,runtimeHash:hash,input:json,timeoutSeconds:z.number().int().min(30).max(600).default(300)}).strict(),
  z.object({action:z.literal('cancel'),jobId:id}).strict(),

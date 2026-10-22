@@ -27,7 +27,7 @@ export function VaultPanel({session,busy,perform,onSessions,refreshKey}:{session
   </form>
   <form onSubmit={event=>{event.preventDefault();const cents=Math.round(Number(new FormData(event.currentTarget).get('withdraw'))*100);void perform(async()=>{try{await client.withdraw(cents);}finally{await refresh();}});}}><label className="field">{tr('Withdraw from Vault · token units')}<input name="withdraw" type="number" min="0.01" step="0.01" required/></label><button className="btn secondary small" disabled={busy}>{tr('Withdraw to owner')}</button></form>
   <p className="form-note">{tr('Revocation prevents new escrow funding. Already funded orders keep their original settlement and refund rules.')}</p>
-  {sessions.filter(s=>s.signature).map(s=><div key={s.sessionId}><p><code>{s.sessionId}</code> · {tr(s.revokedAt?'Revoked':'Authorized')} · {tr('Session total cap')}: {(s.totalCents/100).toFixed(2)}</p><button type="button" className="btn secondary small" disabled={busy||!!s.revokedAt} onClick={()=>void perform(async()=>{try{await client.revoke(s.sessionId);}finally{await refresh();}})}>{tr('Revoke Vault purchases')}</button></div>)}
+  {sessions.filter(s=>s.signature).map(s=><div key={s.sessionId}><p><code>{s.sessionId}</code> · {tr(s.revokedAt?'Revoked':'Authorized')} · {tr('Session total cap')}: {(s.totalCents/100).toFixed(2)}</p><button type="button" className="btn secondary small" disabled={busy||!!s.revokedAt} onClick={()=>void perform(async()=>{try{await client.revokeSession(s.sessionId);}finally{await refresh();}})}>{tr('Revoke this session')}</button></div>)}
   <button type="button" className="btn secondary small" disabled={busy} onClick={()=>void refresh()}>{tr('Refresh Vault status')}</button>
  </details>;
 }
