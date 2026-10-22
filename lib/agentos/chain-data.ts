@@ -21,7 +21,7 @@ export function dataRpc(url:DataRPCURL,request:typeof fetch=fetch,allowCaptured=
     const reader=response.body?.getReader();if(!reader)throw new DataRPCError('invalid',method);let size=0,text='';const decoder=new TextDecoder();
     try{for(;;){const {done,value}=await reader.read();if(done)break;if((size+=value.length)>1000000){await reader.cancel();throw new DataRPCError('limit',method);}text+=decoder.decode(value,{stream:true});}text+=decoder.decode();}finally{reader.releaseLock();}
     let result;try{result=JSON.parse(text);}catch{throw new DataRPCError('invalid',method);}if(result.jsonrpc!=='2.0'||result.id!==1||result.error||result.result===undefined||result.result===null)throw new DataRPCError('invalid',method);preferred=index;return result.result;
-   }catch(error){last=error;if(error instanceof DataRPCError&&(error.category==='limit'||error.category==='http'&&![429,502,503,504].includes(error.status!)))throw error;}
+   }catch(error){last=error;if(error instanceof DataRPCError&&(error.category==='limit'||error.category==='http'&&![429,502,503,504].includes(error.status!)&&(endpoints.length===1||attempt>=endpoints.length-1)))throw error;}
   }
   throw last;
  };
