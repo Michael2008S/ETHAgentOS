@@ -450,3 +450,7 @@ CLI 验收后停模型（约 2444 MiB RSS），编写浏览器用例期间模型
 模型按场景启停已提交 b6abfb1：可选 --manage-models 接入全量 Chromium 与完整 runner，只停止自己实际启动的模型，保留外部匹配服务，拒绝替换未知端口；失败/中断清理且不能再次启动。首尾 doctor 保留九项真实服务检查，所有原验收关卡保留。六项资源管理/运行配置专项通过。验收前后清理均未发现多余进程，当前服务与历史保留。
 
 首次当前 25 项 Chromium 为 24 通过、1 失败：新插件四项全部通过，但业务目标“先 treasury-report 再 event-analysis”实际模型生成了相反顺序。审批前断言失败，没有采购；未放宽断言。提示明确按 first/then/finally 逐阶段选择，移除重复目录字段，并让正反顺序两个示例均符合两步上限。14 项规划单测及真实模型浏览器复验通过，原失败日志、trace、截图与报告保留在 outputs/validation-final-services-2026-10-22/browser-first-*。最终全量浏览器与 41 步完整 demo 尚待执行，不将专项复验当作整套通过。
+
+首次 41 步 demo 在第 14 步停止，前 13 步通过：编号式两步目标的真实模型返回 unsupported，未创建采购。原报告保留于 outputs/full-demo-f709e278-98aa-4fb9-8138-1025411350a4/，诊断原始响应在 outputs/validation-final-services-2026-10-22/numbered-plan-model.json。模型目录给出了真实输出契约，却没有明确业务工作流已有的已付款投影适配关系。补充 agentos.accepted-artifact.v2 的 allocations/summary-total/ranked-accounts → transfers.v1 说明，保留完整服务描述、真实契约与验证器；超过两步的示例只在请求允许时发送。未把任意 JSON 伪装成转账。
+
+14 项规划单测、两种实际模型目标的四组 HTTP/D1/SDK/EVM 验收（五笔唯一付款）以及受影响浏览器流程均通过。实际报告 outputs/workflow-plan-demo-3d21d59d-0d40-436e-bf88-9697f983755e.json。此前全量浏览器已 25/25 通过，最新说明改动仅复验受影响流程；按用户更新的“快速实现、简单验证”要求不再扩大回归。修改实现后完整 demo 必须从第一步新跑，不能续用旧报告作为新版通过证据。每轮结束确认模型全部退出，当前有用服务及历史保留。
