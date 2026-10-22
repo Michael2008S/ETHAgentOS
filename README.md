@@ -238,3 +238,6 @@ Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/
 
 
 本地多业务闭环：运行 `npm run demo:local-business` 验证并存业务、授权中断恢复、失败退款后复用成果、消费者重启、监测续订及人工处置收据。按需模型控制器为 `npm run models:control`，不会启动托管任务。逐项验证、最新证据和资源清理见 [LOCAL-DEMO](docs/LOCAL-DEMO.md) 与 [VALIDATION](docs/VALIDATION.md)。
+
+
+从空白工作区复验：`npm run demo:browser-business` 自动创建并清理独立持久化实例，覆盖授权拒绝重试、并存业务、连续失败退款修复、整套服务重启、监测续订及真实 AI/记忆操作。最终验收使用明确标注的已确认 USDC 样本回放，页面与收据记录此边界；实时 HTTPS 监测入口保留。业务中心位于 `#business`。运行方式及证据见 [LOCAL-DEMO](docs/LOCAL-DEMO.md) 和 [VALIDATION](docs/VALIDATION.md)。
