@@ -76,10 +76,11 @@ export class AgentWalletSession {
     const intent:ChainIntent={id,buyer,seller,amount,deadline,specHash:commitment};
     return {id,status:status===1?'funded' as const:status===2?'paid' as const:'refunded' as const,intent,outputHash};
   }
-  async send(transaction:TransactionIntent,onSubmitted?:(hash:Hex)=>void){
+  async send(transaction:TransactionIntent,onSubmitted?:(hash:Hex)=>void,onWillSubmit?:()=>void){
     await this.assertSession();
     const estimate=await this.client.estimateGas({...transaction,account:this.account});
     await this.assertSession();
+    onWillSubmit?.();
     const hash=await this.signer.sendTransaction({...transaction,account:this.account,gas:estimate+estimate/5n});onSubmitted?.(hash);
     const receipt=await this.client.waitForTransactionReceipt({hash,confirmations:this.deployment.confirmations,timeout:60000,pollingInterval:500});
     if(receipt.status!=='success')throw new Error('Wallet transaction reverted.');return hash;
