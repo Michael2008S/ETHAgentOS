@@ -29,3 +29,10 @@ At this checkpoint the existing Vault ordering runtime has not yet been connecte
 - An isolated local stack uses the new EIP-3009 token and separate supplier procurement/facilitator/provider accounts. Existing runtime deployments stay unchanged.
 - Nine focused tests passed, including existing supplier/Vault regression, three actual HTTP/EVM order flows, full-result recomputation rejection, full user-principal refund, one escrow/settlement per order, upstream cost borne by supplier, non-replenished gross Vault limits, policy revocation during a callback, expired/wrong-scope tickets, old leases and replacement nonce refusal.
 - Evidence: `outputs/x402-validation-20261023/increment-3-regression.log`. Web/API demo and UI acceptance are the next increment.
+
+## Increment 4 — real process interruption and independent gas limits
+
+- Added acceptance that actually SIGKILLs only the test-owned procurement process before submission and after mined payment. A new process reopens its private journal, reuses the original nonce/payment and produces one authorization transfer in both cases.
+- Facilitator transactions have independent 300,000 gas, 25 gwei fee and 0.05 native ETH daily ceilings. Durable gas reservations precede broadcast; unresolved broadcasts retain their reservation. Actual gas expense is recorded separately from token procurement and user escrow. Unresolved facilitator gas intents fail closed and require reconciliation; there is no automatic new transaction allocation.
+- Gas-budget refusal was tested before broadcast: no token authorization was consumed and no gas reservation leaked. Three real Vault orders also reconciled three separate gas receipts with zero outstanding gas reservation.
+- Evidence: `outputs/x402-validation-20261023/crash-acceptance-attempt-1.log`, `x402-gas-and-crash-regression.log`, and `gas-budget-acceptance.log` in the same directory. This is procurement-process crash acceptance, not a claim of production key management or DON execution.

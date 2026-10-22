@@ -25,6 +25,7 @@ test('real x402 report purchase, Vault escrow, independent acceptance, refund an
   assert.equal(procurementBefore-await balance(f.stack.procurementAccount.address),600000n);assert.equal(await balance(f.stack.policy.payTo)-merchantBefore,600000n);
   assert.equal(await f.client.readContract({address:f.deployment.vault,abi:vaultABI,functionName:'spent',args:[f.deployment.vaultExecutor,(await f.client.getBlock()).timestamp/86400n]}),3000000n,'refund cannot restore gross daily allowance');
   assert.equal(f.stack.store.summary({network:f.stack.policy.network,asset:f.stack.policy.asset,payer:f.stack.procurementAccount.address.toLowerCase()}).reserved,'0');
+  const gas=await(await fetch(f.stack.facilitator.base+'/gas')).json();assert.equal(gas.transactions,3);assert.equal(gas.reservedWei,'0');assert.ok(BigInt(gas.spentWei)>0n);assert.ok(BigInt(gas.spentWei)<BigInt(gas.dailyGasWei));
   // Exercise application authority races on an explicitly reset state-machine fixture.
   const original=(await f.store.read(f.owner)).state.chainOrders[0];
   await f.mutate(async s=>{const o=s.chainOrders[0];o.status='running';o.step=2;o.failure=null;o.settlement=null;delete o.settlementAuthorization;delete o.supplierDelivery;o.supplierLease={token:crypto.randomUUID(),expiresAt:new Date(Date.now()+60000).toISOString(),requestHash:await digest(await supplierRequest(o))};return s;});
