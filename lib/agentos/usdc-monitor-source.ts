@@ -1,10 +1,10 @@
-import {dataRpc,importTransfers} from './chain-data.ts';
+import {dataRpc,importTransfers,type DataRPCURL} from './chain-data.ts';
 import {USDC_ADDRESS,TRANSFER_TOPIC,sourceCommitment} from './transfer-source.ts';
 import {DomainError} from './engine.ts';
 import type {USDCMonitor} from './usdc-monitor-state.ts';
 const quantity=(n:number)=>'0x'+n.toString(16);
 type Block={number:string;hash:string};
-export async function scanUSDCWindow(url:string,m:Pick<USDCMonitor,'cursor'|'anchor'|'draft'>,request:typeof fetch=fetch,allowCaptured=false){
+export async function scanUSDCWindow(url:DataRPCURL,m:Pick<USDCMonitor,'cursor'|'anchor'|'draft'>,request:typeof fetch=fetch,allowCaptured=false){
  const rpc=dataRpc(url,request,allowCaptured);if(await rpc<string>('eth_chainId',[])!=='0x1')throw new DomainError('USDC monitoring requires Ethereum mainnet data.','FORBIDDEN');
  const head=await rpc<Block>('eth_getBlockByNumber',['finalized',false]),finalized=Number(BigInt(head.number));if(!Number.isSafeInteger(finalized))throw Error('Invalid finalized height.');
  if(m.anchor){const anchor=await rpc<Block>('eth_getBlockByNumber',[quantity(m.anchor.number),false]);if(anchor.hash.toLowerCase()!==m.anchor.hash)throw new DomainError('The saved finalized cursor anchor changed. Monitor stopped without rewinding or repurchasing.','CONFLICT');}

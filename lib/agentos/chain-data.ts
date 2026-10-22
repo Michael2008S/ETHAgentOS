@@ -5,18 +5,29 @@ type Block={number:string;hash:string};
 type RpcLog={address:string;blockNumber:string;blockHash:string;transactionHash:string;logIndex:string;topics:string[];data:string;removed?:boolean};
 const quantity=(n:number)=>'0x'+n.toString(16);
 const number=(raw:unknown)=>{if(typeof raw!=='string'||!/^0x[0-9a-f]+$/i.test(raw)||!Number.isSafeInteger(Number(BigInt(raw))))throw new Error('Invalid RPC quantity.');return Number(BigInt(raw));};
-export function dataRpc(url:string,request:typeof fetch=fetch,allowCaptured=false){
- const endpoint=new URL(url);if(!(endpoint.protocol==='https:'||allowCaptured&&endpoint.protocol==='http:'&&endpoint.hostname==='127.0.0.1'&&endpoint.pathname==='/captured-usdc')||endpoint.username||endpoint.password||endpoint.hash||endpoint.search)throw new Error('Configure a plain HTTPS data RPC endpoint.');
+export type DataRPCURL=string|readonly string[];
+export class DataRPCError extends Error {category:'transport'|'http'|'invalid'|'limit';method:string;status?:number;constructor(category:'transport'|'http'|'invalid'|'limit',method:string,status?:number){super(category==='limit'?'Data RPC response exceeds limit.':`Data RPC ${category==='http'?'HTTP failure':category==='invalid'?'invalid response':'transport failed'}: ${status?status+' ':''}${method}`);this.category=category;this.method=method;this.status=status;}}
+export function dataRpc(url:DataRPCURL,request:typeof fetch=fetch,allowCaptured=false){
+ const endpoints=[...new Set(typeof url==='string'?[url]:url)].map(value=>{const endpoint=new URL(value);if(!(endpoint.protocol==='https:'||allowCaptured&&endpoint.protocol==='http:'&&endpoint.hostname==='127.0.0.1'&&['/captured-usdc','/live-usdc'].includes(endpoint.pathname))||endpoint.username||endpoint.password||endpoint.hash||endpoint.search)throw new Error('Configure a plain HTTPS data RPC endpoint.');return endpoint;});
+ if(!endpoints.length||endpoints.length>3)throw Error('Configure one to three data RPC endpoints.');let preferred=0;
  return async<T>(method:string,params:unknown[]):Promise<T>=>{
-  const response=await request(endpoint.href,{method:'POST',redirect:'manual',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params}),signal:AbortSignal.timeout(15000)}).catch(()=>{throw new Error('Data RPC transport failed: '+method);});
-  if(!response.ok){await response.body?.cancel();throw new Error('Data RPC HTTP failure: '+response.status+' '+method);}
-  const reader=response.body?.getReader();if(!reader)throw new Error('Data RPC unavailable.');let size=0,text='';const decoder=new TextDecoder();
-  try{for(;;){const {done,value}=await reader.read();if(done)break;if((size+=value.length)>1000000){await reader.cancel();throw new Error('Data RPC response exceeds limit.');}text+=decoder.decode(value,{stream:true});}text+=decoder.decode();}finally{reader.releaseLock();}
-  const result=JSON.parse(text);if(result.jsonrpc!=='2.0'||result.id!==1||result.error||result.result===undefined||result.result===null)throw new Error('Data RPC invalid response: '+method);return result.result;
+  if(!['eth_chainId','eth_getBlockByNumber','eth_call','eth_getLogs'].includes(method))throw Error('Read-only data RPC method required.');
+  const start=preferred;let last:unknown;
+  for(let attempt=0;attempt<Math.min(3,endpoints.length+1);attempt++){
+   const index=(start+attempt)%endpoints.length;
+   try{
+    const response=await request(endpoints[index].href,{method:'POST',redirect:'manual',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params}),signal:AbortSignal.timeout(8000)}).catch(()=>{throw new DataRPCError('transport',method);});
+    if(!response.ok){await response.body?.cancel();throw new DataRPCError('http',method,response.status);}
+    const reader=response.body?.getReader();if(!reader)throw new DataRPCError('invalid',method);let size=0,text='';const decoder=new TextDecoder();
+    try{for(;;){const {done,value}=await reader.read();if(done)break;if((size+=value.length)>1000000){await reader.cancel();throw new DataRPCError('limit',method);}text+=decoder.decode(value,{stream:true});}text+=decoder.decode();}finally{reader.releaseLock();}
+    let result;try{result=JSON.parse(text);}catch{throw new DataRPCError('invalid',method);}if(result.jsonrpc!=='2.0'||result.id!==1||result.error||result.result===undefined||result.result===null)throw new DataRPCError('invalid',method);preferred=index;return result.result;
+   }catch(error){last=error;if(error instanceof DataRPCError&&(error.category==='limit'||error.category==='http'&&![429,502,503,504].includes(error.status!)))throw error;}
+  }
+  throw last;
  };
 }
 /** Bounded, read-only source import. No private key or token approval is involved. */
-export async function importTransfers(url:string,query:DataQuery,request:typeof fetch=fetch,checkpoint?:TransferSource['finalized'],allowCaptured=false){
+export async function importTransfers(url:DataRPCURL,query:DataQuery,request:typeof fetch=fetch,checkpoint?:TransferSource['finalized'],allowCaptured=false){
  if(!/^0x[0-9a-fA-F]{40}$/.test(query.account)||!['incoming','outgoing','all'].includes(query.direction))throw new Error('An Ethereum account and valid direction are required.');
  const rpc=dataRpc(url,request,allowCaptured);
  if(await rpc<string>('eth_chainId',[])!=='0x1')throw new Error('The data source must be Ethereum mainnet.');
@@ -40,7 +51,7 @@ export async function importTransfers(url:string,query:DataQuery,request:typeof 
  const source=parseTransferSource({version:'agentos.ethereum-usdc.v1',chainId:1,token:USDC_ADDRESS,decimals:6,account,direction:query.direction,blockFrom,blockTo,finalized:{number:number(fixed.number),hash:fixed.hash.toLowerCase()},blocks,logs});
  return {dataset:'custom-transfers-v1',blockFrom,blockTo,records:sourceRecords(source),source};
 }
-export async function verifyTransferSource(url:string,source:TransferSource,request:typeof fetch=fetch,allowCaptured=false){
+export async function verifyTransferSource(url:DataRPCURL,source:TransferSource,request:typeof fetch=fetch,allowCaptured=false){
  const parsed=parseTransferSource(source),current=await importTransfers(url,parsed,request,parsed.finalized,allowCaptured);
  if(JSON.stringify(current.source)!==JSON.stringify(parsed))throw new Error('Source events or canonical blocks have changed.');
  return current;

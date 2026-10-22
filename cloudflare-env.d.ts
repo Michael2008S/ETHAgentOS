@@ -19,6 +19,7 @@ declare namespace Cloudflare {
     AGENTOS_SUPPLIER_CONFIGURATIONS?: string;
     AGENTOS_SUPPLIER_API_KEYS?: string;
     AGENTOS_DATA_RPC_URL?: string;
+    AGENTOS_DATA_RPC_FALLBACK_URLS?: string;
     AGENTOS_SUPPLIER_API_KEY?: string;
     AGENTOS_RUNTIME_PRIVATE_ORIGIN?: string;
   }
