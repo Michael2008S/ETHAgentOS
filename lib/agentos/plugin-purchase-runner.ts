@@ -32,7 +32,7 @@ export async function runPluginPurchase(store:PluginDatabase,owner:string,id:str
  try{
   let runtime:PluginPurchaseRuntime|undefined;
   for(let transition=0;transition<(options.maxTransitions??24);transition++){
-   let flow=await pluginPurchase(store,owner,id);if(!active(flow)||flow.runLease?.token!==token||flow.runLease.until<=now())return {status:flow.status};
+   const flow=await pluginPurchase(store,owner,id);if(!active(flow)||flow.runLease?.token!==token||flow.runLease.until<=now())return {status:flow.status};
    const step=flow.steps.find(s=>!['paid','refunded','cancelled'].includes(s.status));
    if(!step){await mutate((_s,f)=>{f.status=f.steps.every(s=>s.status==='paid')?'completed':f.stopReason==='owner-cancelled'?'cancelled':'failed';delete f.runLease;});return {status:(await pluginPurchase(store,owner,id)).status};}
    const snapshot=await store.read(owner);let authority:Awaited<ReturnType<typeof permit>>|undefined;

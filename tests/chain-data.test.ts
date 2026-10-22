@@ -48,7 +48,7 @@ test('full delivery binds raw provenance and exact amounts, and refuses edited r
 });
 
 test('read-only RPC retries transport failures, prefers a working fallback and never retries oversized payloads',async()=>{
- const calls:string[]=[];let fail=true;const request:typeof fetch=async(url,init)=>{calls.push(String(url));if(String(url).includes('primary')&&fail)return new Response(null,{status:503});return Response.json({jsonrpc:'2.0',id:1,result:'0x1'});};
+ const calls:string[]=[];const fail=true;const request:typeof fetch=async(url,init)=>{calls.push(String(url));if(String(url).includes('primary')&&fail)return new Response(null,{status:503});return Response.json({jsonrpc:'2.0',id:1,result:'0x1'});};
  const rpc=dataRpc(['https://primary.example','https://fallback.example'],request);assert.equal(await rpc('eth_chainId',[]),'0x1');assert.equal(await rpc('eth_chainId',[]),'0x1');assert.deepEqual(calls,['https://primary.example/','https://fallback.example/','https://fallback.example/']);await assert.rejects(rpc('eth_sendRawTransaction',[]),/Read-only/);
  let attempts=0;await assert.rejects(dataRpc('https://rpc.example',async()=>{attempts++;return new Response('x'.repeat(1000001));})('eth_getLogs',[]),/exceeds limit/);assert.equal(attempts,1);
 });
