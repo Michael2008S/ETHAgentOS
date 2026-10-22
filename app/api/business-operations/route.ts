@@ -1,2 +1,3 @@
+import {configuredDataReplay} from '@/lib/agentos/data-runtime';
 import {owner,read} from '@/lib/agentos/store';import {apiFailure} from '@/lib/agentos/api-failure';import {businessOperations,businessOperationCounts} from '@/lib/agentos/business-operations';
-export async function GET(request:Request){try{const s=await read(owner(request));return Response.json({scope:s.scope,operations:businessOperations(s.state),counts:businessOperationCounts(s.state)},{headers:{'Cache-Control':'private, no-store'}});}catch(e){return apiFailure(e,'runtime');}}
+export async function GET(request:Request){try{const s=await read(owner(request));return Response.json({scope:s.scope,sourceMode:configuredDataReplay(request)?'captured-finalized-replay':'live-finalized-read',operations:businessOperations(s.state),counts:businessOperationCounts(s.state)},{headers:{'Cache-Control':'private, no-store'}});}catch(e){return apiFailure(e,'runtime');}}

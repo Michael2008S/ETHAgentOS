@@ -1,0 +1,61 @@
+{
+  "version": "agentos.captured-usdc.v1",
+  "sourceMode": "captured-finalized-replay",
+  "provenance": {
+    "originalRPC": "https://ethereum-rpc.publicnode.com",
+    "originalImplementation": "b16b7d39e8278093c459f29c1ccd2cc030cbe843",
+    "description": "Previously verified finalized outgoing USDC windows. Fixed sample replay; no live RPC or fresh mainnet acceptance claim.",
+    "originalFinalityCheckpoints": [
+      {
+        "number": 26248014,
+        "hash": "0x00bac38fa8b2dda5e2634f0796f061546a5dd4af45eb97e11141a62c378ce025"
+      },
+      {
+        "number": 26248014,
+        "hash": "0x00bac38fa8b2dda5e2634f0796f061546a5dd4af45eb97e11141a62c378ce025"
+      }
+    ]
+  },
+  "head": {
+    "number": 26248003,
+    "hash": "0xc1e4aef4ca751e88630e0b428188aa36b4bf621c98522fc78b1af6bebef0a5af"
+  },
+  "blocks": [
+    {
+      "number": 26248002,
+      "hash": "0x1a2b7f246c7493ec68cda9bc45c094acaf536321a5f9a6e8c8268a504a8b32fe"
+    },
+    {
+      "number": 26248003,
+      "hash": "0xc1e4aef4ca751e88630e0b428188aa36b4bf621c98522fc78b1af6bebef0a5af"
+    }
+  ],
+  "logs": [
+    {
+      "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "blockNumber": 26248002,
+      "blockHash": "0x1a2b7f246c7493ec68cda9bc45c094acaf536321a5f9a6e8c8268a504a8b32fe",
+      "transactionHash": "0x2879699488cd42a637791a1361d4fd64d1fbaebde2940873cf9eafdb135b7c5e",
+      "logIndex": 2,
+      "topics": [
+        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+        "0x000000000000000000000000ebf6c883a1d60ab38c8ed4780aadbfe4c805ed4f",
+        "0x00000000000000000000000047b6f5ad4bebff7b88cdb1adb7bb9a7b32ce3ba3"
+      ],
+      "data": "0x0000000000000000000000000000000000000000000000000000000001412ada"
+    },
+    {
+      "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "blockNumber": 26248003,
+      "blockHash": "0xc1e4aef4ca751e88630e0b428188aa36b4bf621c98522fc78b1af6bebef0a5af",
+      "transactionHash": "0x71bbda2b10eaf2d4dd003f1779a5ae96c08aa4e694606fdf35b93fc0f7f27bb8",
+      "logIndex": 137,
+      "topics": [
+        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+        "0x000000000000000000000000ebf6c883a1d60ab38c8ed4780aadbfe4c805ed4f",
+        "0x000000000000000000000000afa69ffccd6741086abb79e38986eccecacb817f"
+      ],
+      "data": "0x000000000000000000000000000000000000000000000000000000000121cd0e"
+    }
+  ]
+}

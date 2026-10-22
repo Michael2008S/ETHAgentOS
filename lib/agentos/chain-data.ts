@@ -5,8 +5,8 @@ type Block={number:string;hash:string};
 type RpcLog={address:string;blockNumber:string;blockHash:string;transactionHash:string;logIndex:string;topics:string[];data:string;removed?:boolean};
 const quantity=(n:number)=>'0x'+n.toString(16);
 const number=(raw:unknown)=>{if(typeof raw!=='string'||!/^0x[0-9a-f]+$/i.test(raw)||!Number.isSafeInteger(Number(BigInt(raw))))throw new Error('Invalid RPC quantity.');return Number(BigInt(raw));};
-export function dataRpc(url:string,request:typeof fetch=fetch){
- const endpoint=new URL(url);if(endpoint.protocol!=='https:'||endpoint.username||endpoint.password||endpoint.hash||endpoint.search)throw new Error('Configure a plain HTTPS data RPC endpoint.');
+export function dataRpc(url:string,request:typeof fetch=fetch,allowCaptured=false){
+ const endpoint=new URL(url);if(!(endpoint.protocol==='https:'||allowCaptured&&endpoint.protocol==='http:'&&endpoint.hostname==='127.0.0.1'&&endpoint.pathname==='/captured-usdc')||endpoint.username||endpoint.password||endpoint.hash||endpoint.search)throw new Error('Configure a plain HTTPS data RPC endpoint.');
  return async<T>(method:string,params:unknown[]):Promise<T>=>{
   const response=await request(endpoint.href,{method:'POST',redirect:'manual',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params}),signal:AbortSignal.timeout(15000)}).catch(()=>{throw new Error('Data RPC transport failed: '+method);});
   if(!response.ok){await response.body?.cancel();throw new Error('Data RPC HTTP failure: '+response.status+' '+method);}
@@ -16,9 +16,9 @@ export function dataRpc(url:string,request:typeof fetch=fetch){
  };
 }
 /** Bounded, read-only source import. No private key or token approval is involved. */
-export async function importTransfers(url:string,query:DataQuery,request:typeof fetch=fetch,checkpoint?:TransferSource['finalized']){
+export async function importTransfers(url:string,query:DataQuery,request:typeof fetch=fetch,checkpoint?:TransferSource['finalized'],allowCaptured=false){
  if(!/^0x[0-9a-fA-F]{40}$/.test(query.account)||!['incoming','outgoing','all'].includes(query.direction))throw new Error('An Ethereum account and valid direction are required.');
- const rpc=dataRpc(url,request);
+ const rpc=dataRpc(url,request,allowCaptured);
  if(await rpc<string>('eth_chainId',[])!=='0x1')throw new Error('The data source must be Ethereum mainnet.');
  const final=await rpc<Block>('eth_getBlockByNumber',['finalized',false]),head=number(final.number),blockTo=query.blockTo??head,blockFrom=query.blockFrom??blockTo;
  if(!Number.isSafeInteger(blockFrom)||blockFrom<0||!Number.isSafeInteger(blockTo)||blockTo<blockFrom||blockTo-blockFrom>=10000||blockTo>head)throw new Error('Select at most 10000 finalized blocks.');
@@ -40,8 +40,8 @@ export async function importTransfers(url:string,query:DataQuery,request:typeof 
  const source=parseTransferSource({version:'agentos.ethereum-usdc.v1',chainId:1,token:USDC_ADDRESS,decimals:6,account,direction:query.direction,blockFrom,blockTo,finalized:{number:number(fixed.number),hash:fixed.hash.toLowerCase()},blocks,logs});
  return {dataset:'custom-transfers-v1',blockFrom,blockTo,records:sourceRecords(source),source};
 }
-export async function verifyTransferSource(url:string,source:TransferSource,request:typeof fetch=fetch){
- const parsed=parseTransferSource(source),current=await importTransfers(url,parsed,request,parsed.finalized);
+export async function verifyTransferSource(url:string,source:TransferSource,request:typeof fetch=fetch,allowCaptured=false){
+ const parsed=parseTransferSource(source),current=await importTransfers(url,parsed,request,parsed.finalized,allowCaptured);
  if(JSON.stringify(current.source)!==JSON.stringify(parsed))throw new Error('Source events or canonical blocks have changed.');
  return current;
 }
