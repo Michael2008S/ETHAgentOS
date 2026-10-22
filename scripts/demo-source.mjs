@@ -1,4 +1,5 @@
-import {execFileSync} from 'node:child_process';import {mkdir,readFile,writeFile,symlink,rm,lstat} from 'node:fs/promises';import {resolve,join,dirname,sep} from 'node:path';import {createHash} from 'node:crypto';import {pathToFileURL} from 'node:url';
+import {execFileSync} from 'node:child_process';import {mkdir,readFile,writeFile,symlink,rm,lstat,mkdtemp} from 'node:fs/promises';import {resolve,join,dirname,sep} from 'node:path';import {createHash} from 'node:crypto';import {tmpdir} from 'node:os';
+import {pathToFileURL} from 'node:url';
 /** Snapshot application source only; never copy credentials, Git metadata or runtime state. */
 export async function syncDemoSource(destination){
  const base=resolve('.sites-runtime/isolated-demo'),target=resolve(destination);if(!target.startsWith(base+sep)||!target.endsWith(sep+'source'))throw new Error('Only an owned isolated-demo source directory may be synchronized.');
@@ -21,5 +22,9 @@ export async function verifyDemoSource(destination){
  const metadata=JSON.parse(await readFile(join(dirname(target),'source.json'),'utf8')),paths=JSON.parse(await readFile(join(dirname(target),'source-files.json'),'utf8'));if(metadata.sourceRoot!==target||!Array.isArray(paths)||paths.length!==metadata.files||new Set(paths).size!==paths.length)throw Error('Source snapshot manifest differs.');
  const hash=createHash('sha256');for(const path of paths){if(typeof path!=='string'||path.startsWith('/')||path.split('/').some(p=>['..','.git','node_modules'].includes(p))||(await lstat(join(target,path))).isSymbolicLink())throw Error('Unsafe source snapshot entry.');hash.update(path+'\0').update(await readFile(join(target,path)));}
  if(hash.digest('hex')!==metadata.sourceDigest)throw Error('Pinned source snapshot changed. Preserve it and review a separate runtime.');return metadata;
+}
+/** Vite denies .sites-runtime paths; serve an identical, private temporary mirror. */
+export async function createPreviewSource(snapshot){
+ const metadata=await verifyDemoSource(snapshot),paths=JSON.parse(await readFile(join(dirname(snapshot),'source-files.json'),'utf8')),target=await mkdtemp(join(tmpdir(),'agentos-preview-'));try{const hash=createHash('sha256');for(const path of paths){const bytes=await readFile(join(snapshot,path));hash.update(path+'\0').update(bytes);await mkdir(dirname(join(target,path)),{recursive:true});await writeFile(join(target,path),bytes);}if(hash.digest('hex')!==metadata.sourceDigest)throw Error('Source changed during preview copy.');await symlink(resolve('node_modules'),join(target,'node_modules'),'dir');return target;}catch(error){await rm(target,{recursive:true,force:true});throw error;}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){const arg=process.argv[2]||'.sites-runtime/isolated-demo/current.json',runtime=JSON.parse(await readFile(arg,'utf8'));console.log(JSON.stringify(await syncDemoSource(runtime.sourceSnapshot||runtime.sourceRoot)));}
