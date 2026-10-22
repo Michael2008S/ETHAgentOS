@@ -1,3 +1,4 @@
+import {drainIndependent} from './parallel-drain';
 import {runUSDCMonitor} from './usdc-monitor-runner';
 import {configuredMonitorRuntime} from './usdc-monitor-runtime';
 import {runMixedWorkflow} from './mixed-workflow-runner';
@@ -33,9 +34,7 @@ export async function drainQueue(request: Request, ownerId?: string, intervalMs=
   await heartbeat('busy');
   try {
   const counts = {claimed:0,completed:0,rescheduled:0,failed:0}, started=Date.now();
-  for(let i=0;i<4 && Date.now()-started<20000;i++) {
-    const job = await claimJob(env.DB,ownerId);
-    if(!job) break;
+  await drainIndependent(()=>claimJob(env.DB!,ownerId),async job=>{
     counts.claimed++;
     let failed=false;
     try {
@@ -63,13 +62,13 @@ export async function drainQueue(request: Request, ownerId?: string, intervalMs=
     } catch { failed=true; }
     // A read/ack failure leaves the lease for crash recovery; never claim completion.
     const snapshot=await store.read(job.owner_id);
-    const acked=await acknowledgeJob(env.DB,job,snapshot,failed);
+    const acked=await acknowledgeJob(env.DB!,job,snapshot,failed);
     if(failed) counts.failed++;
     if(acked) {
       const terminal=!workItems(snapshot.state).some(j=>j.kind===job.kind&&j.taskId===job.task_id);
       if(terminal) counts.completed++;else counts.rescheduled++;
     }
-  }
+  });
   const result={...counts,queue:await queueSummary(env.DB,ownerId)};
   await heartbeat(counts.failed?'failed':'ready');return result;
   }catch(error){await heartbeat('failed').catch(()=>{});throw error;}

@@ -56,3 +56,5 @@ export async function verifyTransferSource(url:DataRPCURL,source:TransferSource,
  if(JSON.stringify(current.source)!==JSON.stringify(parsed))throw new Error('Source events or canonical blocks have changed.');
  return current;
 }
+
+export function deadlineDataFetch(request:typeof fetch=fetch,milliseconds=35000):typeof fetch{const end=Date.now()+milliseconds;return (url,init)=>request(url,{...init,signal:AbortSignal.any([...(init?.signal?[init.signal]:[]),AbortSignal.timeout(Math.max(0,end-Date.now()))])});}

@@ -1,3 +1,4 @@
+import {configuredDataReplay} from '@/lib/agentos/data-runtime';
 import { env } from 'cloudflare:workers';
 import { owner,isLoopback } from '@/lib/agentos/auth';
 import { read } from '@/lib/agentos/store';
@@ -9,7 +10,7 @@ import {localServices} from '@/lib/agentos/local-services';
 async function healthy(url:string){try{const r=await fetch(url,{redirect:'manual',signal:AbortSignal.timeout(2000)});await r.body?.cancel();return r.ok;}catch{return false;}}
 export async function GET(request:Request){
  try{
-  const ownerId=owner(request);await read(ownerId);if(!env.DB)throw new Error('DB unavailable');
+  const ownerId=owner(request);const snapshot=await read(ownerId);if(!env.DB)throw new Error('DB unavailable');
   const local=Boolean(import.meta.env.DEV)&&isLoopback(new URL(request.url));
   const [chain,model,planning,memory,plugins,supplier,queue,consumer,oldest]=await Promise.all([
    serverChain(request,env.AGENTOS_CHAIN_CONFIGURATION).then(async({client,deployment})=>{const [id,code]=await Promise.all([client.getChainId(),client.getCode({address:deployment.escrow})]);return id===deployment.chainId&&!!code&&code!=='0x'?'healthy':'unavailable';}).catch(()=>local||env.AGENTOS_CHAIN_CONFIGURATION?'unavailable':'not-configured'),
@@ -23,6 +24,7 @@ export async function GET(request:Request){
    env.DB.prepare("SELECT MIN(created_at) AS at FROM agentos_runtime_jobs WHERE owner_id=? AND status IN ('pending','leased','dead')").bind(ownerId).first<{at:number|null}>(),
   ]);
   const services:Record<string,ServiceState>={database:'healthy',chain:chain as ServiceState,model:model as ServiceState,planning:planning as ServiceState,memory:memory as ServiceState,plugins:plugins as ServiceState,supplier:supplier as ServiceState,consumer:consumerState(consumer)};
-  return Response.json({checkedAt:new Date().toISOString(),ready:Object.entries(services).filter(([key])=>!['model','planning','memory'].includes(key)).every(([,s])=>s==='healthy'||s==='busy')&&!queue.dead,services,queue,lastConsumerAt:consumer?new Date(consumer.last_seen).toISOString():null,oldestPendingAt:oldest?.at?new Date(oldest.at).toISOString():null},{headers:{'Cache-Control':'no-store'}});
+  const monitors=(snapshot.state.usdcMonitors??[]).filter(m=>['running','paused','stopping'].includes(m.status)),dataSource={mode:configuredDataReplay(request)?'captured-finalized-replay':'live-finalized-read',status:monitors.some(m=>m.sourceFailures)?'degraded':monitors.length&&monitors.every(m=>m.lastSuccessfulScanAt)?'healthy':'unchecked',activeMonitors:monitors.length};
+  return Response.json({dataSource,checkedAt:new Date().toISOString(),ready:Object.entries(services).filter(([key])=>!['model','planning','memory'].includes(key)).every(([,s])=>s==='healthy'||s==='busy')&&!queue.dead&&dataSource.status!=='degraded',services,queue,lastConsumerAt:consumer?new Date(consumer.last_seen).toISOString():null,oldestPendingAt:oldest?.at?new Date(oldest.at).toISOString():null},{headers:{'Cache-Control':'no-store'}});
  }catch(error){return apiFailure(error,'runtime');}
 }

@@ -1,5 +1,6 @@
+import {businessExecution,type BusinessJobState} from './business-execution.ts';
 import {missionList,missionSelection} from './business-missions.ts';import {isArchived} from './business-archives.ts';import type {Workspace} from './types.ts';
-export function businessOperations(input:Workspace){
+export function businessOperations(input:Workspace,jobs:BusinessJobState[]=[]){
  const state=input;
  const monitorChildren=new Set<string>();for(const m of state.usdcMonitors??[])for(const f of missionSelection(state,m.id).flows)monitorChildren.add(f.id);
  return missionList(state).filter(m=>!m.successor&&!isArchived(state,m.kind==='monitor'?'monitor':'mixed',m.id)&&(m.kind==='monitor'||!monitorChildren.has(m.id))).map(m=>{
@@ -14,7 +15,8 @@ export function businessOperations(input:Workspace){
    }else nextAction=pending?'review':'renew';
   }else if(['failed','cancelled'].includes(m.status))nextAction='repair';else if(pending)nextAction='review';
   if(nextAction==='review')targetId=selected.flows.find(f=>f.status==='completed'&&!state.businessReviews?.some(r=>r.missionId===f.id))?.id??m.id;
-  return {...m,nextAction,targetId,pendingReviewCount:pending,lastError:raw.lastError??null};
+  const execution=businessExecution(state,m.id,jobs);if(execution.status==='needs-retry'){nextAction='retry';targetId=m.id;}
+  return {...m,execution,nextAction,targetId,pendingReviewCount:pending,lastError:raw.lastError??null};
  });
 }
 export function businessOperationCounts(state:Workspace){const rows=businessOperations(state);return {total:rows.length,running:rows.filter(r=>['running','paused','cancelling','stopping'].includes(r.status)).length,attention:rows.filter(r=>['repair','adopt-repair','review'].includes(r.nextAction)).length};}

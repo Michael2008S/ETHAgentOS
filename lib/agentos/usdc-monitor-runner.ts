@@ -12,6 +12,7 @@ import type {MixedStore,MixedCreationContext} from './mixed-workflow-store.ts';
 import type {Workspace} from './types.ts';
 export type MonitorRuntime={context:()=>Promise<MixedCreationContext>;mixed:()=>Promise<MixedRuntime>;scan:(m:USDCMonitor)=>ReturnType<typeof scanUSDCWindow>};
 export async function runUSDCMonitor(store:MixedStore,owner:string,id:string,getRuntime:()=>Promise<MonitorRuntime>){
+ let scanning=false,scanStarted=0;
  const now=()=>new Date().toISOString(),token=crypto.randomUUID();
  const claimed=await store.updateWorkspace(owner,async state=>{const old=findMonitor(state,id);await verifyMonitor(old);if(!['running','paused','stopping'].includes(old.status)||old.lease&&old.lease.until>now()||old.expiresAt>now()&&old.nextPollAt&&old.nextPollAt>now())return state;const next=structuredClone(state);findMonitor(next,id).lease={token,until:new Date(Date.now()+240000).toISOString()};return next;});
  if(findMonitor(claimed.state,id).lease?.token!==token)return {status:findMonitor(claimed.state,id).status};
@@ -31,7 +32,7 @@ export async function runUSDCMonitor(store:MixedStore,owner:string,id:string,get
   else if(m.status==='running'){
    if(m.reports.length>=m.draft.maxReports)await mutate((_s,current)=>{current.status='completed';});
    else if(m.pending){await createMixedWorkflow(store,owner,m.pending.draft,runtime.context,undefined,undefined,{id,token});await mutate((_s,current)=>{current.nextPollAt=now();delete current.lastError;});}
-   else{const scan=await runtime.scan(m);if(scan.kind==='data'){
+   else{scanning=true;scanStarted=Date.now();const scan=await runtime.scan(m);scanning=false;await mutate((_s,current)=>{current.lastScanAt=now();current.lastSuccessfulScanAt=now();current.lastScanDurationMs=Date.now()-scanStarted;current.finalizedHead=scan.finalized;current.sourceFailures=0;delete current.sourceError;});if(scan.kind==='data'){
      const draft=await businessWizardDraft({requestId:await mixedStepUUID(m.draft.requestId,m.reports.length),buyer:m.draft.buyer,title:m.draft.title.slice(0,90)+' · '+scan.from+'–'+scan.to,input:scan.input,mode:'usdc-policy',catalog:m.services,thresholdBps:m.draft.thresholdBps});draft.vaultSessionId=m.draft.vaultSessionId;draft.timeoutSeconds=Math.max(120,Math.min(600,Math.floor((Date.parse(m.expiresAt)-Date.now())/1000)));
      await mutate((_s,current)=>{current.pending={draft,from:scan.from,to:scan.to,endHash:scan.endHash,sourceHash:scan.sourceHash};current.nextPollAt=now();delete current.lastError;});
     }else await mutate((_s,current)=>{if(scan.kind==='empty'){current.cursor=scan.to+1;current.anchor={number:scan.to,hash:scan.endHash};current.emptyWindows++;}current.nextPollAt=new Date(Date.now()+current.draft.pollSeconds*1000).toISOString();delete current.lastError;});
@@ -41,7 +42,7 @@ export async function runUSDCMonitor(store:MixedStore,owner:string,id:string,get
  }catch(error){
   if(error instanceof DomainError&&['FORBIDDEN','CONFLICT'].includes(error.code)){
    await mutate((state,current)=>{const completed=current.reports.find(report=>report.status==='active'&&state.mixedWorkflows?.some(flow=>flow.id===report.workflowId&&flow.status==='completed'));if(completed){completed.status='failed';completed.error=error.message;current.status='failed';current.lastError=error.message;delete current.pending;return;}const stopped=controlMonitor(state,id,'stop');Object.assign(state,stopped);findMonitor(state,id).lease={token,until:new Date(Date.now()+240000).toISOString()};findMonitor(state,id).lastError=error.message;}).catch(()=>{});
-  }else await mutate((_s,m)=>{m.lastError='Source or runtime temporarily unavailable; checkpoint retained for retry.';m.nextPollAt=new Date(Date.now()+m.draft.pollSeconds*1000).toISOString();}).catch(()=>{});
+  }else await mutate((_s,m)=>{m.lastError='Source or runtime temporarily unavailable; checkpoint retained for retry.';if(scanning){m.lastScanAt=now();m.lastScanDurationMs=Date.now()-scanStarted;m.sourceFailures=(m.sourceFailures??0)+1;m.sourceError=error instanceof Error&&/^Data RPC /.test(error.message)?error.message:'Source scan unavailable.';}m.nextPollAt=new Date(Date.now()+m.draft.pollSeconds*1000).toISOString();}).catch(()=>{});
   return {status:'retryable',error:error instanceof DomainError?error.message:'Monitor checkpoint retained for retry.'};
  }finally{await store.updateWorkspace(owner,state=>{if(findMonitor(state,id).lease?.token!==token)return state;const next=structuredClone(state);delete findMonitor(next,id).lease;return next;}).catch(()=>{});}
 }
