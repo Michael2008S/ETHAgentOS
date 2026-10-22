@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS evidence_objects (
+  key TEXT PRIMARY KEY NOT NULL,
+  body TEXT NOT NULL,
+  etag TEXT NOT NULL
+);
