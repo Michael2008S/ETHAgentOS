@@ -1,8 +1,8 @@
 import {spawn} from 'node:child_process';
-import {mkdir,open,writeFile,readFile,rm} from 'node:fs/promises';
+import {mkdir,open,writeFile,readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {createConnection} from 'node:net';
-import {syncDemoSource,verifyDemoSource,createPreviewSource} from './demo-source.mjs';
+import {syncDemoSource,verifyDemoSource} from './demo-source.mjs';
 const resumeAt=process.argv.indexOf('--resume'),previous=resumeAt>=0?JSON.parse(await readFile(resolve(process.argv[resumeAt+1]),'utf8')):undefined;
 if(previous&&!previous.persistent)throw Error('This older runtime is in-memory. Start a new persistent instance; its running chain was not changed.');
 const sourceProxy=previous?.sourceProxy??process.env.AGENTOS_DEMO_SOURCE_PROXY==='1';
@@ -18,10 +18,10 @@ const base='http://127.0.0.1:'+ports.web,chain='http://127.0.0.1:'+ports.chain,s
 // Vinext's CommonJS transform recognizes optimized modules under node_modules/.vite.
 // A custom cache outside that directory may be transformed twice.
 const env={...process.env,...(capturedSource?{AGENTOS_REPLAY_PORT:String(ports.capture??ports.data),VITE_AGENTOS_CAPTURED_DATA_URL:'http://127.0.0.1:'+ports.data+'/captured-usdc'}:{}),...(sourceProxy&&!capturedSource?{VITE_AGENTOS_LIVE_DATA_URL:'http://127.0.0.1:'+ports.data+'/live-usdc'}:{}),VINEXT_NO_DEV_LOCK:'1',AGENTOS_DEV_STATE_DIRECTORY:root+'/db',AGENTOS_DEV_CACHE_DIRECTORY:resolve('node_modules/.vite/agentos-'+root.split('/').at(-1)),SITES_RUNTIME_ROOT:root,WRANGLER_REGISTRY_PATH:root+'/dev-registry',MINIFLARE_REGISTRY_PATH:root+'/registry',WRANGLER_LOG_PATH:root+'/wrangler/logs',AGENTOS_TEST_URL:base,AGENTOS_CHAIN_URL:chain,AGENTOS_APP_ORIGIN:base,AGENTOS_CHAIN_STATE:root+'/chain',AGENTOS_CHAIN_PORT:String(ports.chain),AGENTOS_SUPPLIER_PORT:String(ports.supplier),AGENTOS_SUPPLIER_STATE:root+'/supplier',VITE_AGENTOS_LOCAL_PLUGIN_URL:pluginURL,AGENTOS_PLUGIN_RUNTIME_PORT:String(ports.plugin),AGENTOS_MCP_FIXTURE_PORT:String(ports.mcp),AGENTOS_PLUGIN_JOURNAL:root+'/plugins/journal',AGENTOS_MCP_SERVERS:JSON.stringify([{id:'local-chain',url:mcpURL+'/mcp',revision:'1.0.0',readTools:['vault_snapshot']}]),VITE_AGENTOS_LOCAL_CHAIN_URL:chain,VITE_AGENTOS_LOCAL_SUPPLIER_URL:supplier};
-let previewSource;let stopping=false;const stop=()=>{if(stopping)return;stopping=true;for(const child of children)if(child.exitCode===null)child.kill('SIGTERM');};for(const signal of ['SIGTERM','SIGINT'])process.on(signal,stop);
+let stopping=false;const stop=()=>{if(stopping)return;stopping=true;for(const child of children)if(child.exitCode===null)child.kill('SIGTERM');};for(const signal of ['SIGTERM','SIGINT'])process.on(signal,stop);
 const occupied=port=>new Promise(done=>{const socket=createConnection({host:'127.0.0.1',port});socket.once('connect',()=>{socket.destroy();done(true);});socket.once('error',()=>done(false));});
 async function run(name,args,ready,overrides={}){
- const log=await open(root+'/'+name+'.log','a',0o600),child=spawn(process.execPath,args,{cwd:name==='web'?previewSource:root+'/source',env:{...env,...overrides},stdio:['ignore',log.fd,log.fd]});await log.close();children.push(child);
+ const log=await open(root+'/'+name+'.log','a',0o600),child=spawn(process.execPath,args,{cwd:name==='web'?process.cwd():root+'/source',env:{...env,...overrides},stdio:['ignore',log.fd,log.fd]});await log.close();children.push(child);
  let terminal=false;const finished=new Promise(done=>{child.once('exit',code=>{terminal=true;done(code);});child.once('error',()=>{terminal=true;done(1);});});
  if(!ready){const code=await finished;if(code!==0)throw new Error(name+' failed; inspect '+root+'/'+name+'.log');return;}
  void finished.then(()=>{if(!stopping){console.error(name+' stopped unexpectedly; inspect '+root+'/'+name+'.log');process.exitCode=1;stop();}});
@@ -41,13 +41,12 @@ try{
  await run('supplier',['scripts/supplier-local.mjs'],supplier+'/health',{AGENTOS_SUPPLIER_PEERS:JSON.stringify(['http://127.0.0.1:'+ports.supplier2])});
  await run('mcp',['scripts/plugins/mcp-fixture.mjs'],mcpURL+'/health');
  await run('plugins',['scripts/plugins/service.mjs'],pluginURL+'/health');
- previewSource=await createPreviewSource(root+'/source');
  await run('web',['scripts/run-framework.mjs','dev','--host','127.0.0.1','--port',String(ports.web)],base+'/api/workspace');
  await run('worker',['scripts/worker.mjs'],base+'/api/runtime/queue');
- const metadata={root,previewSource,persistent:true,capturedSource,sourceProxy,...(sourceProxy?{sourceProxyURL:'http://127.0.0.1:'+ports.data}:{}),sourceMode:capturedSource?'captured-finalized-replay':'live-finalized-read',...(capturedSource?{replayURL:'http://127.0.0.1:'+ports.data}:{}),manageCurrent:previous?.manageCurrent??process.env.AGENTOS_DEMO_NO_CURRENT!=='1',sourceRoot:process.cwd(),sourceSnapshot:root+'/source',baseURL:base,chainURL:chain,supplierURL:supplier,pluginURL,mcpURL,supplier2URL:'http://127.0.0.1:'+ports.supplier2,identityEnabled:process.env.AGENTOS_DEMO_SKIP_IDENTITY!=='1',startedAt:new Date().toISOString(),pid:process.pid,children:children.map(c=>c.pid)};
+ const metadata={root,persistent:true,capturedSource,sourceProxy,...(sourceProxy?{sourceProxyURL:'http://127.0.0.1:'+ports.data}:{}),sourceMode:capturedSource?'captured-finalized-replay':'live-finalized-read',...(capturedSource?{replayURL:'http://127.0.0.1:'+ports.data}:{}),manageCurrent:previous?.manageCurrent??process.env.AGENTOS_DEMO_NO_CURRENT!=='1',sourceRoot:process.cwd(),sourceSnapshot:root+'/source',baseURL:base,chainURL:chain,supplierURL:supplier,pluginURL,mcpURL,supplier2URL:'http://127.0.0.1:'+ports.supplier2,identityEnabled:process.env.AGENTOS_DEMO_SKIP_IDENTITY!=='1',startedAt:new Date().toISOString(),pid:process.pid,children:children.map(c=>c.pid)};
  await writeFile(root+'/runtime.json',JSON.stringify(metadata,null,2));if(metadata.manageCurrent)await writeFile('.sites-runtime/isolated-demo/current.json',JSON.stringify(metadata,null,2));
  console.log('ISOLATED DEMO '+JSON.stringify(metadata));
  await new Promise(done=>{const timer=setInterval(()=>{if(stopping){clearInterval(timer);done();}},250);});
 }catch(error){console.error(error.message);process.exitCode=1;stop();}
 
-finally{stop();await Promise.all(children.filter(c=>c.exitCode===null).map(c=>new Promise(done=>{c.once('close',done);const timer=setTimeout(()=>{if(c.exitCode===null)c.kill('SIGKILL');},15000);timer.unref();})));if(previewSource)await rm(previewSource,{recursive:true,force:true});}
+finally{stop();await Promise.all(children.filter(c=>c.exitCode===null).map(c=>new Promise(done=>{c.once('close',done);const timer=setTimeout(()=>{if(c.exitCode===null)c.kill('SIGKILL');},15000);timer.unref();})));}
