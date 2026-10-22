@@ -26,7 +26,7 @@ async function run(name,args,ready,overrides={}){
  if(!ready){const code=await finished;if(code!==0)throw new Error(name+' failed; inspect '+root+'/'+name+'.log');return;}
  void finished.then(()=>{if(!stopping){console.error(name+' stopped unexpectedly; inspect '+root+'/'+name+'.log');process.exitCode=1;stop();}});
  const deadline=Date.now()+600000;
- for(;;){if(terminal||stopping||Date.now()>deadline)throw new Error(name+' not ready; inspect '+root+'/'+name+'.log');try{const r=await fetch(ready,{signal:AbortSignal.timeout(3000)}),data=await r.json();if(r.ok&&(name==='web'?typeof data.scope==='string'&&Array.isArray(data.state?.tasks):name==='chain'?data.mode==='local'&&!!data.vault:name==='captured-source'||name.startsWith('supplier')||name==='mcp'||name==='plugins'?data.status==='ok':!!data.queue))break;}catch{}await new Promise(done=>setTimeout(done,500));}
+ for(;;){if(terminal||stopping||Date.now()>deadline)throw new Error(name+' not ready; inspect '+root+'/'+name+'.log');try{const r=await fetch(ready,{signal:AbortSignal.timeout(3000)}),data=await r.json();if(r.ok&&(name==='web'?typeof data.scope==='string'&&Array.isArray(data.state?.tasks):name==='chain'?data.mode==='local'&&!!data.vault:name==='captured-source'||name==='source-proxy'||name.startsWith('supplier')||name==='mcp'||name==='plugins'?data.status==='ok':!!data.queue))break;}catch{}await new Promise(done=>setTimeout(done,500));}
  console.log('READY '+name+' '+ready);
 }
 try{
