@@ -61,7 +61,7 @@
   "integrity": {
     "algorithm": "sha256",
     "retainedDryRunChecksumsVerified": 21,
-    "fileCount": 42
+    "fileCount": 45
   },
   "files": [
     {
@@ -315,6 +315,24 @@
       "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-access-recheck-03873765-8c20-483d-bb79-15d94c9a90ff/version.log",
       "bytes": 24,
       "sha256": "e16c4dce4ef8aea92d8fc16266c0e8cc512270aa73f34e16cdab3cba9d8ce075"
+    },
+    {
+      "stage": "cre-application-status",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-application-status-1f5d0090-3f26-4991-9a01-062eedb3ec5a/report.json",
+      "bytes": 1838,
+      "sha256": "86009ad015e7b85373b7143a4bd7dc15c82d2c5c3364f8f98fe8cc89819aeeea"
+    },
+    {
+      "stage": "cre-application-status",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-application-status-1f5d0090-3f26-4991-9a01-062eedb3ec5a/whoami.log",
+      "bytes": 536,
+      "sha256": "43c616804dd685d2e6e3bdf28eb2d079edb031e39b1112046cf8703ee62ee90d"
+    },
+    {
+      "stage": "cre-application-status",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-application-status-1f5d0090-3f26-4991-9a01-062eedb3ec5a/account-access.log",
+      "bytes": 506,
+      "sha256": "d88efd7727efc581eb57ab831149471c7640e8cd420928709b45bb68eaa2d95f"
     }
   ],
   "pending": [
@@ -335,5 +353,14 @@
     "bindingPerformed": false,
     "fundingPerformed": false
   },
-  "lastUpdatedAt": "2026-10-22T23:02:55.277Z"
+  "lastUpdatedAt": "2026-10-22T23:14:23.615Z",
+  "latestApplicationCheck": {
+    "checkedAt": "2026-10-22T23:09:29.281Z",
+    "deployAccess": false,
+    "applicationSubmissionOccurred": true,
+    "applicationCompleteness": "unknown",
+    "specificMissingMaterials": "not exposed",
+    "report": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-application-status-1f5d0090-3f26-4991-9a01-062eedb3ec5a/report.json",
+    "followup": "docs/CRE_DEPLOY_ACCESS_FOLLOWUP.md"
+  }
 }
