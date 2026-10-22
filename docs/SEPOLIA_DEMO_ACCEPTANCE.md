@@ -17,7 +17,7 @@
 | 公共证据服务 | Workers + D1 实际部署；匿名精确读回、写鉴权、幂等、冲突拒绝、归档保留通过 | 原型级应用不可覆盖约束；管理员仍控制数据库，哈希用于独立完整性核验 |
 | 生产 dispatcher | 官方 CLI：空队列、发现未注资任务后 `not-finalized`、归档后空队列三组通过 | 实际 HTTPS + Sepolia 读取；未进入 funded 结算/report 分支 |
 | 证据读取 | 独立只读 CRE 探针通过 HTTP capability/node consensus 读取输入和成果，复算一致 | 复用生产 `verifyDelivery`，无 EVM/report/write 能力；与生产 dispatcher 测试分开记录 |
-| CRE 权限 | 最近检查已登录，`deployAccess=false` | 检查于 `2026-10-22T21:52:00.449Z`（香港 10 月 23 日 05:52）；后续部署前须重查 |
+| CRE 权限 | 最新复查已登录，`deployAccess=false` | 检查于 `2026-10-22T23:02:18.661Z`（香港 10 月 23 日 07:02）；凭证见第 7 节，后续部署前须重查 |
 
 最近 dry-run 的链上前后快照为区块 `11972321` / `11972329`，两次 workflow ID 都为零、receiver 测试代币余额都为零，未提交交易。合成 ready 项已归档，队列为零，输入/成果字节仍保留。探针输出哈希：`0xfdbcdffbd5cd22ddf72754142d88c3c5a761985be1bb22394c28ce3570882498`。
 
@@ -177,3 +177,13 @@
 - 已整理 5 笔历史成功交易、阶段边界、private registry 兼容性关卡和两钱包要求。
 - 未执行 deployment、activation、bind、mint、approve、openTask 或任何链上写入；未更改 active 支付配置。
 - 后续执行完成一个阶段，添加新凭证和验收结论，保留当前历史快照，不把待办直接改成通过。
+
+## 7. 最新 CRE 部署权限复查
+
+检查时间：`2026-10-22T23:02:18.661Z`（UTC）；CLI `v1.39.0`，组织 `My Org` / `org_xLpqnc5AuiRvywaW`。联网 `whoami` 成功，账户已认证，**Deploy Access: Not enabled**。这是最新权限结果，未满足第 4 节 A 阶段部署前提。
+
+凭证：[本轮报告](../outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-access-recheck-03873765-8c20-483d-bb79-15d94c9a90ff/report.json)、[脱敏 whoami 原始输出](../outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-access-recheck-03873765-8c20-483d-bb79-15d94c9a90ff/whoami.log)、[CLI 版本](../outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-access-recheck-03873765-8c20-483d-bb79-15d94c9a90ff/version.log)。机器索引已收录上述文件及 SHA-256。
+
+本轮没有尝试 deploy/activate，没有取得真实 workflow ID；报告身份兼容性仍为 pending，未进行绑定、铸币、approve、注资或交易广播。权限获批后再执行第 4 节 A → B，保存真实 ID 与兼容性证明；本轮不会自动执行后续绑定和注资。
+
+用户手动操作：当前无需 MetaMask 签名。等待 Chainlink 开通 deploy access；若 Chainlink 要求补充申请信息，由用户在官方账户页面处理；若后续登录失效，再手动完成登录/MFA。当前已有登录态，不需要重新登录。

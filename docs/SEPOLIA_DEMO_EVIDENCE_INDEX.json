@@ -61,7 +61,7 @@
   "integrity": {
     "algorithm": "sha256",
     "retainedDryRunChecksumsVerified": 21,
-    "fileCount": 39
+    "fileCount": 42
   },
   "files": [
     {
@@ -297,6 +297,24 @@
       "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-public-d1-dry-run-abe46dce-f735-4a1c-936a-bb690819b24e/checksums.sha256.json",
       "bytes": 2151,
       "sha256": "11302894e04d51e2b5e255459d601decdaa34adc1ddf4302db569eb12554b4d5"
+    },
+    {
+      "stage": "cre-deploy-access-recheck",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-access-recheck-03873765-8c20-483d-bb79-15d94c9a90ff/report.json",
+      "bytes": 1312,
+      "sha256": "48cc1dcf8b151cfe3fee2dc00c552eb91db2d711bff37a9f33a75b4d6fbbdcaa"
+    },
+    {
+      "stage": "cre-deploy-access-recheck",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-access-recheck-03873765-8c20-483d-bb79-15d94c9a90ff/whoami.log",
+      "bytes": 536,
+      "sha256": "43c616804dd685d2e6e3bdf28eb2d079edb031e39b1112046cf8703ee62ee90d"
+    },
+    {
+      "stage": "cre-deploy-access-recheck",
+      "path": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-access-recheck-03873765-8c20-483d-bb79-15d94c9a90ff/version.log",
+      "bytes": 24,
+      "sha256": "e16c4dce4ef8aea92d8fc16266c0e8cc512270aa73f34e16cdab3cba9d8ce075"
     }
   ],
   "pending": [
@@ -307,5 +325,15 @@
     "Active payment runtime/configuration and distinct buyer wallet",
     "New funded identity-bound orders and actual DON payment/rejection/refund",
     "Paid ERC-8004 feedback and independent revocation receipt"
-  ]
+  ],
+  "lastAccessRecheck": {
+    "checkedAt": "2026-10-22T23:02:18.661Z",
+    "authenticated": true,
+    "deployAccess": false,
+    "report": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-access-recheck-03873765-8c20-483d-bb79-15d94c9a90ff/report.json",
+    "deploymentAttempted": false,
+    "bindingPerformed": false,
+    "fundingPerformed": false
+  },
+  "lastUpdatedAt": "2026-10-22T23:02:55.277Z"
 }
