@@ -102,7 +102,8 @@
     "demo:operations": "node scripts/demo-local-operations.mjs",
     "ops:local": "node scripts/local-operations.mjs",
     "baseline": "node scripts/local-baseline.mjs",
-    "validate:local": "node scripts/validate-local.mjs"
+    "validate:local": "node scripts/validate-local.mjs",
+    "demo:product-soak": "node scripts/demo-product-soak.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
