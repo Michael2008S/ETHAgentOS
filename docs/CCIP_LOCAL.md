@@ -1,5 +1,7 @@
 # P3：CCIP 本地双链任务消息原型
 
+当前运行基线、CCIP 业务集成及本轮 60 阶段完整验收见 [当前本地验收总览](LOCAL_INTEGRATION_ACCEPTANCE_2026-10-23.md)。下文旧测试数量、旧实例状态和旧功能边界按各自阶段理解。
+
 范围：A 链提交任务授权 → B 链在本地预算内通过现有 AgentVault/AgentEscrow 执行 → 回传结算结果 → A 链确认。只传消息、不跨链转移代币。两条独立 Ganache EVM 的 chainId 为 31338 / 31339，Mock selector 为 1001 / 1002；这些 selector 不是官方网络配置。
 
 ## 运行与实现

@@ -1,5 +1,7 @@
 # Local x402 implementation and acceptance
 
+当前运行基线、CCIP 业务集成及本轮 60 阶段完整验收见 [当前本地验收总览](LOCAL_INTEGRATION_ACCEPTANCE_2026-10-23.md)。下文旧测试数量、旧实例状态和旧功能边界按各自阶段理解。
+
 2026-10-23 P1/P2 更新：[恢复、独立实现互操作及本地 Data Feeds 验收](P1_P2_LOCAL_ACCEPTANCE_2026-10-23.md)。
 
 当前本地整体验收入口：[2026-10-23 P0 基线](P0_LOCAL_ACCEPTANCE_2026-10-23.md)。本文各阶段 lint 数量与测试数量是历史检查点；以该基线中的实际运行报告为准。

@@ -1,5 +1,7 @@
 # Chainlink 与测试网接入
 
+当前运行基线、CCIP 业务集成及本轮 60 阶段完整验收见 [当前本地验收总览](LOCAL_INTEGRATION_ACCEPTANCE_2026-10-23.md)。下文旧测试数量、旧实例状态和旧功能边界按各自阶段理解。
+
 ## 当前选型
 
 核心采用 **CRE：定时读取链上任务 → 获取已承诺的证据和交付 → 多节点相同结果共识 → 签名 report → EVM 托管结算**。入口为 `cre/workflow/main.ts`，处理逻辑为 `handler.ts`。它使用 SDK 的 CronCapability、HTTPClient、EVMClient、runInNodeMode、runtime.report、writeReport。[官方 onchain write 示例](https://docs.chain.link/cre/getting-started/part-4-writing-onchain-ts)。

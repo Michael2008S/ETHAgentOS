@@ -1,5 +1,7 @@
 # AgentOS 开发与验收追踪
 
+当前运行基线、CCIP 业务集成及本轮 60 阶段完整验收见 [当前本地验收总览](LOCAL_INTEGRATION_ACCEPTANCE_2026-10-23.md)。下文旧测试数量、旧实例状态和旧功能边界按各自阶段理解。
+
 2026-10-23 全部历史验收型 demo 已重跑 **57/57**，含 CRE dry-run 和完整浏览器；修复及旧实例离线状态见 [本次完整回归](FULL_HISTORY_ACCEPTANCE_2026-10-23.md)。
 
 2026-10-23 P3：[CCIP 本地双链任务消息原型及验收边界](CCIP_LOCAL.md)。

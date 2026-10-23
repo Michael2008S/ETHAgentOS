@@ -24,7 +24,7 @@
 - 审阅式重规划：保留已付款成果与原凭证，确认退款后为剩余目标生成替代步骤；人工批准时原子替换未支出工作，退款尝试仍占用累计额度。见 [WORKFLOW-REPLANNING](docs/WORKFLOW-REPLANNING.md)。
 - 使用真实 `@chainlink/cre-sdk` 的工作流源码与 TypeScript 客户端 SDK。
 
-- 通用插件付费核心：API/SDK 与持久队列支持通用 JSON 输入、已付款父成果、精确插件支付授权、签名交付、独立重放和实际本地 Vault 付款/退款。插件规划、模板和失败修复已接通，历史完整本地 demo 已扩展至 57 阶段并通过，包含统一混合 AI 规划、无 JSON 业务向导及持续 USDC 监测；此前 44 步验收的临时 HTTPS 失败与续跑记录也保留，见 [PLUGIN-PURCHASES](docs/PLUGIN-PURCHASES.md)。
+- 通用插件付费核心：API/SDK 与持久队列支持通用 JSON 输入、已付款父成果、精确插件支付授权、签名交付、独立重放和实际本地 Vault 付款/退款。插件规划、模板和失败修复已接通，当前完整本地 demo 已扩展至 60 阶段并通过，包含统一混合 AI 规划、无 JSON 业务向导及持续 USDC 监测；此前 44 步验收的临时 HTTPS 失败与续跑记录也保留，见 [PLUGIN-PURCHASES](docs/PLUGIN-PURCHASES.md)。
 
 - 技能与插件混合编排：2–8 步明确程序，支持插件→业务技能、已付款业务成果→插件、显式数据适配、共享额度和持久恢复；包含新安装版本化技能的真实本地付款验收。
 - 统一混合 AI 规划与业务向导：模型从当前服务目录中选择兼容路线；转账表格、主网来源导入、报告类型与阈值均可直接填写，审核费用后再独立授权执行，高级 JSON 可选。
@@ -34,11 +34,13 @@
 
 当前可恢复本地运行与统一检查入口见 [LOCAL_BASELINE](docs/LOCAL_BASELINE.md)。旧离线内存链与新持久化基线分别管理。
 
+本轮最终验证：383 项 Node、6 项 CRE SDK、完整浏览器覆盖及 60 阶段 demo 通过。验收代码提交、证据和恢复命令见 [当前本地验收总览](docs/LOCAL_INTEGRATION_ACCEPTANCE_2026-10-23.md)。
+
 ## 状态边界
 
 **沙盒任务与链上订单是两条独立链路。** 沙盒使用 testUSD 积分；预注资订单通过真实 EVM 托管测试代币。两个内置技能及按需安装的版本化扩展可分析内置或用户提交的转账记录，可选择内置适配器或受授权的独立 HTTP 供应商。预注资订单可选择真实 LLM 工具规划，服务端负责权限校验与独立复算；模型不签名、不计算最终金额。智能体档案可绑定真实 ERC-8004 注册表身份快照。任务由服务端后台推进，关闭浏览器不影响当前执行。请求中止或服务重启后，持久检查点可通过恢复 API 或本地恢复 worker 继续。自定义业务 Agent 绑定已安装的版本化技能；通用 JavaScript 插件通过独立的受限 QuickJS 执行，当前付款仍仅限本地环境。
 
-Solidity 已在本地 EVM 中测试；CRE 工作流已通过 SDK 与官方 CLI 编译及 HTTPS/EVM capability dry-run。x402 已实现本地测试代币采购、Vault 托管、独立验收与失败退款；Data Feeds 已有 ETH/USD gas 美元展示及 USDC/USD 风控的本地 Mock 版本；CCIP 已有[本地双链任务消息原型](docs/CCIP_LOCAL.md)，真实 CCIP 网络尚未验收。历史 Sepolia 身份注册、未绑定 receiver 和 Worker+D1 证据服务的进度见 [公共验收记录](docs/SEPOLIA_DEMO_ACCEPTANCE.md)；这些不代表 DON 部署或已注资付款验收。真实浏览器钱包扩展、公共资金结算和生产调度仍待验证。沙盒积分与链上资金分别记账，界面收据不能替代链上证明。本轮仅做本地实现与验收，不新增公网部署；P1/P2 当前实现及验收见 [本地验收记录](docs/P1_P2_LOCAL_ACCEPTANCE_2026-10-23.md)，原实例恢复记录见 [P0 本地验收](docs/P0_LOCAL_ACCEPTANCE_2026-10-23.md)。
+Solidity 已在本地 EVM 中测试；CRE 工作流已通过 SDK 与官方 CLI 编译及 HTTPS/EVM capability dry-run。x402 已实现本地测试代币采购、Vault 托管、独立验收与失败退款；Data Feeds 已有 ETH/USD gas 美元展示及 USDC/USD 风控的本地 Mock 版本；CCIP 已接通[本地 API、D1、队列及持久化双链业务](docs/CCIP_BUSINESS.md)，真实 CCIP 网络尚未验收。历史 Sepolia 身份注册、未绑定 receiver 和 Worker+D1 证据服务的进度见 [公共验收记录](docs/SEPOLIA_DEMO_ACCEPTANCE.md)；这些不代表 DON 部署或已注资付款验收。真实浏览器钱包扩展、公共资金结算和生产调度仍待验证。沙盒积分与链上资金分别记账，界面收据不能替代链上证明。本轮仅做本地实现与验收，不新增公网部署；P1/P2 当前实现及验收见 [本地验收记录](docs/P1_P2_LOCAL_ACCEPTANCE_2026-10-23.md)，原实例恢复记录见 [P0 本地验收](docs/P0_LOCAL_ACCEPTANCE_2026-10-23.md)。
 
 ## 运行
 

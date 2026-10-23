@@ -1,5 +1,7 @@
 # AgentOS implementation roadmap
 
+当前运行基线、CCIP 业务集成及本轮 60 阶段完整验收见 [当前本地验收总览](LOCAL_INTEGRATION_ACCEPTANCE_2026-10-23.md)。下文旧测试数量、旧实例状态和旧功能边界按各自阶段理解。
+
 User request: complete improvements in the review order, test and commit each item separately, then execute the complete demo. The updated objective requires a final complete regression after all remaining functions are finished; per-increment checks do not satisfy that final gate. Local evidence, public-chain evidence and deployment remain separate acceptance gates.
 
 | Order | Deliverable | Required evidence | State |
