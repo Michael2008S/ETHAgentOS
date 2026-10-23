@@ -1490,5 +1490,11 @@
   "Future authorization only; handed-off children account for their own funds": "仅为未来采购授权；已交接的子采购单独记录其资金",
   "Recorded plugin terminal status; full receipt unavailable": "已记录插件终态，完整收据暂不可用",
   "Task finalized; local authorization released": "任务已终结，本地授权预留已释放",
-  "Saved wallet receipt; funding and settlement grouped by canonical task": "已保存的钱包凭证，注资与结算按同一链上任务合并展示"
+  "Saved wallet receipt; funding and settlement grouped by canonical task": "已保存的钱包凭证，注资与结算按同一链上任务合并展示",
+  "Local purchasing and refunds verified": "本地采购及退款已验证",
+  "Per-request API purchasing with supplier budgets, Vault escrow, independent delivery checks and refunds. Local DemoUSDC only; public facilitators remain unverified.": "按请求采购 API，衔接供应商预算、Vault 托管、独立交付验收及退款。仅使用本地 DemoUSDC，公网 Facilitator 尚未验收。",
+  "Local dual-chain state machine verified": "本地双链状态机已验证",
+  "Authorize on A, execute within B budgets, return results and ACK. Pending messages retain budget. Mock Router only; funds stay in separate Vaults.": "A 链授权、B 链预算内执行，回传结果及 ACK。消息未决保留预算；使用 Mock Router，资金各链分别托管。",
+  "Local Mock Feed and risk checks verified": "本地模拟价格及风控已验证",
+  "ETH/USD gas cost snapshots and optional USDC/USD depeg checks. Historical refunds remain recoverable. Real network feeds are not connected.": "ETH/USD Gas 成本快照及可选 USDC/USD 脱锚检查；历史退款仍可恢复，尚未接入真实网络价格。"
 }
