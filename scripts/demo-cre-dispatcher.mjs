@@ -1,3 +1,4 @@
+import {retryCREInitialization} from './cre-initialization-retry.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
@@ -38,8 +39,8 @@ try{
  const cli=process.env.AGENTOS_CRE_BIN||(existsSync('.sites-runtime/cre-bin/cre')?resolve('.sites-runtime/cre-bin/cre'):'cre'),bun=process.env.AGENTOS_BUN_BIN?dirname(resolve(process.env.AGENTOS_BUN_BIN)):resolve('.sites-runtime/cre-tools/node_modules/.bin'),env={...process.env,CRE_ETH_PRIVATE_KEY:key,PATH:[bun,process.env.PATH||''].join(delimiter)};
  async function simulate(name){
   console.log('CRE dispatcher dry-run: '+name);
-  const result=await new Promise((done,reject)=>{const child=spawn(cli,['workflow','simulate','./workflow','--project-root',root,'--target','staging-settings','--wasm',resolve('outputs/agentos-cli.wasm'),'--trigger-index','0','--non-interactive'],{cwd:root,env,stdio:['ignore','pipe','pipe']});let output='';const timer=setTimeout(()=>child.kill('SIGTERM'),120000);for(const stream of [child.stdout,child.stderr])stream.on('data',chunk=>{output+=chunk.toString().split(key).join('[ephemeral key redacted]').split(evidence.token).join('[writer credential redacted]');});child.once('error',error=>{clearTimeout(timer);reject(error);});child.once('exit',code=>{clearTimeout(timer);done({code,output});});});
-  await writeFile(root+'/'+name+'.log',result.output);assert.equal(result.code,0,result.output);assert.equal(resultHash(config),configHash);return result;
+  const result=await retryCREInitialization(async attempt=>{const value=await new Promise((done,reject)=>{const child=spawn(cli,['workflow','simulate','./workflow','--project-root',root,'--target','staging-settings','--wasm',resolve('outputs/agentos-cli.wasm'),'--trigger-index','0','--non-interactive'],{cwd:root,env,stdio:['ignore','pipe','pipe']});let output='';const timer=setTimeout(()=>child.kill('SIGTERM'),120000);for(const stream of [child.stdout,child.stderr])stream.on('data',chunk=>{output+=chunk.toString().split(key).join('[ephemeral key redacted]').split(evidence.token).join('[writer credential redacted]');});child.once('error',error=>{clearTimeout(timer);reject(error);});child.once('exit',code=>{clearTimeout(timer);done({code,output});});});
+  await writeFile(root+'/'+name+(attempt>1?'-attempt-'+attempt:'')+'.log',value.output);return value;},{onRetry:attempt=>console.log('Retry CRE initialization '+name+' after organization lookup failure (attempt '+attempt+')')});assert.equal(result.code,0,result.output);assert.equal(resultHash(config),configHash);return result;
  }
  async function prepare(name,agentId,scenario='success'){
   const requestId=crypto.randomUUID(),input=resolveSkillInput(state,state.agents.find(a=>a.id===agentId).skill,{dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:[{block:1,from:'synthetic-treasury',to:'synthetic-research',cents:123},{block:2,from:'synthetic-treasury',to:'synthetic-operations',cents:456}]}),bytes=inputEvidence({id:'chain-'+requestId,input,skill:state.agents.find(a=>a.id===agentId).skill},buyer),spec=await service.prepare(bytes);
