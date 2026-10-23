@@ -1487,5 +1487,8 @@
   "Result and ACK confirmed; local authorization released": "结果及确认消息已确认，本地授权预留已释放",
   "Recorded plugin escrow checkpoint": "已记录插件托管凭证",
   "Plugin authorization retained separately from unconfirmed funding": "插件授权预留与未确认注资分开保留",
-  "Future authorization only; handed-off children account for their own funds": "仅为未来采购授权；已交接的子采购单独记录其资金"
+  "Future authorization only; handed-off children account for their own funds": "仅为未来采购授权；已交接的子采购单独记录其资金",
+  "Recorded plugin terminal status; full receipt unavailable": "已记录插件终态，完整收据暂不可用",
+  "Task finalized; local authorization released": "任务已终结，本地授权预留已释放",
+  "Saved wallet receipt; funding and settlement grouped by canonical task": "已保存的钱包凭证，注资与结算按同一链上任务合并展示"
 }
