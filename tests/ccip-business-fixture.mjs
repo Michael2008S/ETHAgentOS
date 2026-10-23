@@ -1,0 +1,9 @@
+import {DatabaseSync} from 'node:sqlite';import{readFileSync}from'node:fs';
+import{seed,digest}from'../lib/agentos/engine.ts';import{commitWithJobs}from'../lib/agentos/queue.ts';
+export function ccipWorkspace(path=':memory:'){
+ const db=new DatabaseSync(path);if(!db.prepare("SELECT name FROM sqlite_master WHERE name='agentos_workspaces'").get()){db.exec(readFileSync('drizzle/0000_parallel_roland_deschain.sql','utf8'));db.exec(readFileSync('drizzle/0001_chemical_famine.sql','utf8'));}
+ const database={prepare(sql){return{bind(...args){return{async first(){return db.prepare(sql).get(...args)??null;},async all(){return{results:db.prepare(sql).all(...args)};},async run(){return{meta:db.prepare(sql).run(...args)};}};}};},async batch(statements){db.exec('BEGIN IMMEDIATE');try{const results=[];for(const s of statements)results.push(await s.run());db.exec('COMMIT');return results;}catch(error){db.exec('ROLLBACK');throw error;}}};
+ const read=async owner=>{db.prepare('INSERT OR IGNORE INTO agentos_workspaces VALUES(?,0,?)').run(owner,JSON.stringify(seed()));const row=db.prepare('SELECT * FROM agentos_workspaces WHERE owner_id=?').get(owner);return{state:JSON.parse(row.data),revision:row.revision,scope:await digest({workspace:owner})};};
+ return{db,database,read,async updateWorkspace(owner,reduce){for(let i=0;i<12;i++){const {state,revision}=await read(owner),next=await reduce(structuredClone(state));if(await commitWithJobs(database,owner,revision,state,next))return{state:next};}throw Error('CAS busy');},close:()=>db.close()};
+}
+export const ccipDraft=(extra={})=>({requestId:crypto.randomUUID(),title:'Cross-chain treasury report',budgetCents:100,durationSeconds:600,scenario:'success',approved:true,input:{dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:[{block:1,from:'treasury',to:'research',cents:123},{block:2,from:'treasury',to:'research',cents:456}]},...extra});

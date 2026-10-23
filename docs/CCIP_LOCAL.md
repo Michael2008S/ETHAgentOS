@@ -39,7 +39,7 @@ node --test tests/ccip-local.test.mjs tests/contracts.test.mjs
 
 最终四个本地采购：一次支付、两次拒绝交付退款、一次超时退款。A Vault 保持 10,000,000 最小代币单位；B Vault 9,000,000，卖方 1,000,000，Escrow 余额零，两端 reserved 均零。这里只使用 6 位小数的 MockToken。
 
-验收器直接用测试 owner 作为本地 Escrow forwarder 注入接受/拒绝报告，以验证消息与托管状态衔接；没有调用真实 CRE，也没有把这个 prototype 接到网站、D1、现有业务队列或 x402 自动采购入口。本轮完整 demo 指独立 P3 端到端 demo，未重新运行整个项目的模型、浏览器和全部历史业务 demo。
+最初独立原型的验收器直接用测试 owner 作为本地 Escrow forwarder 注入接受/拒绝报告，以验证消息与托管状态衔接。后续已增加 [API、D1、队列及持久化双链业务集成](CCIP_BUSINESS.md)，仍没有调用真实 CRE，也没有跨链桥接资金。本轮完整 demo 指独立 P3 端到端 demo，未重新运行整个项目的模型、浏览器和全部历史业务 demo。
 
 ## 真实 CCIP 网络验收：尚未进行
 

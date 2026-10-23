@@ -60,6 +60,10 @@ contract LocalCCIPTaskLane {
         tasks[id]=Task(amount,expires,spec,Phase.Pending,false,false,bytes32(0));reserved+=amount;_send(id,1);
         emit Transition(id,Phase.Pending);
     }
+    function cancelUnsent(bytes32 id,uint256 amount,uint64 expires,bytes32 spec) external onlyOwner {
+        require(source&&id!=bytes32(0)&&amount>0&&spec!=bytes32(0)&&tasks[id].phase==Phase.None,"new source task only");
+        tasks[id]=Task(amount,expires,spec,Phase.Complete,true,false,bytes32(0));emit Transition(id,Phase.Complete);
+    }
     function revoke(bytes32 id) external onlyOwner {
         Task storage t=tasks[id];require(source&&t.phase==Phase.Pending,"pending only");
         t.revoked=true;_send(id,2); // No timeout/revocation release without authenticated result.
