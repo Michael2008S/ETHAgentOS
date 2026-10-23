@@ -41,6 +41,7 @@ contract LocalCCIPTaskLane {
     uint256 public reserved;
     mapping(bytes32=>Task) public tasks;
     mapping(bytes32=>bool) public received;
+    mapping(bytes32=>bool) public budgetHeld;
     event Transition(bytes32 indexed id, Phase phase);
     modifier onlyOwner(){require(msg.sender==owner,"owner only");_;}
     constructor(address router_,address vault_,uint64 selector_,bool source_,uint256 cap_){
@@ -85,13 +86,14 @@ contract LocalCCIPTaskLane {
         } else if(p.kind==4){
             _terms(t,p);require(t.phase==Phase.ResultPending||t.phase==Phase.Complete,"unexpected ack");
             require(t.accepted==p.accepted&&t.output==p.output,"ack mismatch");
-            if(t.phase==Phase.ResultPending){reserved-=t.amount;t.phase=Phase.Complete;}
+            if(t.phase==Phase.ResultPending){if(budgetHeld[p.id]){reserved-=t.amount;budgetHeld[p.id]=false;}t.phase=Phase.Complete;}
         } else {
             require(p.kind==1||p.kind==2,"unexpected command");
             if(t.phase==Phase.None){
                 // Refuse over-budget messages without marking them consumed; relay can retry later.
-                require(reserved+p.amount<=cap&&reserved+p.amount<=vault.token().balanceOf(address(vault)),"local budget");
-                tasks[p.id]=Task(p.amount,p.expires,p.spec,Phase.Ready,false,false,bytes32(0));t=tasks[p.id];reserved+=p.amount;
+                bool needsBudget=p.kind==1&&block.timestamp<p.expires;
+                if(needsBudget){require(reserved+p.amount<=cap&&reserved+p.amount<=vault.token().balanceOf(address(vault)),"local budget");budgetHeld[p.id]=true;reserved+=p.amount;}
+                tasks[p.id]=Task(p.amount,p.expires,p.spec,Phase.Ready,false,false,bytes32(0));t=tasks[p.id];
             } else {_terms(t,p);}
             if(p.kind==2)t.revoked=true; // Tombstone survives reordered/duplicate authorization.
             if(t.phase==Phase.ResultPending||t.phase==Phase.Complete){_send(p.id,3);}

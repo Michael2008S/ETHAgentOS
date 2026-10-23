@@ -77,9 +77,15 @@ export async function runCCIPAcceptance(onCheck=()=>{}){
   const [holdResult]=await f.settle(hold,false),[heldAck]=await f.messages(a,await f.deliver(a,holdResult));
   const large=f.id('backpressure'),[largeAuth]=await f.authorize(large,f.cap-1_000_000n);
   await deny(b,b.router,'deliver',[b.lane,largeAuth],'local budget');assert.equal(await b.read(b.lane,'received',[largeAuth.messageId]),false);
-  await f.deliver(b,heldAck);await f.deliver(b,largeAuth);assert.equal(await reserve(b),f.cap-1_000_000n);
-  const [largeRevoke]=await f.messages(a,await a.tx(a.lane,'revoke',[large]));const [largeResult]=await f.messages(b,await f.deliver(b,largeRevoke));await f.roundtrip(largeResult);
-  check('B enforces independent capacity; over-budget message stays retryable until pending ACK releases reserve');
+  const [cancelWhileFull]=await f.messages(a,await a.tx(a.lane,'revoke',[large]));
+  const [cancelWhileFullResult]=await f.messages(b,await f.deliver(b,cancelWhileFull));
+  assert.equal(await reserve(b),1_000_000n);await f.roundtrip(cancelWhileFullResult);
+  await f.deliver(b,largeAuth);assert.equal((await f.task(b,large))[3],5);
+  await f.deliver(b,heldAck);
+  const retryLarge=f.id('backpressure-retry'),[retryLargeAuth]=await f.authorize(retryLarge,f.cap-1_000_000n);
+  await f.deliver(b,retryLargeAuth);assert.equal(await reserve(b),f.cap-1_000_000n);
+  const [largeRevoke]=await f.messages(a,await a.tx(a.lane,'revoke',[retryLarge]));const [largeResult]=await f.messages(b,await f.deliver(b,largeRevoke));await f.roundtrip(largeResult);
+  check('B capacity blocks authorization but permits unfunded cancellation; pending ACK retains its original reserve');
 
   const expired=f.id('expired-authorization'),expires=(await a.client.getBlock({blockTag:'latest'})).timestamp+30n;
   const [expiryAuth]=await f.authorize(expired,1_000_000n,expires);
