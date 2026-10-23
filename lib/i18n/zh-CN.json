@@ -1484,5 +1484,8 @@
   "Recorded native gas cost; separate from token principal": "已记录原生 gas 成本，与代币本金分开核算",
   "Native gas reservation is not available in this workspace checkpoint": "当前工作区检查点没有原生 gas 预留的可核验数额",
   "Keep authorization reserved until result and ACK are confirmed": "结果及确认消息未确认前继续保留授权预算",
-  "Result and ACK confirmed; local authorization released": "结果及确认消息已确认，本地授权预留已释放"
+  "Result and ACK confirmed; local authorization released": "结果及确认消息已确认，本地授权预留已释放",
+  "Recorded plugin escrow checkpoint": "已记录插件托管凭证",
+  "Plugin authorization retained separately from unconfirmed funding": "插件授权预留与未确认注资分开保留",
+  "Future authorization only; handed-off children account for their own funds": "仅为未来采购授权；已交接的子采购单独记录其资金"
 }
