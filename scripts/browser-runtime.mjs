@@ -7,5 +7,5 @@ export async function browserRuntime(arguments_,read=path=>readFile(path,'utf8')
  const runtime=JSON.parse(await read(path));if(runtime.identityEnabled!==true)throw Error('Browser regression requires an identity-enabled local runtime.');
  const base=loopbackService(runtime.baseURL),chain=loopbackService(runtime.chainURL),supplier=loopbackService(runtime.supplierURL),secondary=loopbackService(runtime.supplier2URL??'http://127.0.0.1:'+(Number(new URL(supplier).port)+1));
  const plugin=loopbackService(runtime.pluginURL??'http://127.0.0.1:11438'),mcp=loopbackService(runtime.mcpURL??'http://127.0.0.1:11439');
- args.splice(index,2);return {args,environment:{AGENTOS_PLUGIN_RUNTIME_URL:plugin,AGENTOS_MCP_URL:mcp,AGENTOS_TEST_URL:base,AGENTOS_CHAIN_URL:chain,AGENTOS_SUPPLIER_URL:supplier,AGENTOS_SECOND_SUPPLIER_URL:secondary}};
+ args.splice(index,2);return {args,environment:{...(runtime.ccipEnabled?{AGENTOS_BROWSER_CCIP:'1'}:{}),AGENTOS_PLUGIN_RUNTIME_URL:plugin,AGENTOS_MCP_URL:mcp,AGENTOS_TEST_URL:base,AGENTOS_CHAIN_URL:chain,AGENTOS_SUPPLIER_URL:supplier,AGENTOS_SECOND_SUPPLIER_URL:secondary}};
 }
