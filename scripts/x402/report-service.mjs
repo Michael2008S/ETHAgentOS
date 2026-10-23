@@ -14,8 +14,8 @@ export function computeReport(input){
  if(total>BigInt(Number.MAX_SAFE_INTEGER))throw Error('Report total exceeds its integer bound.');
  return {dataset:input.dataset,blockFrom:input.blockFrom,blockTo:input.blockTo,transferCount:count,totalCents:Number(total),allocations:Object.fromEntries([...recipients].map(([k,v])=>[k,Number(v)])),...(input.source?{source:sourceSummary(input.source,'treasury-report')}:{})};
 }
-export async function startReportService({asset,payTo,account,facilitatorOrigin,port=0,journalPath,amount='200000'}){
- const journal=new Journal(journalPath),locks=new Map();let mode='healthy';
+export async function startReportService({asset,payTo,account,facilitatorOrigin,port=0,journalPath,amount='200000',journal:providedJournal}){
+ const journal=providedJournal??new Journal(journalPath),locks=new Map();let mode='healthy';
  const requirements=()=>x402RequirementsSchema.parse({scheme:'exact',network:'eip155:31337',amount:mode==='overpriced'?'99999999':amount,asset,payTo,maxTimeoutSeconds:60,extra:{name:'DemoUSDC',version:'1',assetTransferMethod:'eip3009'}});
  const server=await localServer(async(req,json,base)=>{
   const path=new URL(req.url,base).pathname;
