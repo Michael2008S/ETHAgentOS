@@ -1474,5 +1474,15 @@
   "Paid by supplier; included in the signed quote.": "供应商垫付，已包含在签名报价中。",
   "Review procurement policy": "审阅采购政策",
   "I allow these transfer records to be sent to the configured x402 report provider. A Vault session is required.": "我同意将这些转账记录发送给指定的 x402 报告提供方。本次采购需要有效的 Vault 会话。",
-  "x402 payment and report": "x402 支付与报告"
+  "x402 payment and report": "x402 支付与报告",
+  "Recorded canonical settlement": "已记录规范结算凭证",
+  "User principal remains in escrow": "用户本金仍在托管中",
+  "Funding intent unresolved; retain authorization": "注资意图未决，继续保留授权",
+  "No confirmed funding recorded": "尚无已确认的注资记录",
+  "Supplier cost persists independently of user refund": "供应商成本单独核算，不因用户退款而消失",
+  "No confirmed supplier payment; exposure is unknown, not zero": "供应商付款尚未确认，风险敞口未知，不按零处理",
+  "Recorded native gas cost; separate from token principal": "已记录原生 gas 成本，与代币本金分开核算",
+  "Native gas reservation is not available in this workspace checkpoint": "当前工作区检查点没有原生 gas 预留的可核验数额",
+  "Keep authorization reserved until result and ACK are confirmed": "结果及确认消息未确认前继续保留授权预算",
+  "Result and ACK confirmed; local authorization released": "结果及确认消息已确认，本地授权预留已释放"
 }
