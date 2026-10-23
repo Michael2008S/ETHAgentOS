@@ -1,0 +1,2 @@
+import{runCombinedAcceptance}from'./ccip/combined-acceptance.mjs';import{writeFile}from'node:fs/promises';
+const report={startedAt:new Date().toISOString()};try{Object.assign(report,await runCombinedAcceptance(name=>console.log('PASS '+name)));}catch(error){report.passed=false;report.error=error.stack;console.error(error);process.exitCode=1;}finally{report.finishedAt=new Date().toISOString();const path='outputs/combined-faults-'+crypto.randomUUID()+'.json';await writeFile(path,JSON.stringify(report,null,2));console.log('Evidence: '+path);}

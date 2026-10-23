@@ -98,6 +98,7 @@
     "demo:x402": "node scripts/demo-x402.mjs",
     "demo:ccip": "node scripts/demo-ccip.mjs",
     "demo:ccip-business": "node scripts/demo-ccip-business.mjs",
+    "demo:combined-faults": "node scripts/demo-combined-faults.mjs",
     "baseline": "node scripts/local-baseline.mjs",
     "validate:local": "node scripts/validate-local.mjs"
   },

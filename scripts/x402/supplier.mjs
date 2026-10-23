@@ -13,7 +13,11 @@ export async function x402Fulfillment({policy,account,client,store,appOrigin,aut
  });
  const guard=async()=>{if(policy.dataFeeds?.riskEnabled){try{await readDataFeedSnapshot(client,policy.dataFeeds);}catch(error){error.terminal=true;throw error;}}};
  const procurement=procurementClient({policy,account,client,store,authorize,afterPersist,afterPayment,beforePurchase:guard});
- return {policy,async feedStatus(){try{const snapshot=await this.quoteSnapshot();return {status:policy.dataFeeds?(snapshot?'ok':'unavailable'):'disabled',mode:'local-mock',snapshot};}catch(error){return {status:'blocked',mode:'local-mock',error:error.message};}},async quoteSnapshot(){if(!policy.dataFeeds)return undefined;try{return await readDataFeedSnapshot(client,policy.dataFeeds);}catch(error){if(policy.dataFeeds.riskEnabled){error.terminal=true;throw error;}return undefined;}},revision:await x402Revision(policy),procurement,
+ return {policy,async reconcilePending(){
+   let pending=0;for(const row of store.rows('purchases').filter(r=>r.payload&&!r.payment&&r.state!=='unpaid').slice(0,20)){try{await procurement.reconcile(row.id);}catch{pending++;}}
+   try{const response=await fetch(policy.facilitatorOrigin+'/gas',{redirect:'manual',signal:AbortSignal.timeout(5000)});await response.body?.cancel();}catch{}
+   return {...store.summary(),observationFailures:pending};
+  },async feedStatus(){try{const snapshot=await this.quoteSnapshot();return {status:policy.dataFeeds?(snapshot?'ok':'unavailable'):'disabled',mode:'local-mock',snapshot};}catch(error){return {status:'blocked',mode:'local-mock',error:error.message};}},async quoteSnapshot(){if(!policy.dataFeeds)return undefined;try{return await readDataFeedSnapshot(client,policy.dataFeeds);}catch(error){if(policy.dataFeeds.riskEnabled){error.terminal=true;throw error;}return undefined;}},revision:await x402Revision(policy),procurement,
   async observe(request,ticket){
    if(!request.quote||request.skill!=='treasury-report'||!/^x402_[0-9a-f]{64}$/.test(ticket??''))throw Object.assign(Error('Reviewed x402 quote and execution ticket required.'),{status:403});
    const jobId=supplierJobId(request),requestHash=await digest(request),prior=store.get('supplier-context',jobId);
