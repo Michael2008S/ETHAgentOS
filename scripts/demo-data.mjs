@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
-import {dataRpc,verifyTransferSource} from '../lib/agentos/chain-data.ts';
+import {demoDataRpc as dataRpc,verifyDemoTransferSource as verifyTransferSource,demoSourceMode,demoSourceDescription} from './demo-data-source.mjs';
 import {USDC_ADDRESS,TRANSFER_TOPIC} from '../lib/agentos/transfer-source.ts';
 import {AgentOSClient} from '../sdk/index.ts';
 import {AgentWalletSession,deliveryBytes,localWalletProvider} from '../sdk/wallet.ts';
 import {startLocalChain} from './local-chain.mjs';
 const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177',url=process.env.AGENTOS_DATA_RPC_URL||'https://ethereum-rpc.publicnode.com';
 if(!['127.0.0.1','localhost'].includes(new URL(base).hostname))throw new Error('Use a loopback demo workspace.');
-const id=crypto.randomUUID(),headers={'x-agentos-sandbox':'source-'+id,'Content-Type':'application/json'},report={id,scope:'read-only Ethereum mainnet source; temporary local EVM service payment',startedAt:new Date().toISOString(),cases:[]};let local;
+const id=crypto.randomUUID(),headers={'x-agentos-sandbox':'source-'+id,'Content-Type':'application/json'},report={id,scope:demoSourceDescription(),dataSourceMode:demoSourceMode(),startedAt:new Date().toISOString(),cases:[]};let local;
 try{
  const rpc=dataRpc(url),final=await rpc('eth_getBlockByNumber',['finalized',false]);
  const logs=await rpc('eth_getLogs',[{address:USDC_ADDRESS,fromBlock:final.number,toBlock:final.number,topics:[TRANSFER_TOPIC]}]);

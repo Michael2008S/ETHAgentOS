@@ -4,8 +4,10 @@ import {prepareLocalDemoFunds} from './demo-fixture.mjs';
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {loopbackService} from '../lib/agentos/local-services.ts';
 import {resolve,dirname} from 'node:path';
+import {demoSourceEnvironment,demoSourceMode} from './demo-data-source.mjs';
 const runtimeIndex=process.argv.indexOf('--runtime');let runtime;
 if(runtimeIndex>=0){runtime=JSON.parse(await readFile(process.argv[runtimeIndex+1]||'.sites-runtime/isolated-demo/current.json','utf8'));if(!runtime.identityEnabled)throw new Error('The full demo requires identity-enabled services; Vault-only validation is not a full demo.');process.env.AGENTOS_TEST_URL=loopbackService(runtime.baseURL);process.env.AGENTOS_CHAIN_URL=loopbackService(runtime.chainURL);process.env.AGENTOS_SUPPLIER_URL=loopbackService(runtime.supplierURL);if(runtime.pluginURL)process.env.AGENTOS_PLUGIN_RUNTIME_URL=loopbackService(runtime.pluginURL);if(runtime.mcpURL)process.env.AGENTOS_MCP_URL=loopbackService(runtime.mcpURL);if(runtime.supplier2URL)process.env.AGENTOS_SECOND_SUPPLIER_URL=loopbackService(runtime.supplier2URL);}
+if(runtime)Object.assign(process.env,demoSourceEnvironment(runtime));
 // Every child, including the isolated-default Vault check, must target one runtime.
 process.env.AGENTOS_TEST_URL=loopbackService(process.env.AGENTOS_TEST_URL||'http://127.0.0.1:5177');
 process.env.AGENTOS_CHAIN_URL=loopbackService(process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545');
@@ -27,6 +29,7 @@ if(resumeFile&&Boolean(report.managedModels)!==managed)throw Error('Resume must 
 const failed=report.steps.findIndex(step=>step.code!==0&&!step.excluded),startIndex=failed>=0?failed:report.steps.length;
 if(failed>=0){report.failedAttempts=[...(report.failedAttempts??[]),...report.steps.slice(failed)];report.steps=report.steps.slice(0,failed);}
 if(resumeFile)report.resumedAt=[...(report.resumedAt??[]),new Date().toISOString()];
+report.dataSourceMode=demoSourceMode();
 report.passed=false;delete report.finishedAt;
 report.setup=[...(report.setup??[]),await prepareLocalDemoFunds(process.env.AGENTOS_CHAIN_URL)];
 await writeFile(directory+'/report.json',JSON.stringify(report,null,2));
