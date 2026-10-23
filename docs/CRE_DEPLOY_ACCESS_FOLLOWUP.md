@@ -2,6 +2,8 @@
 
 整理日期：2026-10-23（Asia/Hong_Kong）。未获批前不部署、不绑定、不注资。无需 MetaMask 操作。
 
+范围更新：用户已明确 hackathon 可使用本地 CRE simulation，无需 workflow deployment。本页保留为可选部署跟进资料；审批不再阻塞参赛 demo。当前优先级见 [验收范围更新](SEPOLIA_DEMO_ACCEPTANCE.md)。
+
 ## 本轮实际检查结果
 
 - `cre whoami` 联网成功：组织 `My Org` / `org_xLpqnc5AuiRvywaW`，已登录，**Deploy Access: Not enabled**。

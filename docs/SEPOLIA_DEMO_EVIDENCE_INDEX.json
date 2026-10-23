@@ -353,7 +353,7 @@
     "bindingPerformed": false,
     "fundingPerformed": false
   },
-  "lastUpdatedAt": "2026-10-22T23:14:23.615Z",
+  "lastUpdatedAt": "2026-10-23T12:50:45.612Z",
   "latestApplicationCheck": {
     "checkedAt": "2026-10-22T23:09:29.281Z",
     "deployAccess": false,
@@ -362,5 +362,14 @@
     "specificMissingMaterials": "not exposed",
     "report": "outputs/erc8004-sepolia-2026-10-23/public-preparation/cre-application-status-1f5d0090-3f26-4991-9a01-062eedb3ec5a/report.json",
     "followup": "docs/CRE_DEPLOY_ACCESS_FOLLOWUP.md"
+  },
+  "hackathonAcceptance": {
+    "basis": "User clarified that local CRE simulation is sufficient for the hackathon",
+    "managedDeploymentRequired": false,
+    "deployAccessBlocksHackathon": false,
+    "existingEvidence": "Official CLI production dispatcher empty/unfunded/archive branches plus separate read-only HTTPS verification probe",
+    "remaining": "Local simulation accepted/rejected delivery and report paths plus clearly labeled local business-loop demonstration",
+    "sepoliaPolicy": "Keep receiver unbound and unfunded; no broadcast",
+    "optionalFollowup": "Live DON deployment and funded Sepolia end-to-end acceptance remain separate"
   }
 }

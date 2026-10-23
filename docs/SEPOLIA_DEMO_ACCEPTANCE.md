@@ -2,6 +2,14 @@
 
 整理日期：2026-10-23（Asia/Hong_Kong）。本页汇总已有验证文件，并根据当前代码、CLI 帮助及官方文档整理后续步骤；本次整理没有重新广播交易、重新部署或刷新所有链上状态。时间和区块以各原始报告为准。
 
+## Hackathon 验收范围更新
+
+根据用户提供的参赛要求，hackathon 使用本地 CRE simulation，无需部署 managed DON workflow；CRE deploy access 不再是参赛演示阻塞项。官方 [simulation 指南](https://docs.chain.link/cre/guides/operations/simulating-workflows)确认模拟在本机运行，并可读取真实 HTTP/RPC；默认不广播写入，`--broadcast` 才会发送交易。官方指南说明模拟能力，本次“无需部署”的赛事范围依据来自用户。
+
+当前已有官方 CLI + 公共 D1 HTTPS 的三组 dispatcher dry-run，以及独立只读证据验证探针。完整成果验收/报告生成与拒绝路径仍须作为本地 simulation 演示补齐；现有未注资任务被生产 dispatcher 跳过，不能改写成完整结算通过。需要本地已注资夹具或专门的 simulation harness，并与 Sepolia 生产配置隔离，明确保留模拟标识和日志，不伪造生产 workflow ID。付款、ERC-8004 评价及撤销若通过本地链展示，必须明确标为本地证据。
+
+演示优先级调整为：补齐本地 simulation 的接受/拒绝和 report 路径、串联本地业务闭环、保存可复跑命令/配置/日志并录制演示。下文第 4 节的真实 DON 部署和 funded Sepolia 验收保留为可选后续，不是 hackathon 的完成门槛。权限跟进不再占据演示关键路径。现有 Sepolia receiver 继续不绑定、不注资，不添加 `--broadcast`。
+
 **当前进度：身份注册 → 文档关联 → 工作区签名绑定 → 未注资身份草稿 → 测试代币/未绑定接收合约 → D1 公共证据 → 官方 CRE HTTPS dry-run 已验证。真实 DON 部署、绑定、注资、付款、付款后评价及撤销仍待验收。拿到真实 workflow ID 前继续不绑定、不注资。**
 
 ## 1. 已验证结果及边界
@@ -77,7 +85,7 @@
 
 凭证原件位于本地 `outputs/`，未随本页全部提交到 Git。移机时需单独复制索引覆盖的文件及 dry-run 整个目录并核对哈希。不要把私钥、助记词、Cloudflare 凭据或 `.sites-runtime/sepolia-public/write-token` 放入凭证包。
 
-## 4. 权限获批后的分阶段步骤（本页仅列步骤，不执行）
+## 4. 可选后续：权限获批后的真实 DON 与 Sepolia 验收（仅列步骤，不执行）
 
 ### A. 重查权限与部署输入，仍不绑定、不注资
 
