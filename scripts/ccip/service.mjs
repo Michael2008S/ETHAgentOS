@@ -18,7 +18,7 @@ export async function startCCIPService({root,port=0,appOrigin='http://127.0.0.1:
   const config={version:'agentos.local-ccip.v1',...Object.fromEntries([['a',a],['b',b]].map(([key,c])=>[key,{chainId:c.chainId,selector:c.selector.toString(),...Object.fromEntries(['token','escrow','vault','router','lane','seller'].map(k=>[k,c[k].toLowerCase()]))}]))};
   async function observe(job){
    const [at,bt,escrow,ablock,bblock,ar,br]=await Promise.all([f.task(a,job.chainTaskId),f.task(b,job.chainTaskId),b.read(b.escrow,'tasks',[job.chainTaskId]),a.client.getBlock({blockTag:'latest'}),b.client.getBlock({blockTag:'latest'}),a.read(a.lane,'reserved'),b.read(b.lane,'reserved')]);
-   const saved=store.get('jobs',job.chainTaskId);
+   const saved=store.get('jobs',job.chainTaskId);if(saved&&at[3]===5&&[0,5].includes(bt[3]))store.put('jobs',job.chainTaskId,{...saved,finalized:true});
    return {aPhase:at[3],bPhase:bt[3],escrowStatus:escrow[5],accepted:at[5],outputHash:at[6],...(saved?.artifactText?{artifactText:saved.artifactText,datasetText:saved.datasetText}:{}),blocks:{a:{number:ablock.number.toString(),hash:ablock.hash},b:{number:bblock.number.toString(),hash:bblock.hash}},aReserved:ar.toString(),bReserved:br.toString()};
   }
   async function drive(job){
@@ -60,7 +60,11 @@ export async function startCCIPService({root,port=0,appOrigin='http://127.0.0.1:
   }
   const allowedRPC=new Set(['eth_chainId','eth_call','eth_getBlockByNumber','eth_getBlockByHash','eth_getTransactionReceipt','eth_getLogs','eth_getCode','eth_blockNumber']);
   server=await localServer(async(req,json)=>{
-   if(req.method==='GET'&&req.url==='/health')return json(200,{status:'ok',version:config.version,localMock:true,jobs:store.entries('jobs').length});
+   if(req.method==='GET'&&req.url==='/health'){
+    const jobs=store.rows('jobs'),pending=jobs.filter(j=>!j.finalized),now=BigInt(Math.floor(Date.now()/1000)),grant=await b.read(b.vault,'grants',[b.lane]),balance=await b.read(b.token,'balanceOf',[b.vault]),reserved=await b.read(b.lane,'reserved'),spent=await b.read(b.vault,'spent',[b.lane,now/86400n]);
+    const alerts=[];if(grant[2]<=now||grant[0]===0n)alerts.push('ccip-grant-expired');if(spent>=grant[1]||balance<=reserved)alerts.push('ccip-budget-capacity');if(jobs.length>=800)alerts.push('ccip-history-capacity');if(pending.some(j=>Date.now()-Date.parse(j.job.createdAt)>60000))alerts.push('ccip-pending-over-60s');
+    return json(200,{status:'ok',version:config.version,localMock:true,jobs:jobs.length,pending:pending.length,alerts,newExecutionAllowed:!alerts.some(a=>['ccip-grant-expired','ccip-budget-capacity'].includes(a)),capacity:{jobs:jobs.length,jobLimit:1000,balance:balance.toString(),reserved:reserved.toString(),dailySpent:spent.toString(),dailyLimit:grant[1].toString(),grantExpires:grant[2].toString()}});
+   }
    if(req.method==='GET'&&req.url==='/config')return json(200,config);
    if(req.method!=='POST')return json(404,{error:'not found'});
    const body=await readJson(req,32768);

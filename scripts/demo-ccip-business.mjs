@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';import{writeFile}from'node:fs/promises';import{AgentCCIPClient}from'../sdk/ccip.ts';import{ccipTerminal}from'../lib/agentos/ccip-tasks.ts';
 const base=process.env.AGENTOS_TEST_URL||'http://127.0.0.1:19977';if(new URL(base).hostname!=='127.0.0.1')throw Error('Local CCIP business demo only.');
-const sandbox='ccip-'+crypto.randomUUID(),headers={'x-agentos-sandbox':sandbox,'x-agentos-queue-only':'1'},client=new AgentCCIPClient(base,headers),report={startedAt:new Date().toISOString(),scope:'local API/D1/queue and persistent dual Mock CCIP chains; separate Vault funds; no real CCIP network',cases:[]};
+const sandbox='ccip-'+crypto.randomUUID(),headers={'x-agentos-sandbox':sandbox,'x-agentos-queue-only':'1'},client=new AgentCCIPClient(base,headers),report={sandbox,startedAt:new Date().toISOString(),scope:'local API/D1/queue and persistent dual Mock CCIP chains; separate Vault funds; no real CCIP network',cases:[]};
 const draft=(scenario='success')=>({requestId:crypto.randomUUID(),title:'CCIP treasury report '+scenario,budgetCents:100,durationSeconds:600,scenario,approved:true,input:{dataset:'custom-transfers-v1',blockFrom:1,blockTo:2,records:[{block:1,from:'treasury',to:'research',cents:123},{block:2,from:'treasury',to:'operations',cents:456}]}});
 try{
  await client.list();const wrong=await fetch(base+'/api/ccip-tasks',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({action:'create',scope:'0x'+'1'.repeat(64),draft:draft()})});assert.equal(wrong.status,403);

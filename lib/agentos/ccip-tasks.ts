@@ -3,6 +3,7 @@ import {parseAbi,keccak256,stringToHex,type Hex} from 'viem';
 import {digest,DomainError,canonical} from './engine.ts';
 import type {Workspace} from './types.ts';
 import {deliveryVerification,verifyDelivery} from '../../cre/workflow/verify.ts';
+export const CCIP_MAX_ACTIVE=10,CCIP_MAX_HISTORY=50;
 const address=z.string().regex(/^0x[0-9a-fA-F]{40}$/).transform(s=>s.toLowerCase() as Hex),hash=z.string().regex(/^0x[0-9a-f]{64}$/);
 const chain=z.object({chainId:z.number().int(),selector:z.string(),token:address,escrow:address,vault:address,router:address,lane:address,seller:address}).strict();
 export const ccipDeploymentSchema=z.object({version:z.literal('agentos.local-ccip.v1'),a:chain.extend({chainId:z.literal(31338),selector:z.literal('1001')}),b:chain.extend({chainId:z.literal(31339),selector:z.literal('1002')})}).strict();
@@ -31,7 +32,7 @@ export interface CCIPStore {read(owner:string):Promise<{state:Workspace;scope?:s
 export async function createCCIPTask(store:CCIPStore,owner:string,raw:unknown,configuration:()=>Promise<CCIPDeployment>){
  const draft=ccipDraftSchema.parse(raw),id='ccip-'+draft.requestId,draftHash=await digest(draft),scope=await digest({workspace:owner}),now=new Date().toISOString();let deployment:Promise<CCIPDeployment>|undefined;
  const saved=await store.updateWorkspace(owner,async state=>{const existing=state.ccipTasks?.find(j=>j.id===id);if(existing){if(existing.draftHash!==draftHash)throw new DomainError('CCIP request ID terms differ.','CONFLICT');return state;}
-  const jobs=state.ccipTasks??[];if(jobs.length>=200||jobs.filter(j=>!ccipTerminal(j)).length>=10)throw new DomainError('CCIP task capacity reached.','CONFLICT');
+  const jobs=state.ccipTasks??[];if(jobs.length>=CCIP_MAX_HISTORY||jobs.filter(j=>!ccipTerminal(j)).length>=CCIP_MAX_ACTIVE)throw new DomainError('CCIP task capacity reached.','CONFLICT');
   if(!state.policy.active||!state.policy.allowedSkills.includes('treasury-report')||draft.budgetCents>state.policy.maxTaskBudget||jobs.filter(j=>j.createdAt.slice(0,10)===now.slice(0,10)).reduce((n,j)=>n+j.draft.budgetCents,0)+draft.budgetCents>state.policy.dailyBudget)throw new DomainError('CCIP policy or daily budget denied.','FORBIDDEN');
   deployment??=configuration();const terms:CCIPTerms={id,scope,chainTaskId:await digest({scope,id}) as Hex,draft,draftHash,expiresAt:new Date(Date.now()+draft.durationSeconds*1000).toISOString(),deployment:ccipDeploymentSchema.parse(await deployment)};
   const job:CCIPJob={...terms,termsHash:await digest(terms) as Hex,createdAt:now,status:'queued',reservedCents:draft.budgetCents,cancelRequested:false};return {...state,ccipTasks:[...jobs,job]};});return ccipJob(saved.state,id);

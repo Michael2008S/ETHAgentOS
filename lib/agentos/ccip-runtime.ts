@@ -6,7 +6,8 @@ import {escrowABI} from '../../sdk/chain.ts';
 import {ccipLaneABI,ccipDeploymentSchema,type CCIPJob,type CCIPObservation,type CCIPTransport} from './ccip-tasks.ts';
 async function bounded(response:Response){if(!response.ok)throw new DomainError('Local CCIP unavailable.','UNAVAILABLE');const reader=response.body?.getReader();if(!reader)throw Error('No CCIP response');let text='',size=0;const decoder=new TextDecoder();try{for(;;){const part=await reader.read();if(part.done)break;if((size+=part.value.length)>65536)throw Error('CCIP response exceeds bound');text+=decoder.decode(part.value,{stream:true});}return JSON.parse(text+decoder.decode());}finally{await reader.cancel().catch(()=>{});reader.releaseLock();}}
 export function ccipOrigin(request:Request){if(!import.meta.env.DEV||!isLoopback(new URL(request.url)))throw new DomainError('CCIP prototype is local-only.','FORBIDDEN');return localServices().ccip;}
-export async function configuredCCIPDeployment(request:Request){return ccipDeploymentSchema.parse(await bounded(await fetch(ccipOrigin(request)+'/config',{redirect:'manual',signal:AbortSignal.timeout(10000)})));}
+export async function configuredCCIPDeployment(request:Request){return readLocalCCIPDeployment(ccipOrigin(request));}
+export async function readLocalCCIPDeployment(origin:string){const health=await bounded(await fetch(origin+'/health',{redirect:'manual',signal:AbortSignal.timeout(10000)}));if(health.newExecutionAllowed===false)throw new DomainError('Local CCIP grant or budget blocks new tasks. Existing work retains its recovery rights.','FORBIDDEN');return ccipDeploymentSchema.parse(await bounded(await fetch(origin+'/config',{redirect:'manual',signal:AbortSignal.timeout(10000)})));}
 export async function configuredCCIPTransport(request:Request):Promise<CCIPTransport>{
  return localCCIPTransport(ccipOrigin(request));
 }

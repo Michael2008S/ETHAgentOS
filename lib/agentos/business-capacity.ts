@@ -1,3 +1,4 @@
+import {CCIP_MAX_ACTIVE,CCIP_MAX_HISTORY,ccipTerminal} from './ccip-tasks.ts';
 import {activeHistory} from './business-archives.ts';
 import {futureMonitorTickets} from './usdc-monitor-state.ts';
 import {mixedPluginRuns} from './mixed-workflow.ts';
@@ -7,6 +8,8 @@ import type {Workspace} from './types.ts';
 export function businessCapacity(state:Workspace,pluginVersions=0){
  const tickets=futureMonitorTickets(state).length,pluginReserved=pendingPluginPurchaseSlots(state)+mixedPluginRuns(state);
  const rows=[
+  ['ccip-active',(state.ccipTasks??[]).filter(j=>!ccipTerminal(j)).length,0,CCIP_MAX_ACTIVE,'export'],
+  ['ccip-retained',(state.ccipTasks??[]).length,0,CCIP_MAX_HISTORY,'export'],
   ['mixed-active',activeHistory(state,'mixed',state.mixedWorkflows??[]).length,tickets,20,'archive'],
   ['monitor-active',activeHistory(state,'monitor',state.usdcMonitors??[]).length,0,10,'archive'],
   ['plugin-purchase-active',activeHistory(state,'plugin-purchase',state.pluginPurchases??[]).length,mixedPluginRuns(state),20,'archive'],

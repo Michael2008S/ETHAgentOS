@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import{mkdtemp,rm}from'node:fs/promises';import{tmpdir}from'node:os';
-import{startCCIPService}from'../scripts/ccip/service.mjs';import{createCCIPTask,runCCIPTask,ccipJob,ccipTerminal}from'../lib/agentos/ccip-tasks.ts';import{localCCIPTransport}from'../lib/agentos/ccip-runtime.ts';import{ccipWorkspace,ccipDraft}from'./ccip-business-fixture.mjs';import{workItems}from'../lib/agentos/queue.ts';
+import{startCCIPService}from'../scripts/ccip/service.mjs';import{createCCIPTask,runCCIPTask,ccipJob,ccipTerminal}from'../lib/agentos/ccip-tasks.ts';import{localCCIPTransport,readLocalCCIPDeployment}from'../lib/agentos/ccip-runtime.ts';import{ccipWorkspace,ccipDraft}from'./ccip-business-fixture.mjs';import{workItems}from'../lib/agentos/queue.ts';
 test('CCIP business uses atomic D1 jobs, independent verification, durable two-chain recovery, refund and cancellation',async()=>{
  const root=await mkdtemp(tmpdir()+'/agentos-ccip-business-');let service;const store=ccipWorkspace();try{
   service=await startCCIPService({root,appOrigin:'http://127.0.0.1:12345',faults:{holdKinds:[3]}});const deployment=service.config,draft=ccipDraft(),created=await createCCIPTask(store,'owner',draft,async()=>deployment);
@@ -18,5 +18,6 @@ test('CCIP business uses atomic D1 jobs, independent verification, durable two-c
   assert.equal((await get(bad.id)).status,'refunded');assert.equal((await get(bad.id)).reservedCents,0);
   const cancelled=await createCCIPTask(store,'owner',ccipDraft(),async()=>deployment);await store.updateWorkspace('owner',s=>{const j=ccipJob(s,cancelled.id);j.cancelRequested=true;j.status='cancelling';return s;});await runCCIPTask(store,'owner',cancelled.id,transport);assert.equal((await get(cancelled.id)).status,'cancelled');
   assert.equal(workItems((await store.read('owner')).state).filter(j=>j.kind==='ccip').length,0);assert.equal(store.db.prepare("SELECT COUNT(*) n FROM agentos_runtime_jobs WHERE kind='ccip' AND status='pending'").get().n,0);
+  await service.fixture.b.tx(deployment.b.vault,'revoke',[deployment.b.lane]);const health=await(await fetch(service.base+'/health')).json();assert.equal(health.newExecutionAllowed,false);assert.ok(health.alerts.includes('ccip-grant-expired'));await assert.rejects(readLocalCCIPDeployment(service.base),/budget blocks/);assert.equal((await get(created.id)).status,'completed');
  }finally{await service?.close();store.close();await rm(root,{recursive:true,force:true});}
 });

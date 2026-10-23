@@ -1,3 +1,4 @@
+import {withOperationLock} from './local-operation-lock.mjs';
 import {readFile,writeFile,mkdir,readdir,cp,chmod,appendFile,open,rm} from 'node:fs/promises';
 import {resolve,join,dirname} from 'node:path';
 import {spawn} from 'node:child_process';
@@ -29,7 +30,8 @@ export async function archiveOfflineLegacy(path,destination){
 async function event(action,phase,data){await mkdir(base,{recursive:true,mode:0o700});await appendFile(base+'/events.jsonl',JSON.stringify({at:new Date().toISOString(),action,phase,...data})+'\n',{mode:0o600});}
 async function launch(args,env,logPath){const fd=await open(logPath,'a',0o600),child=spawn(process.execPath,args,{detached:true,env,stdio:['ignore',fd.fd,fd.fd]});await fd.close();child.unref();return child;}
 async function awaitRuntime(path,pid){for(let i=0;i<600;i++){try{const r=JSON.parse(await readFile(path));if(r.pid===pid&&(await inspectRuntime(path)).services.every(s=>s.listening))return r;}catch{}await pause(250);}throw Error('Baseline start timed out; inspect startup log, do not replace existing state.');}
-export async function baseline(action){
+export const baseline=action=>withOperationLock(base+'/lifecycle.lock',()=>performBaseline(action));
+async function performBaseline(action){
  await mkdir(base,{recursive:true,mode:0o700});
  if(action==='init'){
   try{await readFile(pointer);throw Error('Baseline already exists; use start.');}catch(e){if(e.code!=='ENOENT')throw e;}
@@ -44,7 +46,7 @@ export async function baseline(action){
  }
  const record=JSON.parse(await readFile(pointer)),before=await inspectRuntime(record.runtimePath);await event(action,'before',{state:before});
  if(action==='status')return before;
- if(action==='stop'){if(before.services.some(s=>s.listening)){await stopTestRuntime(record.runtimePath);record.lastStoppedChain=before.chain;await writeFile(pointer,JSON.stringify(record,null,2),{mode:0o600});}}
+ if(action==='stop'){if(before.services.some(s=>s.listening)){await stopTestRuntime(record.runtimePath);record.lastStoppedChain=before.chain??record.lastStoppedChain;await writeFile(pointer,JSON.stringify(record,null,2),{mode:0o600});}}
  else if(action==='start'){
   if(before.services.some(s=>s.listening))throw Error('Baseline has live services; inspect status instead of starting another copy.');
   const r=JSON.parse(await readFile(record.runtimePath)),child=await launch([r.launcherSnapshot,'--resume',record.runtimePath],process.env,base+'/resume.log');await awaitRuntime(record.runtimePath,child.pid);

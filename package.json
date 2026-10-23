@@ -99,6 +99,8 @@
     "demo:ccip": "node scripts/demo-ccip.mjs",
     "demo:ccip-business": "node scripts/demo-ccip-business.mjs",
     "demo:combined-faults": "node scripts/demo-combined-faults.mjs",
+    "demo:operations": "node scripts/demo-local-operations.mjs",
+    "ops:local": "node scripts/local-operations.mjs",
     "baseline": "node scripts/local-baseline.mjs",
     "validate:local": "node scripts/validate-local.mjs"
   },

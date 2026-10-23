@@ -104,7 +104,10 @@ export async function startLocalSupplier({port=7461,runtimeRoot=resolve('.sites-
    return json(200,delivery);
   }catch(e){return json([403,409,422].includes(e.status)?e.status:e.terminal?422:502,{error:e.status===409?'Supplier request commitment or authority differs.':'Supplier execution could not complete.'});}
  });
- await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});return {base,descriptor,close:()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();})};
+ await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
+ let reconciliation=Promise.resolve(),reconciling=false;
+ const timer=fulfillment?.reconcilePending?setInterval(()=>{if(reconciling)return;reconciling=true;reconciliation=fulfillment.reconcilePending().catch(()=>{}).finally(()=>{reconciling=false;});},15000):undefined;timer?.unref();
+ return {base,descriptor,close:async()=>{clearInterval(timer);await reconciliation;await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});}};
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
  const service=await startLocalSupplier({port:Number(process.env.AGENTOS_SUPPLIER_PORT||7461),skills:process.env.AGENTOS_SUPPLIER_SKILLS?JSON.parse(process.env.AGENTOS_SUPPLIER_SKILLS):undefined,chainBase:process.env.AGENTOS_CHAIN_URL||'http://127.0.0.1:8545',runtimeRoot:process.env.AGENTOS_SUPPLIER_STATE||resolve('.sites-runtime/skill-supplier'),supplierId:process.env.AGENTOS_SUPPLIER_ID,supplierName:process.env.AGENTOS_SUPPLIER_NAME,walletRole:process.env.AGENTOS_SUPPLIER_WALLET_ROLE||'seller',peers:process.env.AGENTOS_SUPPLIER_PEERS?JSON.parse(process.env.AGENTOS_SUPPLIER_PEERS):[],prices:process.env.AGENTOS_SUPPLIER_PRICES?JSON.parse(process.env.AGENTOS_SUPPLIER_PRICES):{},quoteTTL:Number(process.env.AGENTOS_SUPPLIER_QUOTE_TTL||21600)});console.log('AgentOS independent skill supplier: '+service.base);console.log('Public supplier descriptor: '+JSON.stringify(service.descriptor));let closing=false;for(const signal of ['SIGINT','SIGTERM'])process.on(signal,async()=>{if(closing)return;closing=true;await service.close();process.exitCode=0;});
