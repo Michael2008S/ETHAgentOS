@@ -1,5 +1,7 @@
 # Local x402 implementation and acceptance
 
+2026-10-23 P1/P2 更新：[恢复、独立实现互操作及本地 Data Feeds 验收](P1_P2_LOCAL_ACCEPTANCE_2026-10-23.md)。
+
 当前本地整体验收入口：[2026-10-23 P0 基线](P0_LOCAL_ACCEPTANCE_2026-10-23.md)。本文各阶段 lint 数量与测试数量是历史检查点；以该基线中的实际运行报告为准。
 
 Scope: local HTTP, test-token EVM transactions, Vault escrow, independent delivery acceptance and refunds. No public deployment, real-token purchase or DON execution.

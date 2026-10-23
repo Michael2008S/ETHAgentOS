@@ -4,7 +4,7 @@
 
 核心采用 **CRE：定时读取链上任务 → 获取已承诺的证据和交付 → 多节点相同结果共识 → 签名 report → EVM 托管结算**。入口为 `cre/workflow/main.ts`，处理逻辑为 `handler.ts`。它使用 SDK 的 CronCapability、HTTPClient、EVMClient、runInNodeMode、runtime.report、writeReport。[官方 onchain write 示例](https://docs.chain.link/cre/getting-started/part-4-writing-onchain-ts)。
 
-Functions 不作为新项目依赖；当前官方文档已提示弃用。Data Feeds 可在以后对非稳定币预算换算时接入；CCIP 可在单链闭环完成后扩展跨链任务消息与资金路由。两者当前均未实现，不作为已完成的赛道集成声称。
+Functions 不作为新项目依赖；当前官方文档已提示弃用。Data Feeds 已接入本地 AggregatorV3 Mock：ETH/USD 用于供应商 gas 美元成本，USDC/USD 用于可选脱锚风控；签名报价保存价格快照，已有退款继续处理。接口、验证和本地范围见 [P1/P2 验收](P1_P2_LOCAL_ACCEPTANCE_2026-10-23.md)。真实网络 Feed 尚未接入；CCIP 跨链消息与资金路由仍未实现。
 
 ## 当前验证任务
 
