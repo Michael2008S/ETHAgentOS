@@ -16,6 +16,7 @@ export async function copyPrivateTree(source,target){
 async function entries(root,prefix=''){
  const result=[];for(const name of (await readdir(join(root,prefix))).sort()){const path=join(prefix,name);if(path==='manifest.json')continue;const stat=await lstat(join(root,path));if(stat.isSymbolicLink())throw Error('Archive contains a symlink.');if(stat.isDirectory())result.push(...await entries(root,path));else result.push({path,sha256:digest(await readFile(join(root,path)))});}return result;
 }
+export function sealArchiveDatabase(path){const db=new DatabaseSync(path);try{db.exec("PRAGMA journal_mode=DELETE");}finally{db.close();}}
 export async function verifyPreservedBackup(root){
  const manifest=JSON.parse(await readFile(join(root,'manifest.json'),'utf8'));
  if(JSON.stringify(await entries(root))!==JSON.stringify(manifest.entries))throw Error('Archive checksum or file inventory differs.');
@@ -28,6 +29,8 @@ export async function backupPreservedRuntime(runtimePath,destination){
  for(const field of ['baseURL','chainURL','pluginURL']){const u=new URL(r[field]);if(u.protocol!=='http:'||u.hostname!=='127.0.0.1')throw Error('Only loopback runtime backup is supported.');}
  const config=await(await fetch(r.chainURL+'/config')).json();
  execFileSync(process.execPath,['scripts/archive-legacy-runtime.mjs',resolve(runtimePath),root],{stdio:'pipe',timeout:300000});
+ // Seal only the copied databases. Read-only verification must not create WAL sidecars.
+ for(const name of await readdir(root))if(name.endsWith('.sqlite'))sealArchiveDatabase(join(root,name));
  for(const path of ['runtime.json','source.json','source-files.json','plugins','supplier','supplier2','source'])await copyPrivateTree(join(r.root,path),join(root,'runtime',path));
  if(r.componentRecovery){await copyPrivateTree(r.componentRecovery.source,join(root,'web-source'));for(const name of ['source.json','source-files.json'])await copyPrivateTree(join(dirname(r.componentRecovery.source),name),join(root,'web-'+name));}
  if(JSON.stringify(config)!==JSON.stringify(await(await fetch(r.chainURL+'/config')).json()))throw Error('Chain configuration changed during backup; preserve archive and inspect.');
