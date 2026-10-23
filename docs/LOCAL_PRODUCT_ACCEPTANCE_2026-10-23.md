@@ -1,50 +1,58 @@
 # 当前本地产品验收 · 2026-10-23
 
-本页是“版本与文档入口 → CCIP 网页闭环 → 统一资金证据 → 持续运行”的当前入口。前三项已有实现及同版本完整回归证据；正式两小时观测仍在进行，四项整体尚未完成。公网部署、真实资产、真实 CCIP/Feed 与 DON 结算均不在本轮范围。
+完成核验时间：2026-10-24 01:09:07（Asia/Hong_Kong）。文件日期沿用本轮开始日期。
 
-## 当前代码与运行基线
+**版本与文档入口、CCIP 网页闭环、统一资金证据、最新版本持续运行四项逐项验收通过。** 本轮只完成本地产品交付；公网部署、真实资产、真实 CCIP/Feed 及 DON 结算继续后置。
 
-当前产品代码固定为 `e990c9382a7ecec05283981d0b06b56a331f477a`，808 个源码文件摘要为 `399dd48a1a930af4056867cb234f9da149db6e9d305039f1f73cbf1206874ae7`。常规浏览器、完整 demo、持续观测与保留业务基线都采用这一提交和摘要；后续文档提交不冒充运行代码提交。
+## 同一代码与明确实例
 
-常规浏览器与完整 demo 在固定工作树 `../agentos-product-final` 中使用两个独立持久化实例；持续观测在 `../agentos-product-soak` 的第三个实例进行。两个工作树 HEAD 保持固定，不拼接不同版本结果。入口索引为 `outputs/product-delivery/current-gates.json`，动态原始进度为 `outputs/product-delivery/progress.json`；`regression-audit.json` 已独立核对同版本完整回归，最终四项逐项审计仍等待持续观测。
+产品代码为 `e990c9382a7ecec05283981d0b06b56a331f477a`，808 个源码文件摘要为 `399dd48a1a930af4056867cb234f9da149db6e9d305039f1f73cbf1206874ae7`。保留业务基线、常规浏览器、完整 demo 与正式持续观测均使用这份代码和摘要。后续文档提交单独记录，不冒充运行代码提交。
 
-保留业务基线已经先备份再升级到同一代码，启动/只读健康核验/停止通过。业务表保持一致，99 个插件文件字节一致；只有内部元数据和运行心跳表变化。凭证为 `outputs/product-delivery/baseline-data-preservation.json` 和 `baseline-e990c93-{start,health,stop}.json`。基线当前停止以释放资源，使用 [LOCAL_BASELINE.md](LOCAL_BASELINE.md) 的 start/status/stop 命令恢复，不需重建链或钱包。
+浏览器和完整 demo 位于固定工作树 `../agentos-product-final` 的两个独立持久化实例；持续观测位于 `../agentos-product-soak` 的第三个实例，两个工作树 HEAD 均固定。主工作区业务基线先备份再升级，测试采购及故障注入不在该业务基线上执行。旧指针未覆盖。
 
-旧 9455 内存链已离线；磁盘归档包含旧指针、数据库和插件文件，明确 restartable=false。保留数据不等于恢复旧内存链，不将历史订单绑定到新链。
+统一入口为 `outputs/product-delivery/current-gates.json`；逐项机器审计为 `outputs/product-delivery/summary.json`，逐文件哈希为 `manifest.json`。原始失败、续跑和模型诊断全部保留。
 
-## 最新同版本验证
+## 四项交付与验收
 
-- Node 389/389，零失败、零跳过；严格 lint 零错误/零警告、网站及 CRE 类型检查、生产构建均通过。
-- CRE SDK 6/6，92 次断言。
-- 常规 Chromium 33 项通过、3 项条件跳过；收据用例随后实际补跑 2/2，独立完整业务浏览器另通过，合计 36 个不同用例。包含 CCIP、资金视图、供应商/规划元数据延迟、语义记忆和插件修复，不将跳过直接计为通过。
-- 本轮完整 demo 61/61 通过，无排除阶段，包含新增 CRE 参赛演示 10/10。原失败和同实例续跑记录保留，不称为首次无中断通过。
-- 独立完整业务浏览器 17 步通过，11 笔唯一 Escrow（其中插件 7 笔）：2140 分注资 = 1940 分付款 + 200 分退款；未结算和预留均为零，资金视图 11 笔记录与交易责任一致。
-- 正式持续观测要求至少 7200 个真实秒，当前仍在运行；passed=false 不改为成功。完成时需核对样本、最大间隔、三种终态、实际中断恢复及清理。
+| 项目 | 已交付行为 | 当前证据 |
+| --- | --- | --- |
+| 版本及文档入口 | 当前代码、运行基线、验收版本和历史边界一致；入口链接到本页 | 四份入口文档、基线源码快照、808 文件摘要、逐项审计 |
+| CCIP 网页闭环 | 审核创建、编辑/刷新撤销审核、同编号幂等重试、未决预算、显式取消/恢复、双链状态与区块证据 | 常规 Chromium、双链 API/D1/队列、成功/退款/取消和实际进程中断恢复 |
+| 统一资金证据 | 主链及 A/B Vault 分池、订单及插件托管、上游 token/gas、CCIP 和未来授权，未知不按零，去重与 owner 隔离 | 纯投影及组合故障、常规 Chromium、完整业务 11 笔 Escrow（其中插件 7 笔） |
+| 最新版本持续运行 | 同一持久化数据库和双链连续观测至少 7200 个真实秒，实际 SIGKILL 后恢复原任务 | 本轮实际 7200.044 秒，472 个样本全部正常，最大采样间隔 17.211 秒，正式报告与清理通过 |
 
-原始核心与浏览器日志在独立工作树 `outputs/product-final-v4/`。完整 demo 原始报告为 `outputs/full-demo-1ad68b44-cad9-46df-863b-233550552a91/report.json`；续跑保存独立 continuation 报告与原报告快照，失败不覆盖。当前通过的续跑汇总为 `outputs/product-final-v4/continuation5.json`；核心、浏览器、完整序列、收据检查及回归实例停止均记录。当前 soak 原始报告为另一工作树的 `outputs/product-soak-472b354b-82c4-4b49-8f6c-1677c6aa19ac/report.json`。
+## 完整回归
 
-## 已完成的产品增量
+- Node **389/389**，零失败、零跳过；严格 lint 零错误/零警告，网站及 CRE 类型检查、生产构建通过。
+- CRE SDK **6/6**、**92** 次断言。
+- 常规 Chromium **33** 项通过、3 项条件跳过；收据用例实际补跑 **2/2**，独立完整业务浏览器另通过，合计 **36 个不同用例**。不把跳过直接计为通过。
+- 完整 demo **61/61**，无排除阶段，包含官方 CLI 参赛演示 **10/10**。独立完整业务浏览器 **17 步**通过：**11 笔唯一 Escrow，2140 分注资 = 1940 分付款 + 200 分退款，未结算和预留均零**。资金视图按原始整数单位核对 21400000；7 笔插件托管未漏算或重复。
+- CCIP、资金视图及完整业务的中文/英文和 390px 布局通过，最新截图已查看并保存哈希。
 
-[CCIP 网页闭环](CCIP_BUSINESS.md)：钱包页审核条款后创建，编辑/刷新撤销审核；丢响应重试同编号；待决展示预算；owner 显式取消/恢复。常规 Chromium 已验证成功、拒绝退款、取消、中英文与 390px 布局，最新截图已检查。
+完整 demo 报告：`/Users/michael/Develop/ETH2026ShenZhenHackathon/agentos-product-final/outputs/full-demo-1ad68b44-cad9-46df-863b-233550552a91/report.json`。当前续跑汇总：`/Users/michael/Develop/ETH2026ShenZhenHackathon/agentos-product-final/outputs/product-final-v4/continuation5.json`。完整业务报告：`/Users/michael/Develop/ETH2026ShenZhenHackathon/agentos-product-final/outputs/full-business-browser-browser-full-d8bc8d29-3f1b-42cd-aa30-999974209379.json`。核心及常规浏览器日志位于独立工作树 `outputs/product-final-v4/`。
 
-[统一资金证据](FUNDS_EVIDENCE.md)：区分沙盒、托管本金、供应商 token/gas 成本、CCIP 及未来采购预留；插件与独立钱包收据去重。三个共享 Vault 余额附观测区块；未知/不可用不按零处理，检查点不冒充实时复核。普通浏览器、实际组合故障及完整业务 11 笔 Escrow 的最新版本核对均通过，移动截图已检查。
+这次整套通过包含显式续跑：首次新工作树缺少历史 current 别名和本地 CRE 配置；临时 HTTPS 出现不可达；最后浏览器要求模型控制器自行持有进程，而外部热模型仍在运行。分别补齐私有夹具配置、使用已验证的进程级 IPv4、停止核验归属的外部热模型后，从失败阶段继续。此前阶段、断言和失败记录保持，不称为首次无中断通过。共保留 5 个失败阶段记录。
 
-`b8b04b7` 修复供应商/规划器元数据未就绪时提交和禁用选项导致受控字段遗漏的问题；新增实际延迟响应屏障，原付款和精确字段断言保留。`e990c93` 修复从未启动的恢复副本 pid=0 被误判为活动进程的问题；真实备份、再次恢复、字节一致及非法/活动进程拒绝测试已通过。
+## 两小时持续观测
 
-## 模型运行条件
+本轮从 `2026-10-23T15:08:16.977Z` 开始，至 `2026-10-23T17:08:16.847Z`，要求 7200 个真实秒，实际 7200.044 秒；472 个样本全部正常，最大间隔 17.211 秒（门槛 60 秒，含首尾边界）。时长按单调时钟计；首末样本跨度约 7172.867 秒，开始时的实际中断恢复及结束前的尾段也纳入覆盖检查。成功、错误交付退款、未发送取消三任务均已终态、预留为零。队列及三个共享 Vault 按实际区块持续核对，终态唯一 Opened/Settled 验证通过。
 
-反复冷启动曾导致两项规划推理超时，另有一次 Metal 退出异常；诊断记录保留。真实规范修复请求直接交给相同模型约 16 秒返回成功，随后已运行服务下两项修复专项 2/2 和常规 33 项通过。完整 demo 的常规阶段复用这套真实规划服务，原 60 秒上限、权重、人工审批与付款断言保持。最后的独立业务浏览器要求模型控制器自行持有进程；其首次因外部热模型存在而失败，控制器正确显示不持有该服务。停止已核验归属的热模型后，最后阶段 17 步完整重跑通过，实际规划推理、切换记忆模型和各自停止均执行，未改断言。
+首次成功在 B 已付款但 Lane 尚未收集结果时实际 SIGKILL，观察到不可用后恢复同一部署、数据库和原条款；该计划恢复区间约 15.997 秒，单列记录，不声称全程无中断。`passed=true`、`acceptancePassed=true`、`runtimeStopped=true`。
 
-`outputs/product-delivery/warm-planner-profile.json` 固定模型及二进制指纹，`planning-native-*` 保存请求、响应与时序。冷启动可靠性尚未验收；不能把热服务下通过声称为生产 SLA。外部热模型已核验 PID、父子关系、命令与 cwd 后停止，原会话正常结束；独立业务浏览器控制器也完成其模型清理。`regression-cleanup.json` 只读确认 12 个回归/基线实例所涉及的 45 个测试及模型端口关闭，明确排除仍需运行的正式观测实例；最终全量清理仍待观测结束。
+原始报告：`/Users/michael/Develop/ETH2026ShenZhenHackathon/agentos-product-soak/outputs/product-soak-472b354b-82c4-4b49-8f6c-1677c6aa19ac/report.json`，监督器汇总：`/Users/michael/Develop/ETH2026ShenZhenHackathon/agentos-product-soak/outputs/product-soak-final/run.json`。先前约 88 分钟和 100.85 分钟的失败/停止尝试保留，均不计入本轮时长；不拼接版本或计时。详见 [PRODUCT_SOAK.md](PRODUCT_SOAK.md)。
 
-## 持续观测与历史失败
+## 数据保留与进程清理
 
-正式门禁详见 [PRODUCT_SOAK.md](PRODUCT_SOAK.md)：7200 秒、足量样本、最大间隔 60 秒、成功/拒绝退款/取消、B 已付款后实际 SIGKILL、原数据库和双链恢复、唯一 Opened/Settled、终态零预留，以及停止指定实例。
+保留业务基线先备份再升级，启动/只读健康核验/停止通过。业务表一致、99 个插件文件字节一致；独立只读 SQLite 复核只有运行心跳和内部元数据表变化。旧归档 193 个文件哈希与旧指针核验通过。原 9455 内存链已离线，归档明确 restartable=false；磁盘保留不等于恢复旧内存链，不将旧订单绑定新链。
 
-此前约 88 分钟运行因共享 HEAD 改变失败；随后固定旧版本运行约 100.85 分钟，在发现产品字段就绪问题后停止。两份均 acceptancePassed=false、已停止；不拼接时长。本轮 e990c93 从零观测，当前结果以原始报告为准。
+业务基线与全部本轮回归、观测实例保持停止；数据库、链、收据和源码保留。外部热模型按 PID、父子关系、命令、cwd 及启动元数据核验后停止，控制器持有的模型也已释放。最终只读清理核对 53 个已知端口，全部关闭；未知和无关进程不操作。凭证位于 `outputs/product-delivery/final-cleanup.json`、`warm-planner-stopped.json`、`baseline-data-preservation.json`、`baseline-readonly-final.json` 和 `legacy-preserved-final.json`。
 
-## 独立工作树复跑条件
+按需恢复保留业务基线：`npm run baseline -- status`、`npm run baseline -- start`、`npm run baseline -- stop`，网页为 `http://127.0.0.1:19977`。不需重建钱包或重新部署。详见 [LOCAL_BASELINE.md](LOCAL_BASELINE.md)。
 
-依赖与 CLI/模型资产可以共享，运行数据库、进程元数据及源码快照独立。新工作树需准备本地 CRE 示例配置（cre:prepare），并为历史脚本建立仅指向该测试实例的 testOnly current 别名；本地监管基线也须指向同一完整 demo 实例。主工作区旧指针不得覆盖。临时 HTTPS 只公开合成夹具，不公开工作区或 RPC；IPv4 是单进程选项，不修改系统 DNS/代理/TLS。
+## 运行条件与验收边界
 
-历史 1f17dbc 的 60 阶段、36 个浏览器用例和完整业务金额仅证明旧版本，不替代本轮 61 阶段及最终逐项审计。新增独立 CRE 演示的历史 10/10 证据见 [CRE_HACKATHON_DEMO.md](CRE_HACKATHON_DEMO.md)，仍需通过当前完整序列。
+普通规划回归复用真实已运行模型，原 60 秒上限及固定权重不变。最后独立业务浏览器实际由控制器启动规划模型、执行三步真实规划、切换记忆模型并清理通过。此前反复冷启动曾超时并出现一次 Metal 退出异常；一次完整生命周期通过不等于冷启动可靠性或生产 SLA。请求、响应、16 秒原生诊断及二进制指纹保存在 `planning-native-*` 和 `warm-planner-profile.json`。
+
+本轮来源为捕获的 finalized 数据回放；x402 使用本地 DemoUSDC，Feed 为 Mock，CCIP 为受信 Mock Router 的应用状态机，资金各链分别托管。供应商完整钱包预留仍是其私有日志责任；共享 Vault 余额不是工作区独占额度，保存检查点不是实时持续核验。官方 CRE CLI 使用临时合成 HTTPS 和本地 RPC，测试 forwarder 不验证 DON 签名；未进行公网部署或广播。
+
+新工作树复跑需准备依赖/模型/CLI、`cre:prepare` 和仅指向测试实例的 testOnly current 别名及监管基线；运行状态和进程元数据独立，主工作区旧指针不覆盖。临时 HTTPS 不公开工作区或 RPC，IPv4 仅进程级设置。协议和操作分别见 [CCIP_BUSINESS.md](CCIP_BUSINESS.md)、[FUNDS_EVIDENCE.md](FUNDS_EVIDENCE.md)、[CRE_HACKATHON_DEMO.md](CRE_HACKATHON_DEMO.md)。

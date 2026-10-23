@@ -1,6 +1,6 @@
 # AgentOS · ETH Shenzhen 2026
 
-当前四项产品收尾状态见 [本地产品验收](docs/LOCAL_PRODUCT_ACCEPTANCE_2026-10-23.md)：CCIP 网页与资金视图已有回归，正式持续运行验收尚未完成。历史阶段记录按各自版本阅读。
+当前四项产品收尾状态见 [本地产品验收](docs/LOCAL_PRODUCT_ACCEPTANCE_2026-10-23.md)：四项已按同版本逐项验收通过，含 61 阶段完整 demo 和至少 7200 秒正式持续观测。历史阶段记录按各自版本阅读。
 
 **Give agents a goal, a budget, and boundaries. Verify delivery before settlement.**
 
