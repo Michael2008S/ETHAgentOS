@@ -1,0 +1,275 @@
+{
+  "version": "agentos.cre-hackathon-evidence.v1",
+  "status": "passed",
+  "assembledAt": "2026-10-23T13:04:52.750Z",
+  "scope": "Official CRE CLI dry-run + disposable local EVM 31337 + persistent local D1 + owned temporary HTTPS synthetic evidence. Local test-forwarder callbacks do not verify DON signatures.",
+  "implementationCommit": "ad4dbc1",
+  "originalRunSourceCommit": "c0175c963ebbf7c5b6eedf59cd77414bcbceb56a",
+  "sourceHashesMatchCurrent": true,
+  "reproductionCommand": "npm run demo:cre-hackathon",
+  "entryReport": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/report.json",
+  "cases": [
+    {
+      "name": "official local ERC-8004 registration, owner signature and D1 identity binding",
+      "status": "passed"
+    },
+    {
+      "name": "accepted delivery: official CLI consensus/report and dry-run leaves escrow funded",
+      "status": "passed"
+    },
+    {
+      "name": "rejected delivery: official CLI consensus/report and dry-run leaves escrow funded",
+      "status": "passed"
+    },
+    {
+      "name": "local payment, exact seller balance and replay rejection",
+      "status": "passed"
+    },
+    {
+      "name": "local rejection refund, exact buyer balance and replay rejection",
+      "status": "passed"
+    },
+    {
+      "name": "unpaid/refunded orders cannot prepare paid feedback",
+      "status": "passed"
+    },
+    {
+      "name": "paid-order feedback matches original local payment and is idempotent",
+      "status": "passed"
+    },
+    {
+      "name": "original buyer revocation confirmed onchain and in D1; another wallet cannot revoke",
+      "status": "passed"
+    },
+    {
+      "name": "archived dispatcher queue produces no second report",
+      "status": "passed"
+    },
+    {
+      "name": "D1 survives worker restart with paid/refunded orders and revoked feedback",
+      "status": "passed"
+    }
+  ],
+  "transactions": [
+    {
+      "name": "deploy MockCREForwarder",
+      "chainId": 31337,
+      "hash": "0x5a0e92622d4914d0c9a69d18ca58c2dfe246a9a858ddcff1c3cbda8b339877f6",
+      "blockNumber": "12",
+      "status": "success"
+    },
+    {
+      "name": "deploy AgentEscrowReceiver",
+      "chainId": 31337,
+      "hash": "0x64cc80530a20b197c61e5e1d6e3f1a1322bbf62e83d5ba64b4d38879dfefd153",
+      "blockNumber": "13",
+      "status": "success"
+    },
+    {
+      "name": "bind synthetic LOCAL workflow",
+      "chainId": 31337,
+      "hash": "0x1866f07f63bd53e866cadd2310f3d81b10eacdc7b6db9895c4f420411003b246",
+      "blockNumber": "14",
+      "status": "success"
+    },
+    {
+      "name": "ERC-8004 local registration",
+      "chainId": 31337,
+      "hash": "0x3508edade4846d492d00eaa7153111823b1c06bf1696e863fc351aca81c8548b",
+      "blockNumber": "15",
+      "status": "success"
+    },
+    {
+      "name": "ERC-8004 complete document",
+      "chainId": 31337,
+      "hash": "0x7c233f7127bd54d68d7dd5f13b867a62c88846f019c3a893722260e8be6d29bf",
+      "blockNumber": "16",
+      "status": "success"
+    },
+    {
+      "name": "fund CRE accepted delivery",
+      "chainId": 31337,
+      "hash": "0x6f7ef88af86bae683d3ef7a938c4e9cc08cceb14e2bcb5c7ff27c7b0b873341d",
+      "blockNumber": "18",
+      "status": "success"
+    },
+    {
+      "name": "fund CRE rejected delivery",
+      "chainId": 31337,
+      "hash": "0x7bdeeba0e62c2b8923ffb22c950237e21741f6b28151826435dca2586e6c94a2",
+      "blockNumber": "20",
+      "status": "success"
+    },
+    {
+      "name": "local test forwarder payment",
+      "chainId": 31337,
+      "hash": "0xb32ad8736888c265704b40525f31d5037dcabe32b49a0ddda4a7ea2bef70932d",
+      "blockNumber": "21",
+      "status": "success"
+    },
+    {
+      "name": "local test forwarder rejection refund",
+      "chainId": 31337,
+      "hash": "0x637c1a0e829a887c7c73c8672c5138bcca8347878ffb6e876fe2dff9b0ccbf43",
+      "blockNumber": "22",
+      "status": "success"
+    },
+    {
+      "name": "paid ERC-8004 feedback",
+      "chainId": 31337,
+      "hash": "0x770d7ac1bafced59e7ac32501e2dedf2b34bbc96222804a19ba7f1bad7705926",
+      "blockNumber": "23",
+      "status": "success"
+    },
+    {
+      "name": "independent ERC-8004 revocation receipt",
+      "chainId": 31337,
+      "hash": "0xafd0353d6d7fa20af758d1610d5fa1a953ddb7a3e1342d54de784b471c9bb939",
+      "blockNumber": "24",
+      "status": "success"
+    }
+  ],
+  "officialCLI": [
+    {
+      "name": "build",
+      "exitCode": 0,
+      "attempts": 1
+    },
+    {
+      "name": "accepted-and-rejected",
+      "exitCode": 0,
+      "attempts": 1
+    },
+    {
+      "name": "archived-empty-queue",
+      "exitCode": 0,
+      "attempts": 1
+    }
+  ],
+  "focusedValidation": {
+    "creDispatcherTests": 6,
+    "identityReceiverTests": 3,
+    "eslint": true,
+    "nodeSyntax": true,
+    "fullRepositoryRegressionClaimed": false,
+    "browserAcceptanceClaimed": false
+  },
+  "final": {
+    "escrowTokenBalance": "0",
+    "activeFeedbackCount": 0,
+    "queueTotal": 0,
+    "workspaceRevision": 26
+  },
+  "sepolia": {
+    "broadcast": false,
+    "binding": false,
+    "funding": false
+  },
+  "files": [
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/accepted-and-rejected-attempt-1.log",
+      "bytes": 2680,
+      "sha256": "2247130447a4cb82b9cfd643286e35eb16778881144836bd689d2458f7497a0b"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/accepted-and-rejected-result.json",
+      "bytes": 695,
+      "sha256": "2aac16581ee4dd6b42721d207385ab3eb266ea57c2f3886921e19de2453cb1c0"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/accepted-evidence.json",
+      "bytes": 11737,
+      "sha256": "e50d087a0bf158e61e2762366c365cc2a6457058730688f98920507b11c04e41"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/archived-empty-queue-attempt-1.log",
+      "bytes": 1563,
+      "sha256": "f99ed2a61a1a5772245b14b7bc33ac3aadc18bf5be6b695162e6a48e090eaaf3"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/archived-empty-queue-result.json",
+      "bytes": 150,
+      "sha256": "51267f456f5fce654fd9f226da3b96818103555c92478dc03997f05fbbfcba47"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/build-attempt-1.log",
+      "bytes": 297,
+      "sha256": "f581289df76c96111347a75b61443fb234d1cbfb225705c2c41ecfd4035f32ca"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/deployment.json",
+      "bytes": 915,
+      "sha256": "5de7ccd1fcfad5cbd5904c9c662bec641de6c45f5dcad6d5426981ef305b3b78"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/feedback-active.json",
+      "bytes": 3489,
+      "sha256": "be6f8388620dd08318b3b5cb825357494475c1745ec52cd4d66c7f120fa86fa5"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/feedback-revoked.json",
+      "bytes": 5527,
+      "sha256": "2203e15e821374f2a37ef2e46ecd2ef42604eab6bdbea712464c5dbfea10eac2"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/identity-binding.json",
+      "bytes": 4136,
+      "sha256": "51f7d87183056fed4f13b19ff5e9daedbdc2c607cc97f213878c968b8c255229"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/invalid-delivery-funding-authorization.json",
+      "bytes": 785,
+      "sha256": "c7be1a72c3398fb0b79448ad6a5d956569a6a8285ff23eaddf5278227abeb75b"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/project.yaml",
+      "bytes": 107,
+      "sha256": "3ceba9e00bee3a329a9998d02f52d0145d27ba1f23490e031fa16acbd6db542d"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/rejected-evidence.json",
+      "bytes": 10876,
+      "sha256": "8f6dcb3c43276916f0be2f1a18e3d246db6e1bb01017726fdc051db44ee5ec8d"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/report.json",
+      "bytes": 45286,
+      "sha256": "db38eb17cdcc443656ab2fd845d60433b802cbee730802c3c71e69e7839b1a57"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/success-funding-authorization.json",
+      "bytes": 785,
+      "sha256": "bd392bd6464212541af54b1fc8ddc19b68033b0e3e60587f000470cf14eb62f7"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/tunnel.log",
+      "bytes": 6065,
+      "sha256": "6a64c7de69fdccdf04c8c852444e5fc5947bb50c16d073bb829c3c30cf4d75c2"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/workflow/config.json",
+      "bytes": 272,
+      "sha256": "0752cdccaf8fa34be66379dd6045bd496743aefaae34a497ca84e1cba99ed868"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/workflow/workflow.yaml",
+      "bytes": 238,
+      "sha256": "2ad63c153eccb0272858decb562f03f9f07a4752935ad81d93048cadc746671e"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/workflow.wasm",
+      "bytes": 2744085,
+      "sha256": "9b8e03977e2e176eeee72afc6ff619d17cb1228bd8d1d12b1f473a73e980b4ce"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/workspace-final.json",
+      "bytes": 38487,
+      "sha256": "112318603b8999bac66aac4eaa3e25f3dcef0699d0ba934270de3e79b4542074"
+    },
+    {
+      "path": "outputs/cre-hackathon-e8d4e567-6938-4172-a7c8-aa87e033a65f/checksums.json",
+      "bytes": 2136,
+      "sha256": "e0123ba45d7394f1b6f0cc33af6995c73495aaf64c66c9e56c136c9912c41457"
+    }
+  ]
+}

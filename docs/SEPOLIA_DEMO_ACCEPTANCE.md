@@ -10,6 +10,8 @@
 
 演示优先级调整为：补齐本地 simulation 的接受/拒绝和 report 路径、串联本地业务闭环、保存可复跑命令/配置/日志并录制演示。下文第 4 节的真实 DON 部署和 funded Sepolia 验收保留为可选后续，不是 hackathon 的完成门槛。权限跟进不再占据演示关键路径。现有 Sepolia receiver 继续不绑定、不注资，不添加 `--broadcast`。
 
+本地闭环现已补齐：2026-10-23 完整 demo 10/10 通过，接受/拒绝 report、本地付款/退款、同一 Paid 订单的评价与撤销、D1 重启读回均有凭证。复跑 `npm run demo:cre-hackathon`；见 [本地 demo 命令及凭证](CRE_HACKATHON_DEMO.md)。这是后续完成记录，以上原 dry-run 能力描述保留为此前检查点；Sepolia 实际 DON/付款仍未验收。
+
 **当前进度：身份注册 → 文档关联 → 工作区签名绑定 → 未注资身份草稿 → 测试代币/未绑定接收合约 → D1 公共证据 → 官方 CRE HTTPS dry-run 已验证。真实 DON 部署、绑定、注资、付款、付款后评价及撤销仍待验收。拿到真实 workflow ID 前继续不绑定、不注资。**
 
 ## 1. 已验证结果及边界

@@ -353,7 +353,7 @@
     "bindingPerformed": false,
     "fundingPerformed": false
   },
-  "lastUpdatedAt": "2026-10-23T12:50:45.612Z",
+  "lastUpdatedAt": "2026-10-23T13:04:52.754Z",
   "latestApplicationCheck": {
     "checkedAt": "2026-10-22T23:09:29.281Z",
     "deployAccess": false,
@@ -368,8 +368,11 @@
     "managedDeploymentRequired": false,
     "deployAccessBlocksHackathon": false,
     "existingEvidence": "Official CLI production dispatcher empty/unfunded/archive branches plus separate read-only HTTPS verification probe",
-    "remaining": "Local simulation accepted/rejected delivery and report paths plus clearly labeled local business-loop demonstration",
+    "remaining": "No remaining work for the requested local acceptance scope; live DON/Sepolia acceptance remains optional follow-up",
     "sepoliaPolicy": "Keep receiver unbound and unfunded; no broadcast",
-    "optionalFollowup": "Live DON deployment and funded Sepolia end-to-end acceptance remain separate"
+    "optionalFollowup": "Live DON deployment and funded Sepolia end-to-end acceptance remain separate",
+    "status": "local-simulation-acceptance-passed",
+    "localEvidenceIndex": "docs/CRE_HACKATHON_EVIDENCE_INDEX.json",
+    "localReproductionCommand": "npm run demo:cre-hackathon"
   }
 }
