@@ -4,6 +4,7 @@ import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import {pathToFileURL} from 'node:url';
+import {chmodSync} from 'node:fs';
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 /** Copy private state without following links out of the selected runtime. */
 export async function copyPrivateTree(source,target){
@@ -16,7 +17,7 @@ export async function copyPrivateTree(source,target){
 async function entries(root,prefix=''){
  const result=[];for(const name of (await readdir(join(root,prefix))).sort()){const path=join(prefix,name);if(path==='manifest.json')continue;const stat=await lstat(join(root,path));if(stat.isSymbolicLink())throw Error('Archive contains a symlink.');if(stat.isDirectory())result.push(...await entries(root,path));else result.push({path,sha256:digest(await readFile(join(root,path)))});}return result;
 }
-export function sealArchiveDatabase(path){const db=new DatabaseSync(path);try{db.exec("PRAGMA journal_mode=DELETE");}finally{db.close();}}
+export function sealArchiveDatabase(path){chmodSync(path,0o600);const db=new DatabaseSync(path);try{db.exec("PRAGMA journal_mode=DELETE");}finally{db.close();}}
 export async function verifyPreservedBackup(root){
  const manifest=JSON.parse(await readFile(join(root,'manifest.json'),'utf8'));
  if(JSON.stringify(await entries(root))!==JSON.stringify(manifest.entries))throw Error('Archive checksum or file inventory differs.');
