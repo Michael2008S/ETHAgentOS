@@ -21,7 +21,7 @@ const directory=resumeFile?dirname(resumeFile):resolve('outputs/full-demo-'+cryp
 await mkdir(directory,{recursive:true});
 const report=resumeFile?JSON.parse(await readFile(resumeFile,'utf8')):{startedAt:new Date().toISOString(),scope:'local HTTP/D1/EVM and authenticated CRE dry-run and x402 acceptance; no public broadcast',runtime,steps:[]};
 const steps=demoSteps;
-const withoutCRE=process.argv.includes('--without-cre'),externalCRE=new Set(['demo:cre','demo:cre-dispatcher']);
+const withoutCRE=process.argv.includes('--without-cre'),externalCRE=new Set(['demo:cre','demo:cre-dispatcher','demo:cre-hackathon']);
 if(report.withoutCRE&&!withoutCRE)throw Error('This report excludes external CRE stages. Resume with --without-cre or start a separate full run.');
 if(withoutCRE){report.originalScope??=report.scope;report.scope='Local HTTP/D1/EVM and x402 acceptance; external CRE HTTPS dry-runs excluded by --without-cre';report.withoutCRE=true;}
 if(!Array.isArray(report.steps)||report.steps.some((step,index)=>step.command!==steps[index]))throw new Error('Report does not match this demo sequence.');
