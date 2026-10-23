@@ -1,5 +1,7 @@
 # AgentOS · ETH Shenzhen 2026
 
+当前四项产品收尾状态见 [本地产品验收](docs/LOCAL_PRODUCT_ACCEPTANCE_2026-10-23.md)：CCIP 网页与资金视图已有回归，正式持续运行验收尚未完成。历史阶段记录按各自版本阅读。
+
 **Give agents a goal, a budget, and boundaries. Verify delivery before settlement.**
 
 为本次黑客松制作的 Agent 操作系统 MVP。用统一的任务生命周期，连接身份、技能、权限、预算、交付校验、托管支付和可恢复执行。界面支持中文与英文，右上角切换并在当前浏览器记住选择，默认中文；文档为中文。切换语言不会更改任务数据、技能标识或导出凭证。
