@@ -1,4 +1,4 @@
-import {demoSteps} from './demo-sequence.mjs';
+import {demoSteps,demoInvocation} from './demo-sequence.mjs';
 import {spawn} from 'node:child_process';
 import {createModelManager,demoModels} from './demo-models.mjs';
 import {prepareLocalDemoFunds} from './demo-fixture.mjs';
@@ -50,7 +50,8 @@ try{for(const [index,name] of steps.entries()){
  const start=Date.now(),log=directory+'/'+String(index+1).padStart(2,'0')+'-'+name.replaceAll(':','-')+(attempt>1?'-attempt-'+attempt:'')+'.log';
  console.log('START '+name);
  const code=await new Promise((done,reject)=>{
-  active=spawn(process.execPath,[process.env.npm_execpath||'node_modules/npm/bin/npm-cli.js','run',name,...(name==='demo:showcase'?['--','--fresh']:[])],{stdio:['ignore','pipe','pipe']});
+  const invocation=demoInvocation(name);
+  active=spawn(invocation.command,invocation.args,{stdio:['ignore','pipe','pipe']});
   let output='';for(const stream of [active.stdout,active.stderr])stream.on('data',chunk=>{output+=chunk.toString();});
   active.once('error',reject);active.once('close',async code=>{await writeFile(log,output);done(code??1);});
  });

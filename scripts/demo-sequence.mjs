@@ -1,3 +1,8 @@
 // Every acceptance demo belongs here; lifecycle commands are intentionally excluded.
 export const demoSteps=['demo:doctor','test:api','demo','demo:deadline','demo:wallet','demo:reconcile','demo:prefund','demo:vault','demo:workflow','demo:workflow-configurable','demo:workflow-parallel','demo:workflow-suppliers','demo:workflow-templates','demo:workflow-planning','demo:memory','demo:plugins','demo:plugin-purchases','demo:service-plans','demo:service-templates','demo:mixed','demo:mixed-planning','demo:business-wizard','demo:plugin-memory','demo:treasury-business','demo:usdc-monitor','demo:service-replanning','demo:service-auto-repair','demo:workflow-replanning','demo:auto-repair','demo:queue','demo:consumer','demo:chain','demo:data','demo:model','demo:identity','demo:supplier','demo:multi-supplier','demo:quotes','demo:skill','demo:planning','demo:quote-planning','demo:purchase-routes','demo:showcase','demo:evidence','demo:cre','demo:cre-dispatcher','demo:doctor','demo:x402','demo:ccip','demo:business-authorizations','demo:business-repair','demo:monitor-renewal','demo:business-review','demo:business-archives','demo:local-business','demo:monitor-repair','demo:browser-business'];
 export const lifecycleDemos=new Set(['demo:start','demo:prepare','demo:full','demo:isolated','demo:cleanup']);
+
+export function demoInvocation(name,{npmExecPath=process.env.npm_execpath,node=process.execPath}={}){
+ const args=['run',name,...(name==='demo:showcase'?['--','--fresh']:[])];
+ return npmExecPath?{command:node,args:[npmExecPath,...args]}:{command:'npm',args};
+}
