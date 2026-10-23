@@ -1,5 +1,7 @@
 # AgentOS 开发与验收追踪
 
+2026-10-23 全部历史验收型 demo 已重跑 **57/57**，含 CRE dry-run 和完整浏览器；修复及旧实例离线状态见 [本次完整回归](FULL_HISTORY_ACCEPTANCE_2026-10-23.md)。
+
 2026-10-23 P3：[CCIP 本地双链任务消息原型及验收边界](CCIP_LOCAL.md)。
 
 2026-10-23 P1/P2 当前实现与验收：[x402 恢复及本地 Data Feeds](P1_P2_LOCAL_ACCEPTANCE_2026-10-23.md)。原实例恢复与 P0 历史验收入口：[P0 本地验收基线](P0_LOCAL_ACCEPTANCE_2026-10-23.md)。以下旧测试数量、旧实例状态与历史表格不代表当前完整回归结果。
