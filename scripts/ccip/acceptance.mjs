@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {encodeAbiParameters,zeroAddress} from 'viem';
+import {decodeAbiParameters,encodeAbiParameters,zeroAddress} from 'viem';
 import {createCCIPFixture} from './local-fixture.mjs';
 import {Journal} from '../x402/storage.mjs';
 
@@ -13,6 +13,8 @@ export async function runCCIPAcceptance(onCheck=()=>{}){
  const reserve=c=>c.read(c.lane,'reserved');
  const deny=(c,address,functionName,args,reason)=>assert.rejects(c.client.simulateContract({account:c.owner,address,abi:c.abis.get(address),functionName,args}),new RegExp(reason));
  const fresh=(m,label)=>({...m,messageId:f.id(label)});
+ const payloadType=[{type:'tuple',components:[{name:'kind',type:'uint8'},{name:'id',type:'bytes32'},{name:'amount',type:'uint256'},{name:'expires',type:'uint64'},{name:'spec',type:'bytes32'},{name:'accepted',type:'bool'},{name:'output',type:'bytes32'}]}];
+ const altered=(m,label,changes)=>({...fresh(m,label),data:encodeAbiParameters(payloadType,[{...decodeAbiParameters(payloadType,m.data)[0],...changes}])});
  try {
   assert.notEqual(await a.client.getChainId(),await b.client.getChainId());
   const id=f.id('primary'),[auth]=await f.authorize(id);
@@ -26,7 +28,10 @@ export async function runCCIPAcceptance(onCheck=()=>{}){
   assert.equal(await reserve(a),1_000_000n);assert.equal((await f.task(b,id))[3],0);
   await a.provider.request({method:'evm_increaseTime',params:[60]});await a.provider.request({method:'evm_mine',params:[]});
   assert.equal(await reserve(a),1_000_000n);check('delayed authorization keeps A budget reserved without timeout release');
-  await f.deliver(b,auth);await f.deliver(b,auth);await f.deliver(b,fresh(auth,'semantic-auth-retry'));
+  await f.deliver(b,auth);
+  await deny(b,b.router,'deliver',[b.lane,altered(auth,'changed-terms',{amount:2_000_000n})],'terms mismatch');
+  await deny(b,b.router,'deliver',[b.lane,altered(auth,'early-ack',{kind:4})],'unexpected ack');
+  await f.deliver(b,auth);await f.deliver(b,fresh(auth,'semantic-auth-retry'));
   assert.equal(await reserve(b),1_000_000n);
   await b.tx(b.lane,'execute',[id]);await deny(b,b.lane,'execute',[id],'not executable');
   check('transport and business duplicates cannot reserve or execute twice');
@@ -42,7 +47,9 @@ export async function runCCIPAcceptance(onCheck=()=>{}){
   assert.equal(await reserve(b),0n);assert.equal(await b.read(b.token,'balanceOf',[b.seller]),1_000_000n);
   check('durable relay journal reopen and retry after mined-before-checkpoint crash settle once');
   const [retryResult]=await f.messages(b,await b.tx(b.lane,'resend',[id]));
-  await f.roundtrip(retryResult);await f.deliver(b,ack);assert.equal(await reserve(b),0n);
+  await f.roundtrip(retryResult);await f.deliver(b,ack);
+  await deny(a,a.router,'deliver',[a.lane,altered(result,'conflicting-result',{accepted:false})],'conflicting result');
+  check('reject modified task terms, ACK before settlement and conflicting terminal results');assert.equal(await reserve(b),0n);
   check('lost result or ACK recovers through resend; duplicate results and ACKs are idempotent');
 
   const rev=f.id('revoke-before-auth'),[oldAuth]=await f.authorize(rev);
@@ -88,7 +95,17 @@ export async function runCCIPAcceptance(onCheck=()=>{}){
   assert.equal(await b.read(b.token,'balanceOf',[b.seller]),1_000_000n);
   assert.equal(await b.read(b.token,'balanceOf',[b.escrow]),0n);
   const opened=await b.client.getContractEvents({address:b.escrow,abi:b.abis.get(b.escrow),eventName:'Opened',fromBlock:0n});assert.equal(opened.length,3);
-  check('final conservation: A unchanged, B pays once and refunds twice, escrow empty, no pending reserves');
-  return {passed:true,scope:'Two independent in-process EVMs and privileged local Mock Routers; application state machine only',chains:[{chainId:a.chainId,selector:a.selector.toString(),lane:a.lane,vault:a.vault},{chainId:b.chainId,selector:b.selector.toString(),lane:b.lane,vault:b.vault}],checks,final:{aVault:f.cap.toString(),bVault:(f.cap-1_000_000n).toString(),bSeller:'1000000',aReserved:'0',bReserved:'0',opened:opened.length},realCCIPNetworkAccepted:false,cleanup:{rpcPortsOpened:0,childProcessesStarted:0,evmsDisconnected:true,relayJournalRemoved:true}};
+  const timeout=f.id('funded-timeout'),[timeoutAuth]=await f.authorize(timeout);
+  await f.deliver(b,timeoutAuth);await b.tx(b.lane,'execute',[timeout]);
+  await b.provider.request({method:'evm_increaseTime',params:[4000]});await b.provider.request({method:'evm_mine',params:[]});
+  await b.tx(b.escrow,'refundExpired',[timeout]);
+  assert.equal(await reserve(a),1_000_000n);assert.equal(await reserve(b),1_000_000n);
+  const [timeoutResult]=await f.messages(b,await b.tx(b.lane,'collect',[timeout]));await f.roundtrip(timeoutResult);
+  assert.equal(await reserve(a),0n);assert.equal(await reserve(b),0n);
+  assert.equal(await b.read(b.token,'balanceOf',[b.vault]),f.cap-1_000_000n);
+  check('funded worker timeout refunds only through local Escrow; cross-chain budgets wait for result and ACK');
+  const finalOpened=await b.client.getContractEvents({address:b.escrow,abi:b.abis.get(b.escrow),eventName:'Opened',fromBlock:0n});assert.equal(finalOpened.length,4);
+  check('final conservation: A unchanged, B pays once and refunds three times, escrow empty, no pending reserves');
+  return {passed:true,scope:'Two independent in-process EVMs and privileged local Mock Routers; application state machine only',chains:[{chainId:a.chainId,selector:a.selector.toString(),lane:a.lane,vault:a.vault},{chainId:b.chainId,selector:b.selector.toString(),lane:b.lane,vault:b.vault}],checks,final:{aVault:f.cap.toString(),bVault:(f.cap-1_000_000n).toString(),bSeller:'1000000',aReserved:'0',bReserved:'0',opened:finalOpened.length},realCCIPNetworkAccepted:false,cleanup:{rpcPortsOpened:0,childProcessesStarted:0,evmsDisconnected:true,relayJournalRemoved:true}};
  } finally {journal?.close();await f.close();rmSync(directory,{recursive:true,force:true});}
 }

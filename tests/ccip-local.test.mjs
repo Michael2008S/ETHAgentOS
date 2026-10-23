@@ -22,5 +22,5 @@ test('CCIP local A authorization → B Vault escrow → result/ack retains pendi
 
 import {runCCIPAcceptance} from '../scripts/ccip/acceptance.mjs';
 test('CCIP local security, ordering, revocation, pending budgets and failure recovery',async()=>{
- const report=await runCCIPAcceptance();assert.equal(report.passed,true);assert.equal(report.checks.length,10);assert.equal(report.realCCIPNetworkAccepted,false);
+ const report=await runCCIPAcceptance();assert.equal(report.passed,true);assert.equal(report.checks.length,12);assert.equal(report.realCCIPNetworkAccepted,false);
 });

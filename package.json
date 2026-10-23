@@ -95,7 +95,8 @@
     "demo:local-business": "node scripts/demo-local-business-loop.mjs",
     "demo:monitor-repair": "node scripts/demo-monitor-repair.mjs",
     "demo:browser-business": "node scripts/demo-browser-business.mjs",
-    "demo:x402": "node scripts/demo-x402.mjs"
+    "demo:x402": "node scripts/demo-x402.mjs",
+    "demo:ccip": "node scripts/demo-ccip.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
