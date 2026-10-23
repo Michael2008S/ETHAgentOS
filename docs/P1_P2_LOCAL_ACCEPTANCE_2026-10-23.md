@@ -85,4 +85,4 @@ AGENTOS_DEMO_COMMITTED_SOURCE=1 npm run demo:x402
 
 ## 保留的边界
 
-原实例继续保留 P0 源码和运行数据，原 9455 内存链不得停止。本轮功能运行于新建的独立实例，不能将 checkout 的更新当作原实例已经升级。完整演示显式排除两个外部 CRE HTTPS 阶段；公网部署、公共链 Feed、生产支付和任意第三方 Facilitator 均不在本轮验收。CCIP 仍未实现。
+原实例继续保留 P0 源码和运行数据，原 9455 内存链不得停止。本轮功能运行于新建的独立实例，不能将 checkout 的更新当作原实例已经升级。完整演示显式排除两个外部 CRE HTTPS 阶段；公网部署、公共链 Feed、生产支付和任意第三方 Facilitator 均不在本轮验收。本阶段结束时 CCIP 尚未实现；后续本地原型、API 和网页进度见 [当前产品入口](LOCAL_PRODUCT_ACCEPTANCE_2026-10-23.md)。

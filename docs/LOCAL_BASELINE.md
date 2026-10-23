@@ -30,3 +30,11 @@ npm run validate:local -- all
 core 包含严格 lint、全部 Node 测试、CRE SDK 测试、网站/CRE 类型检查、生产构建；browser 包含常规 Chromium 测试集；demo 包含全部历史验收型 demo。浏览器和 demo 均显式绑定所选基线，按需管理模型。报告固定 commit、源码摘要、运行路径及日志哈希；要求干净工作区；产品代码变化必须先 upgrade。仅 README.md 或 docs/ 下 Markdown 变更可继续使用已校验快照，报告分别记录 runtimeCommit、checkoutCommit、documentationOnly 及变更文件，不将文档提交冒充运行代码提交，阶段之间若代码变动则停止，不将不同版本结果混为一次验收。
 
 公网部署、真实资产、真实 CCIP/Feed 和 DON 结算均继续后置。各阶段记录是特定提交的验收，不应将旧测试数量或旧服务状态当作当前状态。
+
+## 保留业务基线与验收实例
+
+`validate:local` 会使用当前工作目录的 `.sites-runtime/local-baseline/current.json`。完整浏览器和 demo 会创建实际测试采购、消耗日毛额度，并在监管阶段停止/恢复该实例。保留业务基线不会自动补充额度或续权；不要把已消费日额度的业务实例反复当成新测试夹具。
+
+本轮完整验收在独立 Git 工作树内运行：浏览器与完整 demo 使用分别新建的持久化双链实例；该工作树的临时基线只指向完整 demo 实例，主工作区的业务基线和旧指针不变。`demo:operations` 必须与显式 `--runtime` 指向同一所选实例，不能在另一套基线上运行。持续观测使用另一固定工作树，避免共享 HEAD 变动中止。每个报告保留提交、源码摘要与实际运行路径，不混合版本时长。
+
+当前保留基线已升级到产品及浏览器驱动提交 `bab2e270b4694a02621ca5387fc263ff9f9726b6`，保持停止。升级先备份再复制到新目录，业务表及 99 个插件文件已逐项核对，旧副本与归档保留。当前最终验收进度以 [本地产品验收](LOCAL_PRODUCT_ACCEPTANCE_2026-10-23.md) 为准。
