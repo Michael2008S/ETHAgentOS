@@ -12,7 +12,8 @@ export class Journal {
  }
  get(namespace,id){const row=this.db.prepare('SELECT data FROM records WHERE namespace=? AND id=?').get(namespace,id);return row?JSON.parse(row.data):undefined;}
  put(namespace,id,value){this.db.prepare('INSERT INTO records VALUES(?,?,?) ON CONFLICT(namespace,id) DO UPDATE SET data=excluded.data').run(namespace,id,JSON.stringify(value));return value;}
+ entries(namespace){return this.db.prepare('SELECT id,data FROM records WHERE namespace=? ORDER BY id').all(namespace).map(r=>({id:r.id,value:JSON.parse(r.data)}));}
  rows(namespace){return this.db.prepare('SELECT data FROM records WHERE namespace=? ORDER BY id').all(namespace).map(r=>JSON.parse(r.data));}
  transaction(fn){this.db.exec('BEGIN IMMEDIATE');try{const value=fn();this.db.exec('COMMIT');return value;}catch(error){this.db.exec('ROLLBACK');throw error;}}
- close(){this.db.close();}
+ close(){if(this.db.isOpen)this.db.close();}
 }
