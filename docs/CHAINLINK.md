@@ -44,4 +44,4 @@ YAML 结构来自[官方模板](https://github.com/smartcontractkit/cre-template
 
 ERC-8004 身份适配器位于 `sdk/identity.ts` 与 `sdk/agent-identity.ts`。已完成官方注册表的本地 EVM 注册、补齐 registrations、工作区签名绑定、订单身份快照、已付款反馈及撤销；公共测试网待验收。详见 `IDENTITY.md`。身份协议本身不承担付款。[ERC-8004 规范](https://ercs.ethereum.org/ERCS/erc-8004)。
 
-公共接收合约、R2 不可变证据发布、结算事件发现和可复用分发入口已实现。分发器已通过实际临时 HTTPS/workerd/R2 与本地 EVM 的官方 CLI dry-run，尚未完成实际公网部署/DON 验收，详见 [PUBLIC-CRE](PUBLIC-CRE.md)。
+公共接收合约、不可变证据发布、结算事件发现和可复用分发入口已实现。分发器已有临时 HTTPS/workerd/R2 与本地 EVM 的官方 CLI dry-run 记录；后续 Sepolia receiver 和 Worker+D1 部署的实际进度见 [Sepolia 验收记录](SEPOLIA_DEMO_ACCEPTANCE.md)。DON 部署与已注资结算仍待验收，不能把历史 dry-run 等同于这些验收。协议设计与阶段记录见 [PUBLIC-CRE](PUBLIC-CRE.md)。

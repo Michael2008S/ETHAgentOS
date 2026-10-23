@@ -1,6 +1,8 @@
 # 验证记录
 
-## 当前 41 步本地交付（2026-10-22）
+2026-10-23 当前验收以 [P0 本地验收基线](P0_LOCAL_ACCEPTANCE_2026-10-23.md) 为准。下文各阶段记录保留历史测试数量与执行范围，不合并为同一次回归。
+
+## 历史 41 步本地交付（2026-10-22）
 
 实现提交 709bcd39ed5c88804fb5cc49948634a01e20f650，源码摘要 6a6b846789adac5402160a68a7471adc0e66e0bc722967c0d02532473fce01bd。香港时间 14:04:26–14:27:21，最终 41/41 code=0；最终 doctor 九项服务 ready=true、warnings=[]。报告 outputs/full-demo-68ac37bf-7900-4cd9-a6f5-2daf67354a3b/report.json；同目录 verification.json 比对全部命令、源码快照、日志、39 份子报告快照及 SHA-256。
 
@@ -161,8 +163,8 @@
 ## 尚未执行
 
 - 真实 DON 部署及 execution 验证。CRE CLI dry-run 与 SDK/CLI WASM 编译已于 2026-10-19 通过。
-- 公共测试网合约部署、真实浏览器扩展签名与持续链重组监控。网页本地测试钱包、服务端复核签名、预注资后台执行与 D1 凭证历史已验收。
-- ERC-8004 公共测试网注册与信誉；本地 EVM 的官方注册表流程已验证。CCIP、Data Feeds、x402 尚未实现。
+- 真实浏览器扩展签名、公共资金结算及持续链重组监控仍待验收。已发生的 Sepolia 身份注册及 receiver 部署见 `SEPOLIA_DEMO_ACCEPTANCE.md`，与本地测试钱包和 D1 凭证验收分别记录。
+- ERC-8004 已有 Sepolia 身份注册证据；公共信誉及完整结算链路仍待验收。CCIP、Data Feeds 尚未实现；x402 本地采购、Vault 托管、交付验收与失败退款已实现并有独立 demo。
 - 第三方安全审计、任意外部 Agent 或 LLM 的攻击评测、生产负载测试。
 
 网页与合约采用不同的演示单位：网页是整数分 testUSD，合约是 token 最小单位。接入 adapter 时必须读取并校验 decimals，不能直接复用网页金额。

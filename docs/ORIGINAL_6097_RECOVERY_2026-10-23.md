@@ -55,6 +55,7 @@ AGENTOS_CHAIN_URL=http://127.0.0.1:9455 \
 node scripts/demo-local-business-loop.mjs
 
 # Supply the passed report emitted by the preceding command.
+AGENTOS_BROWSER_PRESERVE_HISTORY=1 \
 AGENTOS_BUSINESS_REPORT=outputs/local-business-loop-a930b44d-bf82-4530-a583-0eb1d4862723.json \
 AGENTOS_TEST_URL=http://127.0.0.1:6097 \
 PLAYWRIGHT_BROWSERS_PATH="$PWD/.sites-runtime/playwright-browsers" \
