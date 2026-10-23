@@ -17,7 +17,7 @@ export function x402SupplierHooks(store:X402AuthorityStore,config:SupplierConfig
   const ticket=tickets.get(body);if(!ticket)throw new DomainError('x402 execution ticket unavailable.','SUPPLIER_REJECTED');
   const response=await request(new URL('/v1/x402-evidence',config.url),{method:'POST',redirect:'manual',headers:{'Content-Type':'application/json','x-agentos-x402-ticket':ticket.token},body:JSON.stringify({jobId:supplierJobId(body),requestHash:await digest(body)}),signal:AbortSignal.timeout(5000)});
   if(!response.ok)throw new DomainError('Original x402 procurement evidence awaits recovery.','SUPPLIER_UNAVAILABLE');
-  const evidence=await verifyX402Evidence(await json(response),body,policy);if(evidence.terms.payment)await verifyX402Payment(client,evidence);await saveX402Evidence(store.database,ticket.owner,evidence);
+  const evidence=await verifyX402Evidence(await json(response),body,policy);if(evidence.terms.payment)await verifyX402Payment(client,evidence,body.quote?.payload.priceSnapshot,policy.dataFeeds);await saveX402Evidence(store.database,ticket.owner,evidence);
   if(delivery&&(!evidence.terms.payment||!evidence.terms.report||evidence.terms.report.terms.outputHash!==delivery.payload.outputHash))throw new DomainError('Supplier delivery has no matching paid x402 report.','SUPPLIER_REJECTED');
  }};
 }

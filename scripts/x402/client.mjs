@@ -10,7 +10,7 @@ import {reportMessage} from './report-service.mjs';
 
 const jsonSafe=v=>JSON.parse(JSON.stringify(v,(_k,x)=>typeof x==='bigint'?x.toString():x));
 /** The only component holding the supplier's procurement EOA. Never receives a Vault key. */
-export function procurementClient({policy,account,client,store,authorize,afterPersist=async()=>{},afterPayment=async()=>{}}){
+export function procurementClient({policy,account,client,store,authorize,afterPersist=async()=>{},afterPayment=async()=>{},beforePurchase=async()=>{}}){
  const locks=new Map();
  async function execute(request,ticket){
   const id=request.jobId,binding={jobId:id,inputHash:request.inputHash,requestHash:await digest(request),policyHash:await digest(policy),network:policy.network,asset:policy.asset,payer:account.address.toLowerCase()};
@@ -22,6 +22,7 @@ export function procurementClient({policy,account,client,store,authorize,afterPe
   if(row?.report)return {report:row.report,payment:row.payment};
   await authorize(ticket,{action:'preflight',jobId:id});
   if(!row){
+   await beforePurchase();
    const response=await fetch(policy.upstreamOrigin+policy.path,{method:'POST',redirect:'manual',headers:{'Content-Type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(10000)});
    if(response.status!==402){await response.body?.cancel();throw Object.assign(Error('Configured x402 service did not offer a payment challenge.'),{terminal:response.status<500});}
    let required;try{const header=response.headers.get('PAYMENT-REQUIRED');if(!header||header.length>16384)throw Error();required=decodePaymentRequiredHeader(header);}finally{await response.body?.cancel();}
@@ -44,6 +45,7 @@ export function procurementClient({policy,account,client,store,authorize,afterPe
    row=store.update(id,{payload,state:'authorized'});await afterPersist(row);
   }
   for(let attempt=0;attempt<policy.maxTransportRetries;attempt++){
+   if(!row.payment)await beforePurchase();
    await authorize(ticket,{action:'commit',jobId:id,nonce:row.payload.payload.authorization.nonce,intentHash:await digest(row.intent??store.get('purchases',id).intent)});
    try{
     row=store.update(id,{state:row.payment?'paid':'submitted'});

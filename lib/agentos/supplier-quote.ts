@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {dataFeedSnapshotSchema} from './data-feeds.ts';
 import {verifyMessage,type Address,type Hex} from 'viem';
 import {canonical,deliveryVerification,resultHash} from '../../cre/workflow/verify.ts';
 import {digest,DomainError} from './engine.ts';
@@ -11,7 +12,7 @@ import type {ChainOrder} from './orders.ts';
 const address=z.string().regex(/^0x[0-9a-fA-F]{40}$/).refine(s=>!/^0x0{40}$/.test(s)).transform(s=>s.toLowerCase() as Address),hash=z.string().regex(/^0x[0-9a-f]{64}$/).transform(s=>s as Hex),integer=z.number().int().positive().safe();
 export const supplierQuoteRequestSchema=z.object({version:z.literal('agentos.skill-quote-request.v1'),requestId:z.string().uuid(),workspaceHash:hash,buyer:address,payer:address,chainId:integer,escrow:address,token:address,agentId:z.string().min(1).max(128),skill:skillIdSchema,inputHash:hash,verificationHash:hash,registry:address,registryAgentId:z.string().regex(/^(0|[1-9][0-9]{0,77})$/).refine(v=>BigInt(v)<2n**256n),identityOwner:address,seller:address,documentHash:hash,supplierId:z.string().regex(/^[a-z0-9-]{1,64}$/),configHash:hash}).strict();
 export type SupplierQuoteRequest=z.infer<typeof supplierQuoteRequestSchema>;
-export const supplierQuoteSchema=z.object({payload:z.object({version:z.literal('agentos.skill-quote.v1'),request:supplierQuoteRequestSchema,priceCents:integer.max(1000000),issuedAt:integer,expiresAt:integer}).strict(),signature:z.string().regex(/^0x[0-9a-fA-F]{130}$/).transform(v=>v as Hex)}).strict();
+export const supplierQuoteSchema=z.object({payload:z.object({version:z.literal('agentos.skill-quote.v1'),request:supplierQuoteRequestSchema,priceCents:integer.max(1000000),priceSnapshot:dataFeedSnapshotSchema.optional(),issuedAt:integer,expiresAt:integer}).strict(),signature:z.string().regex(/^0x[0-9a-fA-F]{130}$/).transform(v=>v as Hex)}).strict();
 export type SupplierQuote=z.infer<typeof supplierQuoteSchema>;
 export const supplierQuoteMessage=(payload:SupplierQuote['payload'])=>'AgentOS supplier quote v1\n'+canonical(payload);
 export const supplierQuoteRequestKey=(request:SupplierQuoteRequest)=>'quote-'+resultHash(request);

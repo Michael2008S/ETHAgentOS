@@ -1,4 +1,10 @@
 {
+  "Local Mock Feed snapshot": "本地模拟价格快照",
+  "Gas ceiling estimate": "Gas 费用上限估算",
+  "Feed updated": "价格更新时间",
+  "Feed risk enabled": "汇率风控已启用",
+  "Feed display only": "仅展示汇率",
+  "Supplier gas · USD at quote": "供应商 Gas 美元成本（报价汇率）",
   "Mission control": "任务总览",
   "Task manager": "任务管理",
   "Agents": "智能体",

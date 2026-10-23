@@ -36,9 +36,10 @@ export async function startLocalSupplier({port=7461,runtimeRoot=resolve('.sites-
   const args=[BigInt(request.registryAgentId)],baseIdentity={address:request.registry,abi:identityABI,args},[owner,wallet,uri,metadata,block]=await Promise.all([client.readContract({...baseIdentity,functionName:'ownerOf'}),client.readContract({...baseIdentity,functionName:'getAgentWallet'}),client.readContract({...baseIdentity,functionName:'tokenURI'}),client.readContract({address:request.registry,abi:identityABI,functionName:'getMetadata',args:[args[0],SUPPLIER_METADATA_KEY]}),client.getBlock()]);
   if(owner.toLowerCase()!==request.identityOwner||wallet.toLowerCase()!==request.seller||keccak256(stringToHex(uri))!==request.documentHash||metadata.toLowerCase()!==supplierMetadata(descriptor).toLowerCase())throw Object.assign(new Error('quote authority'),{status:409});
   if(request.payer!==request.buyer&&(!deployment.vault||request.payer!==deployment.vault.toLowerCase()||(await client.readContract({address:deployment.vault,abi:vaultABI,functionName:'owner'})).toLowerCase()!==request.buyer))throw Object.assign(new Error('quote payer'),{status:409});
+  const priceSnapshot=await fulfillment?.quoteSnapshot?.();
   const key=supplierQuoteRequestKey(request),path=join(runtimeRoot,key+'.json'),now=Number(block.timestamp);
   try{return await verifySupplierQuote(JSON.parse(await readFile(path,'utf8')),request,descriptor,now);}catch(error){if(error.code!=='ENOENT')throw error;}
-  const payload={version:'agentos.skill-quote.v1',request,priceCents:pricing[request.skill],issuedAt:now,expiresAt:now+(mode==='short-quote'?30:quoteTTL)},offer={payload,signature:await account.signMessage({message:supplierQuoteMessage(payload)})};await writeAtomic(path,offer);return offer;
+  const payload={version:'agentos.skill-quote.v1',request,priceCents:pricing[request.skill],...(priceSnapshot?{priceSnapshot}:{}),issuedAt:now,expiresAt:now+(mode==='short-quote'?30:quoteTTL)},offer={payload,signature:await account.signMessage({message:supplierQuoteMessage(payload)})};await writeAtomic(path,offer);return offer;
  }
  async function execute(request,fault,ticket){
   const input=normalizeInput(request.input);if(await digest(input)!==request.inputHash||canonical(request.supplier)!==canonical(descriptor)||!descriptor.skills.includes(request.skill))throw Object.assign(new Error('request commitment'),{status:409});
@@ -75,6 +76,7 @@ export async function startLocalSupplier({port=7461,runtimeRoot=resolve('.sites-
    const path=new URL(req.url,base).pathname;
    if(req.method==='GET'&&path==='/config')return json(200,config);
       if(req.method==='GET'&&path==='/v1/x402-policy'&&fulfillment)return json(200,fulfillment.policy);
+   if(req.method==='GET'&&path==='/v1/data-feeds'&&fulfillment?.feedStatus)return json(200,await fulfillment.feedStatus());
    if(req.method==='GET'&&path==='/catalog')return json(200,[config,...peerConfigurations]);
    if(req.method==='GET'&&path==='/health')return json(200,{status:'ok',supplier:descriptor.id});
    if(req.method==='GET'&&path==='/stats'){const files=(await readdir(runtimeRoot)).filter(f=>/^[0-9a-f]{64}\.json$/.test(f));return json(200,{jobs:files.length,quotes:(await readdir(runtimeRoot)).filter(f=>/^quote-0x[0-9a-f]{64}\.json$/.test(f)).length,quoteRequests:Object.fromEntries(quoteAttempts),requests:Object.fromEntries(attempts),mode});}

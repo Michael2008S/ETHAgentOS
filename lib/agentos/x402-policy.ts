@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {dataFeedConfigSchema} from './data-feeds.ts';
 import {digest,DomainError,normalizeInput} from './engine.ts';
 import {canonical} from '../../cre/workflow/verify.ts';
 import {transferSourceSchema} from './transfer-source.ts';
@@ -16,7 +17,7 @@ export const x402PolicySchema=z.object({
  name:z.literal('DemoUSDC'),domainVersion:z.literal('1'),decimals:z.literal(6),
  maxAmount:amount,dailyAmount:amount,authorizationSeconds:z.number().int().min(10).max(60),
  maxAuthorizations:z.literal(1),maxTransportRetries:z.number().int().min(1).max(3),
- refundLiability:z.literal('supplier'),inputDisclosure:z.literal('reviewed-input-to-configured-provider'),
+ dataFeeds:dataFeedConfigSchema.optional(),refundLiability:z.literal('supplier'),inputDisclosure:z.literal('reviewed-input-to-configured-provider'),
 }).strict().refine(v=>BigInt(v.dailyAmount)>=BigInt(v.maxAmount),'Daily procurement cap must cover one purchase.');
 export type X402Policy=z.infer<typeof x402PolicySchema>;
 export const x402PolicyHash=async(p:X402Policy)=>digest(x402PolicySchema.parse(p));
