@@ -1,5 +1,7 @@
 # 验证记录
 
+2026-10-23 P3：[CCIP 本地双链任务消息原型及验收边界](CCIP_LOCAL.md)。
+
 2026-10-23 当前功能验收见 [P1/P2 本地验收](P1_P2_LOCAL_ACCEPTANCE_2026-10-23.md)，原实例恢复见 [P0 本地验收基线](P0_LOCAL_ACCEPTANCE_2026-10-23.md)。下文各阶段记录保留历史测试数量与执行范围，不合并为同一次回归。
 
 ## 历史 41 步本地交付（2026-10-22）
@@ -164,7 +166,7 @@
 
 - 真实 DON 部署及 execution 验证。CRE CLI dry-run 与 SDK/CLI WASM 编译已于 2026-10-19 通过。
 - 真实浏览器扩展签名、公共资金结算及持续链重组监控仍待验收。已发生的 Sepolia 身份注册及 receiver 部署见 `SEPOLIA_DEMO_ACCEPTANCE.md`，与本地测试钱包和 D1 凭证验收分别记录。
-- ERC-8004 已有 Sepolia 身份注册证据；公共信誉及完整结算链路仍待验收。CCIP 尚未实现；Data Feeds 已有本地 Mock 的 gas 美元展示与脱锚风控，真实网络 Feed 待接入。x402 本地采购、Vault 托管、交付验收、失败退款及恢复互操作已有验收。
+- ERC-8004 已有 Sepolia 身份注册证据；公共信誉及完整结算链路仍待验收。CCIP 已有[本地双链任务消息原型](CCIP_LOCAL.md)，真实 CCIP 网络尚未验收；Data Feeds 已有本地 Mock 的 gas 美元展示与脱锚风控，真实网络 Feed 待接入。x402 本地采购、Vault 托管、交付验收、失败退款及恢复互操作已有验收。
 - 第三方安全审计、任意外部 Agent 或 LLM 的攻击评测、生产负载测试。
 
 网页与合约采用不同的演示单位：网页是整数分 testUSD，合约是 token 最小单位。接入 adapter 时必须读取并校验 decimals，不能直接复用网页金额。

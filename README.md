@@ -36,7 +36,7 @@
 
 **沙盒任务与链上订单是两条独立链路。** 沙盒使用 testUSD 积分；预注资订单通过真实 EVM 托管测试代币。两个内置技能及按需安装的版本化扩展可分析内置或用户提交的转账记录，可选择内置适配器或受授权的独立 HTTP 供应商。预注资订单可选择真实 LLM 工具规划，服务端负责权限校验与独立复算；模型不签名、不计算最终金额。智能体档案可绑定真实 ERC-8004 注册表身份快照。任务由服务端后台推进，关闭浏览器不影响当前执行。请求中止或服务重启后，持久检查点可通过恢复 API 或本地恢复 worker 继续。自定义业务 Agent 绑定已安装的版本化技能；通用 JavaScript 插件通过独立的受限 QuickJS 执行，当前付款仍仅限本地环境。
 
-Solidity 已在本地 EVM 中测试；CRE 工作流已通过 SDK 与官方 CLI 编译及 HTTPS/EVM capability dry-run。x402 已实现本地测试代币采购、Vault 托管、独立验收与失败退款；Data Feeds 已有 ETH/USD gas 美元展示及 USDC/USD 风控的本地 Mock 版本；CCIP 尚未实现。历史 Sepolia 身份注册、未绑定 receiver 和 Worker+D1 证据服务的进度见 [公共验收记录](docs/SEPOLIA_DEMO_ACCEPTANCE.md)；这些不代表 DON 部署或已注资付款验收。真实浏览器钱包扩展、公共资金结算和生产调度仍待验证。沙盒积分与链上资金分别记账，界面收据不能替代链上证明。本轮仅做本地恢复与验收，不新增公网部署；P1/P2 当前实现及验收见 [本地验收记录](docs/P1_P2_LOCAL_ACCEPTANCE_2026-10-23.md)，原实例恢复记录见 [P0 本地验收](docs/P0_LOCAL_ACCEPTANCE_2026-10-23.md)。
+Solidity 已在本地 EVM 中测试；CRE 工作流已通过 SDK 与官方 CLI 编译及 HTTPS/EVM capability dry-run。x402 已实现本地测试代币采购、Vault 托管、独立验收与失败退款；Data Feeds 已有 ETH/USD gas 美元展示及 USDC/USD 风控的本地 Mock 版本；CCIP 已有[本地双链任务消息原型](docs/CCIP_LOCAL.md)，真实 CCIP 网络尚未验收。历史 Sepolia 身份注册、未绑定 receiver 和 Worker+D1 证据服务的进度见 [公共验收记录](docs/SEPOLIA_DEMO_ACCEPTANCE.md)；这些不代表 DON 部署或已注资付款验收。真实浏览器钱包扩展、公共资金结算和生产调度仍待验证。沙盒积分与链上资金分别记账，界面收据不能替代链上证明。本轮仅做本地实现与验收，不新增公网部署；P1/P2 当前实现及验收见 [本地验收记录](docs/P1_P2_LOCAL_ACCEPTANCE_2026-10-23.md)，原实例恢复记录见 [P0 本地验收](docs/P0_LOCAL_ACCEPTANCE_2026-10-23.md)。
 
 ## 运行
 
