@@ -10,7 +10,7 @@
 
 ## 当前入口
 
-- 当前保留的隔离网页：<http://127.0.0.1:6097/>，支持中英文；工作区保留任务、身份、评价及链上凭证。准确入口以 `.sites-runtime/isolated-demo/current.json` 为准，不要在已有健康实例旁重复启动默认端口实例。
+- 当前基线按需启动：`npm run baseline -- start`；`npm run baseline -- status` 显示实际地址。旧 6097/9455 仅作历史归档。当前选择以 `.sites-runtime/local-baseline/current.json` 的 runtimePath 为准，不要在已有健康实例旁重复启动默认端口实例。
 - 当前本地 EVM：`127.0.0.1:9455`。此链是临时链，重启会重建部署；旧 D1 记录仍保留原部署信息，需要重新注册/绑定身份和新建订单。全新默认环境的端口仍为网页 5177、链 8545。
 - Qwen：`127.0.0.1:11435`，真实 llama.cpp CPU 推理。
 - 工作流规划模型：`127.0.0.1:11436`，独立的固定版本 Qwen 3B；默认 macOS GPU offload，可切换 CPU。
@@ -71,7 +71,7 @@ npm run demo:evidence
 
 ## 验证命令
 
-服务和模型文件准备完成且 CRE 已登录后，使用 `npm run demo:full -- --runtime .sites-runtime/isolated-demo/current.json --manage-models` 串行执行当前完整 47 步，按场景启动和释放模型。日志及报告保存到 `outputs/full-demo-*/`，单元、类型、构建和浏览器回归另行执行；浏览器也支持同一 `--runtime`。失败立即停止。仅在源码、链部署和服务实例保持不变时，使用相同 `--runtime` 加 `--resume outputs/full-demo-<id>/report.json` 显式续跑，保留 failedAttempts；实现变化后必须从第一步重跑。
+服务和模型文件准备完成且 CRE 已登录后，使用 `npm run validate:local -- demo` 串行执行当前完整序列，按场景启动和释放模型。日志及报告保存到 `outputs/full-demo-*/`，单元、类型、构建和浏览器回归另行执行；浏览器也支持同一 `--runtime`。失败立即停止。仅在源码、链部署和服务实例保持不变时，使用相同 `--runtime` 加 `--resume outputs/full-demo-<id>/report.json` 显式续跑，保留 failedAttempts；实现变化后必须从第一步重跑。
 
 历史 37 步记录：`4ccad5b` 的 37 项最终步骤全部通过；完整 228 Node、21 Chromium、6 CRE SDK 回归及类型/构建也通过。第 35 步曾因默认 UDP DNS 失败，在同源码下经进程级网络参数续跑成功，原失败保留。报告及精确配置在 `outputs/full-demo-8001b0aa-da62-4655-bf28-b885ad6b3f44/`，详见 ROADMAP-IMPLEMENTATION.md 的最终验收。
 
@@ -115,7 +115,7 @@ HTTP demo 使用独立测试工作区。链上集成 demo 使用本地测试代�
 
 ## 按场景管理模型
 
-完整验收可使用 `npm run demo:full -- --runtime .sites-runtime/isolated-demo/current.json --manage-models`；浏览器使用 `npm run test:browser -- --runtime .sites-runtime/isolated-demo/current.json --manage-models`。原有启动方式保持兼容。
+完整验收可使用 `npm run validate:local -- demo`；浏览器使用 `npm run validate:local -- browser`。原有启动方式保持兼容。
 
 管理器仅启动当前关卡需要的模型并在不再需要时停止；首尾 doctor 仍同时核验三个真实模型，验收关卡没有删减。规划、并行规划和修复使用规划模型，语义记忆使用 embedding，其余模型场景使用基础模型。浏览器每例结束释放本次启动的模型。日志和 PID 启停记录保留在 outputs。
 
@@ -136,7 +136,7 @@ HTTP demo 使用独立测试工作区。链上集成 demo 使用本地测试代�
 
 按需模型按钮需要另一个终端运行 `npm run models:control`（回环 6100）；它仅管理固定三种本项目模型，空闲五分钟后释放自己启动的模型。模型停止时确定性业务仍可运行，规划和语义功能会如实提示未就绪。控制器常驻不代表模型占用内存。
 
-收据驱动的界面检查：先运行组合 demo，再将产出的证据路径传给 `AGENTOS_BUSINESS_REPORT=outputs/local-business-loop-<id>.json node scripts/test-browser.mjs --runtime .sites-runtime/isolated-demo/current.json --grep 'local business closed loop'`。覆盖 65% 参数刷新、0.29% 精确阈值、修复时间线、人工处置持久化、中英文和移动布局；此用例没有证据参数时跳过。
+收据驱动的界面检查：先运行组合 demo，再将产出的证据路径传给 `AGENTOS_BUSINESS_REPORT=outputs/local-business-loop-<id>.json node scripts/test-browser.mjs --runtime <profile.runtimePath> --grep 'local business closed loop'`。覆盖 65% 参数刷新、0.29% 精确阈值、修复时间线、人工处置持久化、中英文和移动布局；此用例没有证据参数时跳过。
 
 最新组合验收为实现 d5a7ac7，八项通过；47 步全量序列的历史记录仍是 266c833，不应当作此轮重新执行的全回归。当前代码、证据及清理结果见 VALIDATION.md。公共链、DON、托管部署和调度继续暂缓。
 

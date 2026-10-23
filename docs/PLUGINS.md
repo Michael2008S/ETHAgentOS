@@ -17,7 +17,7 @@ AGENTOS_APP_ORIGIN=http://127.0.0.1:5887 npm run plugins:local
 
 The reference MCP service listens on 11439 and the plugin service on 11438. The MCP fixture reads the actual configured local-chain Vault balance at a specific block. Its separately advertised synthetic write tool is deliberately unavailable to plugins. `demo:start` starts/reuses matching default services and refuses an occupied service bound to another app or chain. A new `demo:isolated` uses separate plugin/MCP ports derived from its web port, preserves all older instances, and records their URLs. Browser/full-demo profiles carry those URLs. Runtime status and doctor include the execution service; the plugin catalogue performs actual MCP discovery when explicitly requested.
 
-Use `.sites-runtime/isolated-demo/current.json` as the authoritative current profile. The retained 5887 instance has standalone plugin/MCP services on 11438/11439; its older launcher does not own these later auxiliary processes. Stop only the matching owned processes when upgrading them. Journals remain under ignored `.sites-runtime/plugins/journal/` with mode-0600 files and a mode-0700 directory. No hosted deployment or unattended schedule is enabled.
+Current managed operation: `npm run baseline -- start`, `npm run baseline -- status`, `npm run baseline -- stop`. Use the selected runtimePath from `.sites-runtime/local-baseline/current.json` for direct browser commands; this pointer is a profile, not a runtime.json. Historical ports and standalone examples below do not select the current baseline. Journals and signing identities remain private and are preserved by baseline backups.
 
 The plugin runtime pins its execution source files and dependency lockfile into its revision. Its descriptor also binds the execution origin, trusted application callback origin, engine and tools. Source changes make health/catalogue/capability checks unavailable until that owned service is restarted. New code or tool versions require a matching reviewed grant; old receipts retain their historical runtime hash.
 
@@ -75,7 +75,8 @@ Receipts bind job, scope, input, manifest, runtime, output, ordered actual tool 
 ```sh
 node --test tests/plugin-runtime.test.mjs tests/browser-runtime.test.mjs
 npm run demo:plugins
-npm run test:browser -- --runtime .sites-runtime/isolated-demo/current.json --grep 'generic plugin'
+npm run validate:local -- browser
+# Direct focused browser run: pass the profile runtimePath to --runtime; append --grep 'generic plugin'
 ```
 
 Core tests execute real QuickJS and SQLite and an official SDK MCP fixture, covering resources, host/module access, orphan calls, verifier rejection, lost CAS, quotas, revocation, stale leases, deadline handling, raw schema-document drift and a service restart with a persistent result. The unit fixture's chain snapshot is controlled; the HTTP demo reads actual local EVM contracts through a separate MCP process and the app's real lease callback. Its six groups preserve Vault balance, block height, zero chain orders/transactions/signatures and an empty queue. Browser acceptance covers explicit review, lost grant/create replies, reload, final-slot recovery, real MCP output, queued revocation, bilingual text and mobile width.

@@ -201,7 +201,7 @@ console.log(result.status, result.receipt);
 
 真实业务数据：钱包页可选择「以太坊 USDC · 真实来源」，导入指定地址的已最终确认事件。保留原始金额、区块和交易证据，并在创建任务前重新复核。`npm run demo:data` 实跑真实主网读取 → HTTP/D1 资金流报告 → 独立临时链完整成果付款；费用网络与数据来源网络分别标明，见 [REAL-DATA](docs/REAL-DATA.md)。
 
-Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/链上每日额度并签名会话，随后选择该会话创建自动注资订单，后续采购无需逐单签名。撤销阻止新注资，已注资订单保留原结算条件，退款回到 Vault 且不补回已用额度。配置与边界见 [VAULT](docs/VAULT.md)。`npm run demo:isolated` 使用 5187/8555/7471/7472 和独立数据库、双供应商进程，不覆盖已有环境；运行 `npm run demo:vault` 验证采购与退款。最终完整演示使用启用身份的隔离实例及 `npm run demo:full -- --runtime .sites-runtime/isolated-demo/current.json`；Vault 专项的跳过身份模式不算完整演示。
+Vault 连续采购：钱包页可存入测试代币、设置单笔/会话总额/链上每日额度并签名会话，随后选择该会话创建自动注资订单，后续采购无需逐单签名。撤销阻止新注资，已注资订单保留原结算条件，退款回到 Vault 且不补回已用额度。配置与边界见 [VAULT](docs/VAULT.md)。`npm run demo:isolated` 使用 5187/8555/7471/7472 和独立数据库、双供应商进程，不覆盖已有环境；运行 `npm run demo:vault` 验证采购与退款。最终完整演示使用启用身份的隔离实例及 `npm run validate:local -- demo`；Vault 专项的跳过身份模式不算完整演示。
 
 x402 本地采购：运行 `npm run demo:x402`，自动启动独立的 HTTP/D1/EVM 实例，演示 USDC 国库报告的正常付款、错误报告退款和付款后丢失响应恢复，并完成中英文及移动端浏览器检查。用户每单固定托管 1.00 DemoUSDC，上游 0.20 由供应商自有钱包支付；失败时用户本金全额退 Vault，上游成本及采购结算的原生 gas 由供应商承担；首次存款和授权等钱包交易的 gas 单列。三单预期为用户托管 3.00、支付 2.00、退款 1.00，上游支出另记 0.60。演示使用历史 finalized USDC 样本回放及本地测试代币，结束后保留证据并停止本轮服务，不覆盖当前实例。设计、启动选项与验收边界见 [接入方案](docs/X402-INTEGRATION-DESIGN.md) 和 [实现记录](docs/X402-IMPLEMENTATION.md)。
 

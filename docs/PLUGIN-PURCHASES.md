@@ -61,6 +61,6 @@ Vault 的可选 `pluginPermissions` 每项绑定 pluginId、manifestHash、runti
 
 浏览器专项已实际覆盖两步付款、一次会话签名、超额零授权拒绝、编辑清空权限、创建响应丢失、刷新后最后一次执行额度重试、完整交付哈希/父付款、撤销、中英文和手机宽度。全部浏览器回归、完整 Node/CRE/类型/构建及 37 步 demo 的最终证据见 ROADMAP-IMPLEMENTATION.md；单项通过不代表整套通过。模型仅在模型场景需要时启动，结束后停掉；公网验收继续暂缓。
 
-已有数据库仅追加 drizzle/0006_natural_archangel.sql，先做在线备份并核对既有工作区/作业快照；不要重放完整 fresh schema。本次新建的隔离数据库执行全部迁移，旧实例的 D1 文件未改动。当前受支持入口和端口以 .sites-runtime/isolated-demo/current.json 为准。
+已有数据库仅追加 drizzle/0006_natural_archangel.sql，先做在线备份并核对既有工作区/作业快照；不要重放完整 fresh schema。本次新建的隔离数据库执行全部迁移，旧实例的 D1 文件未改动。当前基线通过 npm run baseline -- status 查看，所选实例以 .sites-runtime/local-baseline/current.json 的 runtimePath 为准。
 
 为使完整交付的链上哈希稳定，attestation 的字段集合、signer checksum 拼写、签名小写 hex、v=27/28 与 low-S 均采用规范格式。测试先证明高-S 等价签名在密码学上仍有效，再验证协议拒绝它，避免同一执行被换成不同凭证字节。签名身份仍然仅是已配置服务的身份，不是硬件证明或 DON 签名。
