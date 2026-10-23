@@ -10,7 +10,10 @@ import {ccipTerminal} from '../lib/agentos/ccip-tasks.ts';
 import {verifyDemoSource} from './demo-source.mjs';
 import {resumeTestRuntime,stopTestRuntime} from './runtime-resume.mjs';
 const sleep=ms=>new Promise(done=>setTimeout(done,ms));
-export function soakCoverage(samples,elapsedMs,requiredMs){return {elapsedMs,requiredMs,sampleCount:samples.length,passed:elapsedMs>=requiredMs&&samples.length>=Math.floor(requiredMs/15000)*0.8&&samples.every(s=>s.ok)};}
+export function soakCoverage(samples,elapsedMs,requiredMs){
+ const times=[0,...samples.map(s=>s.elapsedMs),elapsedMs],ordered=times.every((t,i)=>Number.isFinite(t)&&t>=0&&(i===0||t>=times[i-1])),maxGapMs=ordered?Math.max(...times.slice(1).map((t,i)=>t-times[i])):null;
+ return {elapsedMs,requiredMs,sampleCount:samples.length,maxGapMs,observedSpanMs:samples.length>1?samples.at(-1).elapsedMs-samples[0].elapsedMs:0,passed:ordered&&elapsedMs>=requiredMs&&samples.length>=Math.floor(requiredMs/15000)*0.8&&maxGapMs<=60000&&samples.every(s=>s.ok)};
+}
 export async function runProductSoak(path,{seconds=7200,smoke=false,stopRuntime=false}={}){
  if(!Number.isInteger(seconds)||seconds<(smoke?60:7200)||seconds>86400)throw Error('Acceptance needs at least 7200 real seconds; --smoke is only a driver check.');
  path=resolve(path);let runtime=JSON.parse(await readFile(path)),source=await verifyDemoSource(runtime.sourceSnapshot);
