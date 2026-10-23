@@ -18,6 +18,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.3.8'
+      - run: npm run lint -- --max-warnings 0
       - run: npm test
       - run: npm run test:cre
       - run: npm run typecheck

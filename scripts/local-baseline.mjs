@@ -1,9 +1,10 @@
-import {readFile,writeFile,mkdir,readdir,cp,chmod,appendFile,open} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,readdir,cp,chmod,appendFile,open,rm} from 'node:fs/promises';
 import {resolve,join,dirname} from 'node:path';
 import {spawn} from 'node:child_process';
 import {createConnection} from 'node:net';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
+import {syncDemoSource} from './demo-source.mjs';
 import {stopTestRuntime} from './runtime-resume.mjs';
 import {backupRuntime,restoreRuntime} from './runtime-backup.mjs';
 const base=resolve('.sites-runtime/local-baseline'),pointer=base+'/current.json';
@@ -49,9 +50,13 @@ export async function baseline(action){
   const r=JSON.parse(await readFile(record.runtimePath)),child=await launch([r.launcherSnapshot,'--resume',record.runtimePath],process.env,base+'/resume.log');await awaitRuntime(record.runtimePath,child.pid);
   const after=await inspectRuntime(record.runtimePath);if(JSON.stringify(record.chain.config)!==JSON.stringify(after.chain.config))throw Error('Deployment changed.');
   const anchor=record.lastStoppedChain??record.chain,response=await fetch(after.services.find(s=>s.field==='chainURL')?JSON.parse(await readFile(record.runtimePath)).chainURL+'/rpc':'',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_getBlockByNumber',params:[anchor.number,false]})});if((await response.json()).result?.hash!==anchor.hash)throw Error('Historical chain anchor changed.');
+ }else if(action==='upgrade'){
+  if(before.services.some(s=>s.listening))throw Error('Stop baseline before upgrading.');
+  const backup=await backupRuntime(record.runtimePath,base+'/pre-upgrade-'+crypto.randomUUID()),restored=await restoreRuntime(backup.backup,resolve('.sites-runtime/isolated-demo/upgraded-'+crypto.randomUUID()));
+  const r=JSON.parse(await readFile(restored.runtimePath));await rm(r.sourceSnapshot,{recursive:true});record.source=await syncDemoSource(r.sourceSnapshot,{committed:true});r.launcherSnapshot=r.sourceSnapshot+'/scripts/demo-isolated.mjs';await writeFile(restored.runtimePath,JSON.stringify(r,null,2),{mode:0o600});record.previousRuntimePaths=[...(record.previousRuntimePaths??[]),record.runtimePath];record.runtimePath=restored.runtimePath;await writeFile(pointer,JSON.stringify(record,null,2),{mode:0o600});await event(action,'after',{backup:backup.backup,runtimePath:record.runtimePath,source:record.source});return record;
  }else if(action==='backup'){const result=await backupRuntime(record.runtimePath,base+'/backup-'+crypto.randomUUID());await event(action,'after',result);return result;}
  else if(action==='restore'){const backup=process.env.AGENTOS_BASELINE_BACKUP;if(!backup)throw Error('Set AGENTOS_BASELINE_BACKUP to a verified backup directory.');const result=await restoreRuntime(backup,resolve('.sites-runtime/isolated-demo/restored-'+crypto.randomUUID()));record.previousRuntimePaths=[...(record.previousRuntimePaths??[]),record.runtimePath];record.runtimePath=result.runtimePath;await writeFile(pointer,JSON.stringify(record,null,2),{mode:0o600});await event(action,'after',result);return result;}
- else throw Error('Use init/start/stop/status/backup/restore.');
+ else throw Error('Use init/start/stop/status/backup/restore/upgrade.');
  const after=await inspectRuntime(record.runtimePath);await event(action,'after',{state:after});return after;
 }
 if(process.argv[1]===fileURLToPath(import.meta.url))baseline(process.argv[2]||'status').then(value=>console.log(JSON.stringify(value,null,2))).catch(error=>{console.error(error.message);process.exitCode=1;});
