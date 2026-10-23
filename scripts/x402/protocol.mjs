@@ -19,10 +19,10 @@ export async function createPayload(policy,requirements,resource,account,payment
  return {...result,accepted:r,resource,extensions};
 }
 export async function checkPayloadSignature(payload,requirements){
- if(payload.x402Version!==2||canonical(payload.accepted)!==canonical(requirements))throw Error('x402 payment requirements differ.');
+ if(payload.x402Version!==2||canonical(payload.accepted)!==canonical(requirements))throw Object.assign(Error('x402 payment requirements differ.'),{status:400});
  const {authorization:a,signature}=payload.payload;
  const valid=await verifyTypedData({address:a.from,domain:{name:requirements.extra.name,version:requirements.extra.version,chainId:31337,verifyingContract:requirements.asset},types:authorizationTypes,primaryType:'TransferWithAuthorization',message:{...a,value:BigInt(a.value),validAfter:BigInt(a.validAfter),validBefore:BigInt(a.validBefore)},signature});
- if(!valid)throw Error('Invalid x402 payment signature.');
+ if(!valid)throw Object.assign(Error('Invalid x402 payment signature.'),{status:400});
  return a;
 }
 /** A token nonce and a canonical Transfer must agree; a facilitator's JSON is not proof. */
@@ -45,7 +45,7 @@ export function facilitator(signer,client,token,journal){
   const key=await digest(payload),old=journal.get('settlements',key),prior=await reconcilePayment(client,token,payload,old?.transaction);
   if(prior)return prior;
   const result=await scheme.settle(payload,r);journal.put('settlements',key,result);
-  if(!result.success)throw Error('Official x402 settlement failed: '+result.errorReason);
+  if(!result.success)throw Object.assign(Error('Official x402 settlement failed: '+result.errorReason),{status:503});
   const proof=await reconcilePayment(client,token,payload,result.transaction);if(!proof)throw Error('x402 payment not confirmed.');return proof;
  });pending=run.catch(()=>{});return run;}};
 }

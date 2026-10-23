@@ -16,9 +16,10 @@ export async function startFacilitator({client,wallet,asset,payTo,port=0,journal
   if(req.method!=='POST'||!['/verify','/settle'].includes(path))return json(404,{});
   const b=await readJson(req),r=x402RequirementsSchema.parse(b.paymentRequirements);
   if(r.asset!==asset.toLowerCase()||r.payTo!==payTo.toLowerCase())return json(403,{});
-  await gas.reconcile();
-  const result=path==='/verify'?await sdk.verify(b.paymentPayload,r):await sdk.settle(b.paymentPayload,r);
-  json(200,result);
+  try{await gas.reconcile();
+   const result=path==='/verify'?await sdk.verify(b.paymentPayload,r):await sdk.settle(b.paymentPayload,r);
+   json(200,result);
+  }catch(error){if(!error.status)error.status=503;throw error;}
  },port);
  return {...server,close:async()=>{await server.close();journal.close();}};
 }
