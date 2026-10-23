@@ -18,6 +18,7 @@ test('CCIP business uses atomic D1 jobs, independent verification, durable two-c
   assert.equal((await get(bad.id)).status,'refunded');assert.equal((await get(bad.id)).reservedCents,0);
   const cancelled=await createCCIPTask(store,'owner',ccipDraft(),async()=>deployment);await store.updateWorkspace('owner',s=>{const j=ccipJob(s,cancelled.id);j.cancelRequested=true;j.status='cancelling';return s;});await runCCIPTask(store,'owner',cancelled.id,transport);assert.equal((await get(cancelled.id)).status,'cancelled');
   assert.equal(workItems((await store.read('owner')).state).filter(j=>j.kind==='ccip').length,0);assert.equal(store.db.prepare("SELECT COUNT(*) n FROM agentos_runtime_jobs WHERE kind='ccip' AND status='pending'").get().n,0);
+  const historical=service.store.get('jobs',created.chainTaskId);delete historical.finalized;historical.job.createdAt=new Date(Date.now()-120000).toISOString();service.store.put('jobs',created.chainTaskId,historical);const reconciled=await(await fetch(service.base+'/health')).json();assert.ok(!reconciled.alerts.includes('ccip-pending-over-60s'));
   await service.fixture.b.tx(deployment.b.vault,'revoke',[deployment.b.lane]);const health=await(await fetch(service.base+'/health')).json();assert.equal(health.newExecutionAllowed,false);assert.ok(health.alerts.includes('ccip-grant-expired'));await assert.rejects(readLocalCCIPDeployment(service.base),/budget blocks/);assert.equal((await get(created.id)).status,'completed');
  }finally{await service?.close();store.close();await rm(root,{recursive:true,force:true});}
 });

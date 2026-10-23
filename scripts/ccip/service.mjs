@@ -61,7 +61,9 @@ export async function startCCIPService({root,port=0,appOrigin='http://127.0.0.1:
   const allowedRPC=new Set(['eth_chainId','eth_call','eth_getBlockByNumber','eth_getBlockByHash','eth_getTransactionReceipt','eth_getLogs','eth_getCode','eth_blockNumber']);
   server=await localServer(async(req,json)=>{
    if(req.method==='GET'&&req.url==='/health'){
-    const jobs=store.rows('jobs'),pending=jobs.filter(j=>!j.finalized),now=BigInt(Math.floor(Date.now()/1000)),grant=await b.read(b.vault,'grants',[b.lane]),balance=await b.read(b.token,'balanceOf',[b.vault]),reserved=await b.read(b.lane,'reserved'),spent=await b.read(b.vault,'spent',[b.lane,now/86400n]);
+    const jobs=store.rows('jobs');
+    for(const row of jobs.filter(j=>!j.finalized)){const [at,bt]=await Promise.all([f.task(a,row.job.chainTaskId),f.task(b,row.job.chainTaskId)]);if(at[3]===5&&[0,5].includes(bt[3])){row.finalized=true;store.put('jobs',row.job.chainTaskId,row);}}
+    const pending=jobs.filter(j=>!j.finalized),now=BigInt(Math.floor(Date.now()/1000)),grant=await b.read(b.vault,'grants',[b.lane]),balance=await b.read(b.token,'balanceOf',[b.vault]),reserved=await b.read(b.lane,'reserved'),spent=await b.read(b.vault,'spent',[b.lane,now/86400n]);
     const alerts=[];if(grant[2]<=now||grant[0]===0n)alerts.push('ccip-grant-expired');if(spent>=grant[1]||balance<=reserved)alerts.push('ccip-budget-capacity');if(jobs.length>=800)alerts.push('ccip-history-capacity');if(pending.some(j=>Date.now()-Date.parse(j.job.createdAt)>60000))alerts.push('ccip-pending-over-60s');
     return json(200,{status:'ok',version:config.version,localMock:true,jobs:jobs.length,pending:pending.length,alerts,newExecutionAllowed:!alerts.some(a=>['ccip-grant-expired','ccip-budget-capacity'].includes(a)),capacity:{jobs:jobs.length,jobLimit:1000,balance:balance.toString(),reserved:reserved.toString(),dailySpent:spent.toString(),dailyLimit:grant[1].toString(),grantExpires:grant[2].toString()}});
    }
